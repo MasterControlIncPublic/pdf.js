@@ -204,6 +204,7 @@ PDFPrintService.prototype = {
 
 let print = window.print;
 window.print = function print() {
+  return; // Dont allow printing of Basic MC Refence PDF
   if (activeService) {
     console.warn('Ignored window.print() because of a pending print job.');
     return;

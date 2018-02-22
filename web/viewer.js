@@ -17,7 +17,7 @@
 'use strict';
 
 if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('CHROME')) {
-  var defaultUrl; // eslint-disable-line no-var
+  let defaultUrl; // eslint-disable-line no-var
 
   (function rewriteUrlClosure() {
     // Run this code outside DOMContentLoaded to make sure that the URL
