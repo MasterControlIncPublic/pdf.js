@@ -573,7 +573,7 @@ let PDFViewerApplication = {
       // Embedded PDF viewers should not be changing their parent page's title.
       return;
     }
-    var documentTitle = _ui_utils.getDocumentTitle();
+    var documentTitle = getDocumentTitle();
     document.title = documentTitle;
   },
 

@@ -14,8 +14,8 @@
  */
 
 import {
-  approximateFraction, CSS_UNITS, DEFAULT_SCALE, getOutputScale, NullL10n,
-  RendererType, roundToDivide, TextLayerMode
+  approximateFraction, CSS_UNITS, DEFAULT_SCALE, getOutputScale, getWatermarkText,
+  NullL10n, RendererType, roundToDivide, TextLayerMode
 } from './ui_utils';
 import {
   createPromiseCapability, RenderingCancelledException, SVGGraphics
@@ -397,7 +397,7 @@ class PDFPageView {
       textLayerDiv.style.height = canvasWrapper.style.height;
 
       var textLayerWatermark = document.createElement('p');
-      var waterMarkText = _ui_utils.getWatermarkText();
+      var waterMarkText = getWatermarkText();
       textLayerWatermark.className = 'mcWatermark';
       textLayerWatermark.innerHTML = waterMarkText;
       textLayerDiv.appendChild(textLayerWatermark);
