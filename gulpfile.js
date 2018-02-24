@@ -18,6 +18,7 @@
 
 'use strict';
 
+var artifactoryUpload = require('gulp-artifactory-upload');
 var autoprefixer = require('autoprefixer');
 var fancylog = require('fancy-log');
 var fs = require('fs');
@@ -52,6 +53,7 @@ var GENERIC_DIR = BUILD_DIR + 'generic/';
 var COMPONENTS_DIR = BUILD_DIR + 'components/';
 var IMAGE_DECODERS_DIR = BUILD_DIR + 'image_decoders';
 var MINIFIED_DIR = BUILD_DIR + 'minified/';
+var MC_DIR = BUILD_DIR + 'PDFjs/';
 var JSDOC_BUILD_DIR = BUILD_DIR + 'jsdoc/';
 var GH_PAGES_DIR = BUILD_DIR + 'gh-pages/';
 var SRC_DIR = 'src/';
@@ -65,6 +67,8 @@ var MOZCENTRAL_DIFF_FILE = 'mozcentral.diff';
 
 var REPO = 'git@github.com:mozilla/pdf.js.git';
 var DIST_REPO_URL = 'https://github.com/mozilla/pdfjs-dist';
+var FORK_REPO = 'https://github.com/MasterControlInc/pdf.js.git';
+var ARTIFACTORY_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-release-local/';
 
 var builder = require('./external/builder/builder.js');
 
@@ -203,6 +207,33 @@ function webpack2Stream(config) {
 
 function getVersionJSON() {
   return JSON.parse(fs.readFileSync(BUILD_DIR + 'version.json').toString());
+}
+
+function getTargetName() {
+  return 'mcPDFjs-' + getVersionJSON().version + '.zip';
+}
+
+function getDeployUrl() {
+  var version = getVersionJSON().version;
+  return ARTIFACTORY_REPO_URL + 'com/mastercontrol/mcPDFjs/' + version;
+}
+
+function commitAndTag() {
+  var VERSION = getVersionJSON().version;
+
+  console.log();
+  console.log('### Committing changes');
+
+  var reason = process.env['PDFJS_UPDATE_REASON'];
+  var message = 'mcPDF.js version ' + VERSION + (reason ? ' - ' + reason : '');
+  safeSpawnSync('git', ['add', '-u']);
+  safeSpawnSync('git', ['commit', '-am', message]);
+  safeSpawnSync('git', ['tag', '-a', 'v' + VERSION, '-m', message]);
+
+  console.log();
+  console.log('Done. Push with');
+  console.log('  git push --tags ' + FORK_REPO + ' mc-master');
+  console.log();
 }
 
 function checkChromePreferencesFile(chromePrefsPath, webPrefsPath) {
@@ -623,8 +654,6 @@ gulp.task('generic', ['buildnumber', 'locale'], function () {
         .pipe(postcss([autoprefixer(AUTOPREFIXER_CONFIG)]))
         .pipe(gulp.dest(GENERIC_DIR + 'web')),
 
-    gulp.src('web/compressed.tracemonkey-pldi-09.pdf')
-        .pipe(gulp.dest(GENERIC_DIR + 'web')),
   ]);
 });
 
@@ -688,8 +717,6 @@ gulp.task('minified-pre', ['buildnumber', 'locale'], function () {
         .pipe(postcss([autoprefixer(AUTOPREFIXER_CONFIG)]))
         .pipe(gulp.dest(MINIFIED_DIR + 'web')),
 
-    gulp.src('web/compressed.tracemonkey-pldi-09.pdf')
-        .pipe(gulp.dest(MINIFIED_DIR + 'web')),
   ]);
 });
 
@@ -967,6 +994,31 @@ gulp.task('publish', ['generic'], function (done) {
           done();
         });
     });
+});
+
+gulp.task('mc-build', ['minified'], function() {
+  var targetName = getTargetName();
+  return gulp.src(BUILD_DIR + 'minified/**')
+    .pipe(gulp.dest(MC_DIR))
+    .on('end', function () {
+      gulp.src(MC_DIR + '**', { base: BUILD_DIR, })
+        .pipe(zip(targetName))
+        .pipe(gulp.dest(BUILD_DIR))
+        .on('end', function () {
+          console.log('Built distribution file: ' + targetName);
+        })});
+});
+
+gulp.task('mc-deploy', ['mc-build'], function(done) {
+  var deployUrl = getDeployUrl();
+  commitAndTag();
+  return gulp.src(BUILD_DIR + getTargetName())
+    .pipe(artifactoryUpload({
+      url: deployUrl,
+      username: process.env.artifactory_username,
+      password: process.env.artifactory_password,
+    }))
+    .on('error', gutil.log);
 });
 
 gulp.task('testing-pre', function() {
