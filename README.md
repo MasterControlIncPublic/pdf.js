@@ -1,6 +1,58 @@
 # MasterControl Fork info
 We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch. 
 
+## MC Contribution guidelines
+**DO NOT** commit **ANYTHING** to _origin/master_.
+
+**DO NOT** use merge commits. We want to keep a linear history of the MasterControl change set.
+
+**DO** use rebasing to update to the current state of the upstream repository.
+
+**DO** full validation before pushing changes to mc-master.
+
+**DO** treat mc-master as if it is MasterControl/master.
+#### Instructions for updating to current state of upstream: 
+###### If you do not feel comfortable with updating the repository, **please** reach out for help on #labs slack channel.
+###### TL;DR - Use the git commands in the [next section](#gitcommands).
+###### Note: _origin_ will reference the MasterControl fork, _upstream_ will reference the Mozilla main repository.
+1. Clone the MasterControl fork (_origin_)
+2. Add the Mozilla repository as a remote (_upstream_)
+3. Fetch objects from upstream
+4. Rebase the _origin/master_ onto onto _upstream/master_ 
+    * There **SHOULD NOT** be any conflicts since _origin/master_ should not have any commits from us.
+5. Push updates to _origin/master_
+6. Check out _origin/mc-master_
+7. Rebase _origin/mc-master_ onto _origin/master_
+    * This is where conflicts **COULD** occur. Generally, changes made by MasterControl will resolve easily, and changes from _upstream_ can be brought into _origin_ by manually resolving differences between the change sets, and ensuring that any changes made on _origin_ are included in the manual merge.
+8. Resolve conflicts during the rebase.
+9. Once finished rebasing, checkout your own dev branch. (**DO NOT** push the rebase directly to _mc-master_. You will pull your hair out if resolving conflicts broke something.
+10. Make your changes as usual and commit to your dev branch.
+11. Submit Pull Request to _mc-master_ and have code review and independent validation completed.
+12. Squash/Fast-Forward your dev branch and merge into _mc-master_.
+13. :fireworks: :joy: :tada: :grinning: :confetti_ball: :raised_hands: :sunglasses: :dancer:
+
+####  <a name="gitcommands"></a>Git commands for updating
+###### assuming use of ssh keys for authentication
+###### if not, use `https://github.com/MasterControlInc/pdf.js.git`
+```
+git clone git@github.com:MasterControlInc/pdf.js.git
+git remote add upstream git@github.com:mozilla/pdf.js.git
+git fetch upstream
+git rebase upstream/master
+git push
+git checkout mc-master
+git rebase origin/master
+<resolve merge conflicts>
+git checkout -b <my dev branch>
+<do your development and commit to <my dev branch> >
+git push -u origin <my dev branch>
+<complete full validation that nothing is broken on <my dev branch> >
+<submit pull request from <my dev branch> to mc-master for code review>
+<complete code review and rework>
+<squash/fast-forward changes from <my dev branch> and merge merge pull request into mc-master>
+<ceeeelebrate good times, COME ON!>
+```
+
 ### Building during development
 To build for use in MasterControl during developmental testing you can run
 
