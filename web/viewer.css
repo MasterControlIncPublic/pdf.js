@@ -426,6 +426,10 @@ html[dir='rtl'] .secondaryToolbar {
   margin-bottom: -4px;
 }
 
+.secondaryToolbarButtonIcon {
+  padding-right: 7px;
+}
+
 .doorHanger,
 .doorHangerRight {
   border: 1px solid hsla(0,0%,0%,.5);
@@ -658,7 +662,7 @@ html[dir='rtl'] .splitToolbarButtonSeparator {
   padding: 2px 6px 0;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: hsla(0,0%,100%,.8);
+  color: hsla(208, 28%, 20%);
   font-size: 12px;
   line-height: 14px;
   -webkit-user-select: none;
@@ -763,7 +767,7 @@ html[dir='rtl'] .dropdownToolbarButton {
 .dropdownToolbarButton > select {
   min-width: 140px;
   font-size: 12px;
-  color: hsl(0,0%,95%);
+  color: hsl(208, 28%, 20%);
   margin: 0;
   padding: 3px 2px 2px;
   border: none;
@@ -1046,7 +1050,7 @@ html[dir='rtl'] .verticalToolbarSeparator {
   border-color: hsla(0,0%,0%,.32) hsla(0,0%,0%,.38) hsla(0,0%,0%,.42);
   box-shadow: 0 1px 0 hsla(0,0%,0%,.05) inset,
               0 1px 0 hsla(0,0%,100%,.05);
-  color: hsl(0,0%,95%);
+  color: hsl(208, 28%, 20%);
   font-size: 12px;
   line-height: 14px;
   outline-style: none;
@@ -1095,7 +1099,7 @@ html[dir='rtl'] .verticalToolbarSeparator {
   margin: 4px 2px 4px 0;
   border: 1px solid transparent;
   border-radius: 2px;
-  color: hsl(0,0%,85%);
+  color: hsl(208, 28%, 20%);
   font-size: 12px;
   line-height: 14px;
   text-align: left;
@@ -1944,7 +1948,7 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
 
 .mcToolbar {
   background-image: none !important;
-  background-color: #34495d !important;
+  background-color: #ffffff !important;
 }
 
 .mcToolbar * button {
@@ -1953,7 +1957,8 @@ html[dir='rtl'] #documentPropertiesOverlay .row > * {
 
 .mcToolbar option{
   background-image: none !important;
-  background-color: #34495d !important;
+  background-color: #ffffff !important;
+  color: hsl(208, 28%, 20%)
 }
 
 
