@@ -67,7 +67,8 @@ var MOZCENTRAL_DIFF_FILE = 'mozcentral.diff';
 
 var REPO = 'git@github.com:mozilla/pdf.js.git';
 var DIST_REPO_URL = 'https://github.com/mozilla/pdfjs-dist';
-var ARTIFACTORY_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-release-local/';
+var ARTIFACTORY_RELEASE_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-release-local/';
+var ARTIFACTORY_SNAPSHOT_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-snapshot-local/';
 
 var builder = require('./external/builder/builder.js');
 
@@ -219,9 +220,16 @@ function getTargetName() {
   return 'mcPDFjs-' + getVersionJSON().version + '.zip';
 }
 
-function getDeployUrl() {
+function getDeployUrl(isRelease = false) {
   var version = getVersionJSON().version;
-  return ARTIFACTORY_REPO_URL + 'com/mastercontrol/mcPDFjs/' + version;
+  var repoURL;
+  if(isRelease){
+    repoURL = ARTIFACTORY_RELEASE_REPO_URL;
+  } else {
+    repoURL = ARTIFACTORY_SNAPSHOT_REPO_URL;
+    version = version + '-SNAPSHOT';
+  }
+  return repoURL + 'com/mastercontrol/mcPDFjs/' + version;
 }
 
 function checkChromePreferencesFile(chromePrefsPath, webPrefsPath) {
