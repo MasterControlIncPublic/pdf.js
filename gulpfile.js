@@ -1017,8 +1017,15 @@ gulp.task('mc-build', ['minified'], function(done) {
     });
 });
 
-gulp.task('mc-deploy', ['mc-build'], function(done) {
-  var deployUrl = getDeployUrl();
+gulp.task('mc-deploy-snapshot', ['mc-build'], function(done) {
+  mcDeploy(getDeployUrl());
+});
+
+gulp.task('mc-deploy-release', ['mc-build'], function(done) {
+  mcDeploy(getDeployUrl(true));
+});
+
+function mcDeploy(deployUrl){
   console.log('### Deploying ' + getTargetName() + ' to ' + deployUrl)
   gulp.src(BUILD_DIR + getTargetName())
     .pipe(artifactoryUpload({
@@ -1026,13 +1033,13 @@ gulp.task('mc-deploy', ['mc-build'], function(done) {
       username: process.env.artifactory_username,
       password: process.env.artifactory_password,
     }))
-    .on('error', gutil.log)
+    .on('error', console.log)
     .on('end', function() {
       console.log('Done uploading ' + getTargetName() + ' to ' + deployUrl);
       console.log('### Please make sure to tag and push!');
       done();
     });
-});
+};
 
 gulp.task('testing-pre', function() {
   process.env['TESTING'] = 'true';
