@@ -31,4 +31,4 @@ gulp.task('build-worker', function() {
     .pipe(gulp.dest(OUTPUT_PATH));
 });
 
-gulp.task('build', ['build-bundle', 'build-worker']);
+gulp.task('build', gulp.series('build-bundle', 'build-worker'));
