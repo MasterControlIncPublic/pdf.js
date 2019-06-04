@@ -919,11 +919,11 @@ html[dir='rtl'] .toolbarButton.pdfSidebarNotification::after {
   white-space: normal;
 }
 html[dir="ltr"] .secondaryToolbarButton {
-  padding-left: 24px;
+  padding-left: 7px;
   text-align: left;
 }
 html[dir="rtl"] .secondaryToolbarButton {
-  padding-right: 24px;
+  padding-right: 7px;
   text-align: right;
 }
 html[dir="ltr"] .secondaryToolbarButton.bookmark {
