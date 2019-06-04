@@ -1018,14 +1018,14 @@ gulp.task('mc-build', ['minified'], function(done) {
 });
 
 gulp.task('mc-deploy-snapshot', ['mc-build'], function(done) {
-  mcDeploy(getDeployUrl());
+  mcDeploy(getDeployUrl(), done);
 });
 
 gulp.task('mc-deploy-release', ['mc-build'], function(done) {
-  mcDeploy(getDeployUrl(true));
+  mcDeploy(getDeployUrl(true), done);
 });
 
-function mcDeploy(deployUrl){
+function mcDeploy(deployUrl, done){
   console.log('### Deploying ' + getTargetName() + ' to ' + deployUrl)
   gulp.src(BUILD_DIR + getTargetName())
     .pipe(artifactoryUpload({
