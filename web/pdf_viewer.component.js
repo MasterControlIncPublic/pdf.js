@@ -12,42 +12,59 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/* eslint-disable no-unused-vars */
 
 import {
-  AnnotationLayerBuilder, DefaultAnnotationLayerFactory
-} from './annotation_layer_builder.js';
-import {
-  DefaultTextLayerFactory, TextLayerBuilder
-} from './text_layer_builder.js';
-import { EventBus, NullL10n, ProgressBar } from './ui_utils.js';
-import { PDFLinkService, SimpleLinkService } from './pdf_link_service.js';
-import { DownloadManager } from './download_manager.js';
-import { GenericL10n } from './genericl10n.js';
-import { PDFFindController } from './pdf_find_controller.js';
-import { PDFHistory } from './pdf_history.js';
-import { PDFPageView } from './pdf_page_view.js';
-import { PDFSinglePageViewer } from './pdf_single_page_viewer';
-import { PDFViewer } from './pdf_viewer.js';
-
-const pdfjsVersion = PDFJSDev.eval('BUNDLE_VERSION');
-const pdfjsBuild = PDFJSDev.eval('BUNDLE_BUILD');
-
-export {
-  PDFViewer,
-  PDFSinglePageViewer,
-  PDFPageView,
-  PDFLinkService,
-  SimpleLinkService,
-  TextLayerBuilder,
-  DefaultTextLayerFactory,
   AnnotationLayerBuilder,
   DefaultAnnotationLayerFactory,
-  PDFHistory,
-  PDFFindController,
-  EventBus,
+} from "./annotation_layer_builder.js";
+import {
+  DefaultStructTreeLayerFactory,
+  StructTreeLayerBuilder,
+} from "./struct_tree_layer_builder.js";
+import {
+  DefaultTextLayerFactory,
+  TextLayerBuilder,
+} from "./text_layer_builder.js";
+import {
+  DefaultXfaLayerFactory,
+  XfaLayerBuilder,
+} from "./xfa_layer_builder.js";
+import { EventBus, ProgressBar } from "./ui_utils.js";
+import { PDFLinkService, SimpleLinkService } from "./pdf_link_service.js";
+import { PDFSinglePageViewer, PDFViewer } from "./pdf_viewer.js";
+import { DownloadManager } from "./download_manager.js";
+import { GenericL10n } from "./genericl10n.js";
+import { NullL10n } from "./l10n_utils.js";
+import { PDFFindController } from "./pdf_find_controller.js";
+import { PDFHistory } from "./pdf_history.js";
+import { PDFPageView } from "./pdf_page_view.js";
+import { PDFScriptingManager } from "./pdf_scripting_manager.js";
+
+// eslint-disable-next-line no-unused-vars
+const pdfjsVersion = PDFJSDev.eval("BUNDLE_VERSION");
+// eslint-disable-next-line no-unused-vars
+const pdfjsBuild = PDFJSDev.eval("BUNDLE_BUILD");
+
+export {
+  AnnotationLayerBuilder,
+  DefaultAnnotationLayerFactory,
+  DefaultStructTreeLayerFactory,
+  DefaultTextLayerFactory,
+  DefaultXfaLayerFactory,
   DownloadManager,
-  ProgressBar,
+  EventBus,
   GenericL10n,
   NullL10n,
+  PDFFindController,
+  PDFHistory,
+  PDFLinkService,
+  PDFPageView,
+  PDFScriptingManager,
+  PDFSinglePageViewer,
+  PDFViewer,
+  ProgressBar,
+  SimpleLinkService,
+  StructTreeLayerBuilder,
+  TextLayerBuilder,
+  XfaLayerBuilder,
 };

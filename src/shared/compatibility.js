@@ -13,215 +13,91 @@
  * limitations under the License.
  */
 
-const globalScope = require('./global_scope');
+import { isNodeJS } from "./is_node.js";
 
-// Skip compatibility checks for the extensions and if we already ran
-// this module.
-if ((typeof PDFJSDev === 'undefined' ||
-     !PDFJSDev.test('FIREFOX || MOZCENTRAL')) &&
-    !globalScope._pdfjsCompatibilityChecked) {
-
-globalScope._pdfjsCompatibilityChecked = true;
-
-// In the Chrome extension, most of the polyfills are unnecessary.
-// We support down to Chrome 49, because it's still commonly used by Windows XP
-// users - https://github.com/mozilla/pdf.js/issues/9397
-if (typeof PDFJSDev === 'undefined' || !PDFJSDev.test('CHROME')) {
-
-const isNodeJS = require('./is_node');
-
-const hasDOM = typeof window === 'object' && typeof document === 'object';
-
-// Support: Node.js
-(function checkNodeBtoa() {
-  if (globalScope.btoa || !isNodeJS()) {
-    return;
+// Skip compatibility checks for modern builds and if we already ran the module.
+if (
+  (typeof PDFJSDev === "undefined" || !PDFJSDev.test("SKIP_BABEL")) &&
+  (typeof globalThis === "undefined" || !globalThis._pdfjsCompatibilityChecked)
+) {
+  // Provides support for `globalThis` in legacy browsers.
+  // Support: Firefox<65, Chrome<71, Safari<12.1, Node.js<12.0.0
+  if (typeof globalThis === "undefined" || globalThis.Math !== Math) {
+    // eslint-disable-next-line no-global-assign
+    globalThis = require("core-js/es/global-this");
   }
-  globalScope.btoa = function(chars) {
-    // eslint-disable-next-line no-undef
-    return Buffer.from(chars, 'binary').toString('base64');
-  };
-})();
+  globalThis._pdfjsCompatibilityChecked = true;
 
-// Support: Node.js
-(function checkNodeAtob() {
-  if (globalScope.atob || !isNodeJS()) {
-    return;
-  }
-  globalScope.atob = function(input) {
-    // eslint-disable-next-line no-undef
-    return Buffer.from(input, 'base64').toString('binary');
-  };
-})();
-
-// Provides document.currentScript support
-// Support: IE, Chrome<29.
-(function checkCurrentScript() {
-  if (!hasDOM) {
-    return;
-  }
-  if ('currentScript' in document) {
-    return;
-  }
-  Object.defineProperty(document, 'currentScript', {
-    get() {
-      var scripts = document.getElementsByTagName('script');
-      return scripts[scripts.length - 1];
-    },
-    enumerable: true,
-    configurable: true,
-  });
-})();
-
-// Provides support for ChildNode.remove in legacy browsers.
-// Support: IE.
-(function checkChildNodeRemove() {
-  if (!hasDOM) {
-    return;
-  }
-  if (typeof Element.prototype.remove !== 'undefined') {
-    return;
-  }
-  Element.prototype.remove = function () {
-    if (this.parentNode) {
-      // eslint-disable-next-line mozilla/avoid-removeChild
-      this.parentNode.removeChild(this);
+  // Support: Node.js
+  (function checkNodeBtoa() {
+    if (globalThis.btoa || !isNodeJS) {
+      return;
     }
-  };
-})();
+    globalThis.btoa = function (chars) {
+      // eslint-disable-next-line no-undef
+      return Buffer.from(chars, "binary").toString("base64");
+    };
+  })();
 
-// Provides support for DOMTokenList.prototype.toggle, with the optional
-// "force" parameter, in legacy browsers.
-// Support: IE
-(function checkDOMTokenListToggle() {
-  if (!hasDOM || isNodeJS()) {
-    return;
-  }
-  const div = document.createElement('div');
-  if (div.classList.toggle('test', 0) === false) {
-    return;
-  }
-  const originalDOMTokenListToggle = DOMTokenList.prototype.toggle;
-
-  DOMTokenList.prototype.toggle = function(token) {
-    if (arguments.length > 1) {
-      const force = !!arguments[1];
-      return (this[force ? 'add' : 'remove'](token), force);
+  // Support: Node.js
+  (function checkNodeAtob() {
+    if (globalThis.atob || !isNodeJS) {
+      return;
     }
-    return originalDOMTokenListToggle(token);
-  };
-})();
+    globalThis.atob = function (input) {
+      // eslint-disable-next-line no-undef
+      return Buffer.from(input, "base64").toString("binary");
+    };
+  })();
 
-// Provides support for String.prototype.includes in legacy browsers.
-// Support: IE, Chrome<41
-(function checkStringIncludes() {
-  if (String.prototype.includes) {
-    return;
-  }
-  require('core-js/fn/string/includes');
-})();
+  // Support: Node.js
+  (function checkDOMMatrix() {
+    if (globalThis.DOMMatrix || !isNodeJS) {
+      return;
+    }
+    globalThis.DOMMatrix = require("dommatrix/dist/dommatrix.js");
+  })();
 
-// Provides support for Array.prototype.includes in legacy browsers.
-// Support: IE, Chrome<47
-(function checkArrayIncludes() {
-  if (Array.prototype.includes) {
-    return;
-  }
-  require('core-js/fn/array/includes');
-})();
+  // Provides support for Object.fromEntries in legacy browsers.
+  // Support: Firefox<63, Chrome<73, Safari<12.1, Node.js<12.0.0
+  (function checkObjectFromEntries() {
+    if (Object.fromEntries) {
+      return;
+    }
+    require("core-js/es/object/from-entries.js");
+  })();
 
-// Provides support for Object.assign in legacy browsers.
-// Support: IE
-(function checkObjectAssign() {
-  if (Object.assign) {
-    return;
-  }
-  require('core-js/fn/object/assign');
-})();
+  // Provides support for *recent* additions to the Promise specification,
+  // however basic Promise support is assumed to be available natively.
+  // Support: Firefox<71, Chrome<76, Safari<13, Node.js<12.9.0
+  (function checkPromise() {
+    if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("IMAGE_DECODERS")) {
+      // The current image decoders are synchronous, hence `Promise` shouldn't
+      // need to be polyfilled for the IMAGE_DECODERS build target.
+      return;
+    }
+    if (globalThis.Promise.allSettled) {
+      return;
+    }
+    globalThis.Promise = require("core-js/es/promise/index.js");
+  })();
 
-// Provides support for Math.log2 in legacy browsers.
-// Support: IE, Chrome<38
-(function checkMathLog2() {
-  if (Math.log2) {
-    return;
-  }
-  Math.log2 = require('core-js/fn/math/log2');
-})();
-
-// Provides support for Number.isNaN in legacy browsers.
-// Support: IE.
-(function checkNumberIsNaN() {
-  if (Number.isNaN) {
-    return;
-  }
-  Number.isNaN = require('core-js/fn/number/is-nan');
-})();
-
-// Provides support for Number.isInteger in legacy browsers.
-// Support: IE, Chrome<34
-(function checkNumberIsInteger() {
-  if (Number.isInteger) {
-    return;
-  }
-  Number.isInteger = require('core-js/fn/number/is-integer');
-})();
-
-// Support: IE, Safari<8, Chrome<32
-(function checkPromise() {
-  if (typeof PDFJSDev !== 'undefined' && PDFJSDev.test('IMAGE_DECODERS')) {
-    // The current image decoders are synchronous, hence `Promise` shouldn't
-    // need to be polyfilled for the IMAGE_DECODERS build target.
-    return;
-  }
-  if (globalScope.Promise) {
-    return;
-  }
-  globalScope.Promise = require('core-js/fn/promise');
-})();
-
-// Support: IE<11, Safari<8, Chrome<36
-(function checkWeakMap() {
-  if (globalScope.WeakMap) {
-    return;
-  }
-  globalScope.WeakMap = require('core-js/fn/weak-map');
-})();
-
-// Provides support for String.codePointAt in legacy browsers.
-// Support: IE11.
-(function checkStringCodePointAt() {
-  if (String.codePointAt) {
-    return;
-  }
-  String.codePointAt = require('core-js/fn/string/code-point-at');
-})();
-
-// Provides support for String.fromCodePoint in legacy browsers.
-// Support: IE11.
-(function checkStringFromCodePoint() {
-  if (String.fromCodePoint) {
-    return;
-  }
-  String.fromCodePoint = require('core-js/fn/string/from-code-point');
-})();
-
-// Support: IE
-(function checkSymbol() {
-  if (globalScope.Symbol) {
-    return;
-  }
-  require('core-js/es6/symbol');
-})();
-
-} // End of !PDFJSDev.test('CHROME')
-
-// Provides support for Object.values in legacy browsers.
-// Support: IE, Chrome<54
-(function checkObjectValues() {
-  if (Object.values) {
-    return;
-  }
-  Object.values = require('core-js/fn/object/values');
-})();
-
+  // Support: Node.js
+  (function checkReadableStream() {
+    if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("IMAGE_DECODERS")) {
+      // The current image decoders are synchronous, hence `ReadableStream`
+      // shouldn't need to be polyfilled for the IMAGE_DECODERS build target.
+      return;
+    }
+    if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("CHROME")) {
+      // Slightly reduce the size of the Chromium-extension, given
+      // that `ReadableStream` has been supported since Chrome 43.
+      return;
+    }
+    if (globalThis.ReadableStream || !isNodeJS) {
+      return;
+    }
+    globalThis.ReadableStream =
+      require("web-streams-polyfill/dist/ponyfill.js").ReadableStream;
+  })();
 }

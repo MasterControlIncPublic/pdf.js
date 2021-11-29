@@ -13,11 +13,13 @@
  * limitations under the License.
  */
 
-import { buildGetDocumentParams } from './test_utils';
-import { EventBus } from '../../web/ui_utils';
-import { getDocument } from '../../src/display/api';
-import { PDFFindController } from '../../web/pdf_find_controller';
-import { SimpleLinkService } from '../../web/pdf_link_service';
+import { buildGetDocumentParams } from "./test_utils.js";
+import { EventBus } from "../../web/ui_utils.js";
+import { getDocument } from "../../src/display/api.js";
+import { PDFFindController } from "../../web/pdf_find_controller.js";
+import { SimpleLinkService } from "../../web/pdf_link_service.js";
+
+const tracemonkeyFileName = "tracemonkey.pdf";
 
 class MockLinkService extends SimpleLinkService {
   constructor() {
@@ -44,55 +46,223 @@ class MockLinkService extends SimpleLinkService {
   }
 }
 
-describe('pdf_find_controller', function() {
-  let eventBus;
-  let pdfFindController;
+async function initPdfFindController(filename) {
+  const loadingTask = getDocument(
+    buildGetDocumentParams(filename || tracemonkeyFileName)
+  );
+  const pdfDocument = await loadingTask.promise;
 
-  beforeEach(function(done) {
-    const loadingTask = getDocument(buildGetDocumentParams('tracemonkey.pdf'));
-    loadingTask.promise.then(function(pdfDocument) {
-      eventBus = new EventBus();
+  const eventBus = new EventBus();
 
-      const linkService = new MockLinkService();
-      linkService.setDocument(pdfDocument);
+  const linkService = new MockLinkService();
+  linkService.setDocument(pdfDocument);
 
-      pdfFindController = new PDFFindController({
-        linkService,
-        eventBus,
-      });
-      pdfFindController.setDocument(pdfDocument); // Enable searching.
-
-      done();
-    });
+  const pdfFindController = new PDFFindController({
+    linkService,
+    eventBus,
   });
+  pdfFindController.setDocument(pdfDocument); // Enable searching.
 
-  afterEach(function() {
-    eventBus = null;
-    pdfFindController = null;
-  });
+  return { eventBus, pdfFindController };
+}
 
-  it('performs a basic search', function(done) {
-    pdfFindController.executeCommand('find', { query: 'Dynamic', });
+function testSearch({
+  eventBus,
+  pdfFindController,
+  state,
+  matchesPerPage,
+  selectedMatch,
+  pageMatches = null,
+  pageMatchesLength = null,
+}) {
+  return new Promise(function (resolve) {
+    const eventState = Object.assign(
+      Object.create(null),
+      {
+        source: this,
+        type: "",
+        query: null,
+        caseSensitive: false,
+        entireWord: false,
+        phraseSearch: true,
+        findPrevious: false,
+      },
+      state
+    );
+    eventBus.dispatch("find", eventState);
 
-    const matchesPerPage = [11, 5, 0, 3, 0, 0, 0, 1, 1, 1, 0, 3, 4, 4];
-    const totalPages = matchesPerPage.length;
+    // The `updatefindmatchescount` event is only emitted if the page contains
+    // at least one match for the query, so the last non-zero item in the
+    // matches per page array corresponds to the page for which the final
+    // `updatefindmatchescount` event is emitted. If this happens, we know
+    // that any subsequent pages won't trigger the event anymore and we
+    // can start comparing the matches per page. This logic is necessary
+    // because we call the `pdfFindController.pageMatches` getter directly
+    // after receiving the event and the underlying `_pageMatches` array
+    // is only extended when a page is processed, so it will only contain
+    // entries for the pages processed until the time when the final event
+    // was emitted.
+    let totalPages = matchesPerPage.length;
+    for (let i = totalPages - 1; i >= 0; i--) {
+      if (matchesPerPage[i] > 0) {
+        totalPages = i + 1;
+        break;
+      }
+    }
+
     const totalMatches = matchesPerPage.reduce((a, b) => {
       return a + b;
     });
 
-    eventBus.on('updatefindmatchescount',
-        function onUpdateFindMatchesCount(evt) {
-      if (pdfFindController.pageMatches.length !== totalPages) {
-        return;
-      }
-      eventBus.off('updatefindmatchescount', onUpdateFindMatchesCount);
+    eventBus.on(
+      "updatefindmatchescount",
+      function onUpdateFindMatchesCount(evt) {
+        if (pdfFindController.pageMatches.length !== totalPages) {
+          return;
+        }
+        eventBus.off("updatefindmatchescount", onUpdateFindMatchesCount);
 
-      expect(evt.matchesCount.total).toBe(totalMatches);
-      for (let i = 0; i < totalPages; i++) {
-        expect(pdfFindController.pageMatches[i].length)
-          .toEqual(matchesPerPage[i]);
+        expect(evt.matchesCount.total).toBe(totalMatches);
+        for (let i = 0; i < totalPages; i++) {
+          expect(pdfFindController.pageMatches[i].length).toEqual(
+            matchesPerPage[i]
+          );
+        }
+        expect(pdfFindController.selected.pageIdx).toEqual(
+          selectedMatch.pageIndex
+        );
+        expect(pdfFindController.selected.matchIdx).toEqual(
+          selectedMatch.matchIndex
+        );
+
+        if (pageMatches) {
+          expect(pdfFindController.pageMatches).toEqual(pageMatches);
+          expect(pdfFindController.pageMatchesLength).toEqual(
+            pageMatchesLength
+          );
+        }
+
+        resolve();
       }
-      done();
+    );
+  });
+}
+
+describe("pdf_find_controller", function () {
+  it("performs a normal search", async function () {
+    const { eventBus, pdfFindController } = await initPdfFindController();
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "Dynamic",
+      },
+      matchesPerPage: [11, 5, 0, 3, 0, 0, 0, 1, 1, 1, 0, 3, 4, 4],
+      selectedMatch: {
+        pageIndex: 0,
+        matchIndex: 0,
+      },
+    });
+  });
+
+  it("performs a normal search and finds the previous result", async function () {
+    // Page 14 (with page index 13) contains five results. By default, the
+    // first result (match index 0) is selected, so the previous result
+    // should be the fifth result (match index 4).
+    const { eventBus, pdfFindController } = await initPdfFindController();
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "conference",
+        findPrevious: true,
+      },
+      matchesPerPage: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5],
+      selectedMatch: {
+        pageIndex: 13,
+        matchIndex: 4,
+      },
+    });
+  });
+
+  it("performs a case sensitive search", async function () {
+    const { eventBus, pdfFindController } = await initPdfFindController();
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "Dynamic",
+        caseSensitive: true,
+      },
+      matchesPerPage: [3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3],
+      selectedMatch: {
+        pageIndex: 0,
+        matchIndex: 0,
+      },
+    });
+  });
+
+  it("performs an entire word search", async function () {
+    // Page 13 contains both 'Government' and 'Governmental', so the latter
+    // should not be found with entire word search.
+    const { eventBus, pdfFindController } = await initPdfFindController();
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "Government",
+        entireWord: true,
+      },
+      matchesPerPage: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+      selectedMatch: {
+        pageIndex: 12,
+        matchIndex: 0,
+      },
+    });
+  });
+
+  it("performs a multiple term (no phrase) search", async function () {
+    // Page 9 contains 'alternate' and pages 6 and 9 contain 'solution'.
+    // Both should be found for multiple term (no phrase) search.
+    const { eventBus, pdfFindController } = await initPdfFindController();
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "alternate solution",
+        phraseSearch: false,
+      },
+      matchesPerPage: [0, 0, 0, 0, 0, 1, 0, 0, 4, 0, 0, 0, 0, 0],
+      selectedMatch: {
+        pageIndex: 5,
+        matchIndex: 0,
+      },
+    });
+  });
+
+  it("performs a normal search, where the text is normalized", async function () {
+    const { eventBus, pdfFindController } = await initPdfFindController(
+      "fraction-highlight.pdf"
+    );
+
+    await testSearch({
+      eventBus,
+      pdfFindController,
+      state: {
+        query: "fraction",
+      },
+      matchesPerPage: [3],
+      selectedMatch: {
+        pageIndex: 0,
+        matchIndex: 0,
+      },
+      pageMatches: [[19, 46, 62]],
+      pageMatchesLength: [[8, 8, 8]],
     });
   });
 });

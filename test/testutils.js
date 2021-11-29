@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/* eslint-disable no-var */
 
-'use strict';
+"use strict";
 
-var fs = require('fs');
-var path = require('path');
-var rimrafSync = require('rimraf').sync;
+var fs = require("fs");
+var path = require("path");
+var rimrafSync = require("rimraf").sync;
 
 exports.removeDirSync = function removeDirSync(dir) {
   fs.readdirSync(dir); // Will throw if dir is not a directory
@@ -48,7 +49,8 @@ exports.ensureDirSync = function ensureDirSync(dir) {
   if (fs.existsSync(dir)) {
     return;
   }
-  var parts = dir.split(path.sep), i = parts.length;
+  var parts = dir.split(path.sep),
+    i = parts.length;
   while (i > 1 && !fs.existsSync(parts.slice(0, i - 1).join(path.sep))) {
     i--;
   }
@@ -62,7 +64,9 @@ exports.ensureDirSync = function ensureDirSync(dir) {
   }
 };
 
-var stdinBuffer = '', endOfStdin = false, stdinInitialized = false;
+var stdinBuffer = "",
+  endOfStdin = false,
+  stdinInitialized = false;
 var stdinOnLineCallbacks = [];
 
 function handleStdinBuffer() {
@@ -80,7 +84,7 @@ function handleStdinBuffer() {
     return;
   }
   while (stdinOnLineCallbacks.length > 0) {
-    var i = stdinBuffer.indexOf('\n');
+    var i = stdinBuffer.indexOf("\n");
     if (i < 0) {
       return;
     }
@@ -94,14 +98,14 @@ function handleStdinBuffer() {
 }
 
 function initStdin() {
-  process.stdin.setEncoding('utf8');
+  process.stdin.setEncoding("utf8");
 
-  process.stdin.on('data', function(chunk) {
+  process.stdin.on("data", function (chunk) {
     stdinBuffer += chunk;
     handleStdinBuffer();
   });
 
-  process.stdin.on('end', function() {
+  process.stdin.on("end", function () {
     endOfStdin = true;
     handleStdinBuffer();
   });
@@ -127,9 +131,9 @@ exports.confirm = function confirm(message, callback) {
       callback();
       return;
     }
-    if (answer[0].toLowerCase() === 'y') {
+    if (answer[0].toLowerCase() === "y") {
       callback(true);
-    } else if (answer[0].toLowerCase() === 'n') {
+    } else if (answer[0].toLowerCase() === "n") {
       callback(false);
     } else {
       confirm(message, callback);
