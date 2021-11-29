@@ -16,10 +16,6 @@
 /** @typedef {import("./interfaces").IRenderableView} IRenderableView */
 
 import {
-  approximateFraction, CSS_UNITS, DEFAULT_SCALE, getOutputScale, NullL10n,
-  RendererType, roundToDivide, TextLayerMode, getWatermarkText
-} from './ui_utils';
-import {
   AnnotationMode,
   createPromiseCapability,
   PixelsPerInch,

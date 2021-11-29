@@ -24,7 +24,6 @@ const gulp = require('gulp');
 const postcss = require('gulp-postcss');
 const rename = require('gulp-rename');
 const replace = require('gulp-replace');
-const transform = require('gulp-transform');
 const mkdirp = require('mkdirp');
 const path = require('path');
 const rimraf = require('rimraf');
@@ -1508,7 +1507,7 @@ function buildLib(defines, dir) {
   return buildLibHelper(bundleDefines, inputStream, dir);
 }
 
-gulp.task('mc-build', ['minified'], function(done) {
+gulp.task('mc-build', gulp.series('minified', function(done) {
   var targetName = getTargetName();
   gulp.src(BUILD_DIR + 'minified/**')
     .pipe(gulp.dest(MC_DIR))
@@ -1521,7 +1520,7 @@ gulp.task('mc-build', ['minified'], function(done) {
           done();
         });
     });
-});
+}));
 
 gulp.task('mc-deploy-snapshot', gulp.series('mc-build', function(done) {
   mcDeploy(getDeployUrl(), done);
