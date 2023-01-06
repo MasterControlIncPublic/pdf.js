@@ -1000,7 +1000,7 @@ const PDFViewerApplication = {
   },
 
   async download() {
-    return; // Dont allow download of Basic MC Reference PDF
+    return; // Don't allow download of mc files
     const url = this._downloadUrl,
       filename = this._docFilename;
     try {
@@ -1018,6 +1018,7 @@ const PDFViewerApplication = {
   },
 
   async save() {
+    return; // Don't allow download of mc files
     if (this._saveInProgress) {
       return;
     }
@@ -2509,6 +2510,7 @@ function webViewerPrint() {
   PDFViewerApplication.triggerPrinting();
 }
 function webViewerDownload() {
+  return; // Don't allow download of mc files
   PDFViewerApplication.downloadOrSave();
 }
 function webViewerFirstPage() {
