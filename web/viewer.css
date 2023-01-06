@@ -574,10 +574,6 @@ body {
   margin-bottom: -4px;
 }
 
-.secondaryToolbarButtonIcon {
-  padding-right: 7px;
-}
-
 #editorInkParamsToolbar {
   inset-inline-end: 40px;
   background-color: var(--toolbar-bg-color);
@@ -848,11 +844,6 @@ body {
   /*background-color: var(--toolbar-icon-bg-color);*/ /*TODO: do we need this?*/
   mask-size: cover;
 }
-
-/*.dropdownToolbarButton::after {*/
-/*  background-color: var(--original-toolbar-icon-hover-bg-color);!*TODO: choose a color and make a more specific selector, this is for the dropdown arrow*!*/
-/*}*/
-
 
 .dropdownToolbarButton:hover::after,
 .dropdownToolbarButton:focus-visible::after,
@@ -1584,9 +1575,5 @@ dialog :link {
   .disablePrint {
     display: none !important;
   }
-}
-
-* {
-  box-sizing: initial !important;
 }
 
