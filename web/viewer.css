@@ -1536,7 +1536,7 @@ dialog :link {
   background-color: rgba(255, 255, 255, 1) !important;
 }
 
-.mcToolbar * button {
+.mcToolbar * button, .mcToolbar * a {
   box-sizing: border-box !important;
 }
 
@@ -1575,5 +1575,9 @@ dialog :link {
   .disablePrint {
     display: none !important;
   }
+}
+
+* {
+  box-sizing: initial !important;
 }
 
