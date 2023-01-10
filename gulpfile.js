@@ -16,7 +16,7 @@
 
 "use strict";
 
-const artifactoryUpload = require('gulp-artifactory-upload');
+const artifactoryUpload = require("gulp-artifactory-upload");
 
 const autoprefixer = require("autoprefixer");
 const postcssDirPseudoClass = require("postcss-dir-pseudo-class");
@@ -47,7 +47,7 @@ const L10N_DIR = "l10n/";
 const TEST_DIR = "test/";
 const EXTENSION_SRC_DIR = "extensions/";
 
-const MC_DIR = BUILD_DIR + 'PDFjs/';
+const MC_DIR = BUILD_DIR + "PDFjs/";
 
 const BASELINE_DIR = BUILD_DIR + "baseline/";
 const MOZCENTRAL_BASELINE_DIR = BUILD_DIR + "mozcentral.baseline/";
@@ -77,8 +77,8 @@ const MOZCENTRAL_DIFF_FILE = "mozcentral.diff";
 const REPO = "git@github.com:mozilla/pdf.js.git";
 const DIST_REPO_URL = "https://github.com/mozilla/pdfjs-dist";
 
-const ARTIFACTORY_RELEASE_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-release-local/';
-const ARTIFACTORY_SNAPSHOT_REPO_URL = 'https://labs.mastercontrol.com/artifactory/libs-snapshot-local/';
+const ARTIFACTORY_RELEASE_REPO_URL = "https://labs.mastercontrol.com/artifactory/libs-release-local/";
+const ARTIFACTORY_SNAPSHOT_REPO_URL = "https://labs.mastercontrol.com/artifactory/libs-snapshot-local/";
 
 const builder = require("./external/builder/builder.js");
 
@@ -294,7 +294,7 @@ function getVersionJSON() {
 }
 
 function getTargetName() {
-  return 'mcPDFjs-' + getVersionJSON().version + '.zip';
+  return "mcPDFjs-" + getVersionJSON().version + ".zip";
 }
 
 function getDeployUrl(isRelease = false) {
@@ -304,9 +304,9 @@ function getDeployUrl(isRelease = false) {
     repoURL = ARTIFACTORY_RELEASE_REPO_URL;
   } else {
     repoURL = ARTIFACTORY_SNAPSHOT_REPO_URL;
-    version = version + '-SNAPSHOT';
+    version += "-SNAPSHOT";
   }
-  return repoURL + 'com/mastercontrol/mcPDFjs/' + version;
+  return repoURL + "com/mastercontrol/mcPDFjs/" + version;
 }
 
 function checkChromePreferencesFile(chromePrefsPath, webPrefs) {
@@ -1739,19 +1739,19 @@ gulp.task(
   )
 );
 
-gulp.task('mc-build',
+gulp.task("mc-build",
   gulp.series(
-    'minified',
+    "minified",
     function packageMcBuild(done) {
       var targetName = getTargetName();
-      gulp.src(BUILD_DIR + 'minified/**')
+      gulp.src(BUILD_DIR + "minified/**")
         .pipe(gulp.dest(MC_DIR))
-        .on('end', function () {
-          gulp.src(MC_DIR + '**', { base: BUILD_DIR, })
+        .on("end", function () {
+          gulp.src(MC_DIR + "**", { base: BUILD_DIR, })
             .pipe(zip(targetName))
             .pipe(gulp.dest(BUILD_DIR))
-            .on('end', function () {
-              console.log('Built distribution file: ' + targetName);
+            .on("end", function () {
+              console.log("Built distribution file: " + targetName);
               done();
             });
         });
@@ -1759,18 +1759,18 @@ gulp.task('mc-build',
   )
 );
 
-gulp.task('mc-deploy-snapshot',
+gulp.task("mc-deploy-snapshot",
   gulp.series(
-    'mc-build',
+    "mc-build",
     function deploySnapshot(done) {
       mcDeploy(getDeployUrl(), done);
     }
   )
 );
 
-gulp.task('mc-deploy-release',
+gulp.task("mc-deploy-release",
   gulp.series(
-    'mc-build',
+    "mc-build",
     function deployRelease(done) {
       mcDeploy(getDeployUrl(true), done);
     }
@@ -1778,17 +1778,17 @@ gulp.task('mc-deploy-release',
 );
 
 function mcDeploy(deployUrl, done){
-  console.log('### Deploying ' + getTargetName() + ' to ' + deployUrl)
+  console.log("### Deploying " + getTargetName() + " to " + deployUrl)
   gulp.src(BUILD_DIR + getTargetName())
     .pipe(artifactoryUpload({
       url: deployUrl,
       username: process.env.artifactory_username,
       password: process.env.artifactory_password,
     }))
-    .on('error', console.log)
-    .on('end', function() {
-      console.log('Done uploading ' + getTargetName() + ' to ' + deployUrl);
-      console.log('### Please make sure to tag and push!');
+    .on("error", console.log)
+    .on("end", function() {
+      console.log("Done uploading " + getTargetName() + " to " + deployUrl);
+      console.log("### Please make sure to tag and push!");
       done();
     });
 };
