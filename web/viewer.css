@@ -25,7 +25,7 @@
   --toolbar-icon-opacity: 1;
   --doorhanger-icon-opacity: 0.9;
 
-  --main-color: hsla(208, 28%, 20%);;
+  --main-color: hsla(208, 28%, 20%);
   --body-bg-color: rgba(237, 237, 240, 1);
   --progressBar-percent: 0%;
   --progressBar-end-offset: 0;
@@ -801,7 +801,7 @@ body {
 
 .dropdownToolbarButton > select {
   appearance: none;
-  width:calc(var(--scale-select-width) - 6px);
+  width: calc(var(--scale-select-width) - 6px);
   height: 24px;
   font-size: 12px;
   color: var(--main-color);
