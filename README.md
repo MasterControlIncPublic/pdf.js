@@ -27,11 +27,11 @@ This should be done after syncing master as described above. The idea here is to
 - Pick a release that you want to merge. Note: choose a released tag rather than master, since there could be unreleased/untested functionality in the master branch.
 - Merge the tagged commit into our `mc-master`
     ```
-    $ git switch -c my-branch-name-for-a-pr-to-sync-mc-master
+    $ git switch -c merge-v3.1.81-into-mc-master
     $ git merge v3.1.81
     ```
 - make sure things still work, deploy snapshot, test, etc
-- Create a PR for `my-branch-name-for-a-pr-to-sync-mc-master` that will go in before your story branch PR goes in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
+- Create a PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in. Make sure to use a squash-merge and note which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
 - Either base your story branch off this branch or merge it into your branch as you see fit.
 
 ### Building during development
