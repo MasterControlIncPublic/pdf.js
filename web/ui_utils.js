@@ -612,25 +612,30 @@ function noContextMenuHandler(evt) {
 }
 
 function getParameterByName(name, url) {
-  if (!url) { url = window.location.href;}
+  if (!url) {
+    url = window.location.href;
+  }
   url = decodeURIComponent(url);
-  name = name.replace(/[\[\]]/g, '\\$&');
-  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-  var results = regex.exec(url);
-  if (!results) {return null;}
-  if (!results[2]) {return '';}
-  return decodeURIComponent(results[2].replace(/\+/g, ' '));
+  name = name.replace(/[[\]]/g, "\\$&");
+  const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
+  const results = regex.exec(url);
+  if (!results) {
+    return null;
+  }
+  if (!results[2]) {
+    return "";
+  }
+  return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
 function getWatermarkText() {
-  return getParameterByName('watermark');
+  return getParameterByName("watermark");
 }
 
 function getDocumentTitle() {
-  var defaultTitle = 'PDF Viewer';
-  return getParameterByName('documentTitle') || defaultTitle;
+  const defaultTitle = "PDF Viewer";
+  return getParameterByName("documentTitle") || defaultTitle;
 }
-
 
 function normalizeWheelEventDirection(evt) {
   let delta = Math.hypot(evt.deltaX, evt.deltaY);
