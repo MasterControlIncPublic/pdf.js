@@ -1,45 +1,53 @@
 # MasterControl Fork info
 We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch.
 
+## Maintaining our fork
+The `master` branch in our fork should be identical to `master` on the upstream mozilla repo. Because of this it should always be safe to sync `master` with the upstream and push that to our repo without doing any special testing.
 
-### Maintaining our fork
-We want to keep the `master` branch exactly as the upstream repo's `master` branch. This means we don't want to do any commits or changes to it. This allows us to regularly sync our fork with theirs painlessly.
-
-To sync our fork manually make sure you've got an upstream remote configured on your working copy.
-
+### Synchronizing with upstream mozilla:pdf.js
+Generally speaking keeping up to date with our dependencies is a great thing. If you need to update our fork with the latest from mozilla's repo here is a quick runthrough:
+- add upstream remote to your working copy
+    ```
     $ git remote add upstream git@github.com:mozilla/pdf.js.git
-
-Fetch the latest from the upstream
-
     $ git fetch upstream
-
-Make sure you're on master
-    
+    ```
+- merge `upstream/master` into our fork's master (`master` not `mc-master`)
+    ```
     $ git switch master
-
-Merge the latest into our master (which should result in a fast-forward)
-    
     $ git merge upstream/master
+    ```
+- push `master` up to our fork's repo
+    ```
+    $ git push master
+    ```
 
-Push that to our repository
+### Updating `mc-master` with changes from the upstream master
+This should be done after syncing master as described above. The idea here is to separate this type of sync from your story/defect work for better history tracking. You can have multiple PRs for your story work, this would be one of them.
 
-    $ git push
-
-### Merging new versions of PDF.js into `mc-master`
-
-This process is still a bit rough around the edges but this is currently our suggested workflow.
-
-
+- Pick a release that you want to merge. Note: choose a released tag rather than master, since there could be unreleased/untested functionality in the master branch.
+- Merge the tagged commit into our `mc-master`
+    ```
+    $ git switch -c my-branch-name-for-a-pr-to-sync-mc-master
+    $ git merge v3.1.81
+    ```
+- make sure things still work, deploy snapshot, test, etc
+- Create a PR for `my-branch-name-for-a-pr-to-sync-mc-master` that will go in before your story branch PR goes in.
+- Either base your story branch off this branch or merge it into your branch as you see fit.
 
 ### Building during development
-To build for use in MasterControl during developmental testing you can run
+To build for use in MasterControl during developmental testing you can either run
+
+    $ gulp generic
+
+Which will quickly build PDF.js for development purposes (not minified, packaged, etc)
+
+OR
 
     $ gulp mc-build
     
-This will build PDF.js in a minified form and zip it up in a file named `mcPDFjs-<version>.zip`.
+This will build PDF.js in a minified form and zip it up in a file named `mcPDFjs-<version>.zip`. This is the artifact that we deploy to artifactory.
 
-It's likely you're looking for the `mc-deploy-snapshot` below.
-   
+You can copy the result (or unzip the mc artifact) into `<site>/services/StaticContent/js/PDFjs/` so that folder contains the `build` and `web` folders.
 
 ### Deploying an artifact to Artifactory
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
