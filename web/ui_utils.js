@@ -611,30 +611,15 @@ function noContextMenuHandler(evt) {
   evt.preventDefault();
 }
 
-function getParameterByName(name, url) {
-  if (!url) {
-    url = window.location.href;
-  }
-  url = decodeURIComponent(url);
-  name = name.replace(/[[]]/g, "\\$&");
-  const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
-  const results = regex.exec(url);
-  if (!results) {
-    return null;
-  }
-  if (!results[2]) {
-    return "";
-  }
-  return decodeURIComponent(results[2].replace(/\+/g, " "));
-}
-
 function getWatermarkText() {
-  return getParameterByName("watermark");
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get("watermark");
 }
 
 function getDocumentTitle() {
   const defaultTitle = "PDF Viewer";
-  return getParameterByName("documentTitle") || defaultTitle;
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get("documentTitle") || defaultTitle;
 }
 
 function normalizeWheelEventDirection(evt) {
