@@ -616,7 +616,7 @@ function getParameterByName(name, url) {
     url = window.location.href;
   }
   url = decodeURIComponent(url);
-  name = name.replace(/[[\]]/g, "\\$&");
+  name = name.replace(/[[]]/g, "\\$&");
   const regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
   const results = regex.exec(url);
   if (!results) {
