@@ -1,5 +1,35 @@
 # MasterControl Fork info
-We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch. **This project requires node version < 12 to build properly. The recommended node version is v11.15.0.**
+We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch.
+
+
+### Maintaining our fork
+We want to keep the `master` branch exactly as the upstream repo's `master` branch. This means we don't want to do any commits or changes to it. This allows us to regularly sync our fork with theirs painlessly.
+
+To sync our fork manually make sure you've got an upstream remote configured on your working copy.
+
+    $ git remote add upstream git@github.com:mozilla/pdf.js.git
+
+Fetch the latest from the upstream
+
+    $ git fetch upstream
+
+Make sure you're on master
+    
+    $ git switch master
+
+Merge the latest into our master (which should result in a fast-forward)
+    
+    $ git merge upstream/master
+
+Push that to our repository
+
+    $ git push
+
+### Merging new versions of PDF.js into `mc-master`
+
+This process is still a bit rough around the edges but this is currently our suggested workflow.
+
+
 
 ### Building during development
 To build for use in MasterControl during developmental testing you can run
@@ -20,15 +50,18 @@ You should be able to deploy a snapshot to artifactory by running the following 
     $ gulp mc-deploy-snapshot
 
 #### Deploying a release
-This will deploy straight to our libs-release-local repo, **you have been warned**.
+**Only release builds from mc-master!** This will deploy straight to our libs-release-local repo, **you have been warned**.
 
-First make sure the version is correct in pdfjs.config.  Then run:
+First make sure the version is correct in pdfjs.config. Then run:
 
     $ gulp mc-deploy-release
 
-Please don't forget to tag the commit you deployed and push the tags to the repository with a command similar to the following:
+Please don't forget to tag the commit you deployed and push the tags to the repository with commands similar to the following:
 
+    $ git tag -a v3.1.37-mc -m "Release v3.1.37-mc"
     $ git push --tags origin mc-master
+    
+We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to help differentiate our tags since we're building from a different branch and the commit counting (used in the automatic version number creation) will be different and likely _behind_ the Mozilla PDFjs numbers.
 
 # ORIGINAL README BELOW
 # PDF.js [![Build Status](https://github.com/mozilla/pdf.js/workflows/CI/badge.svg?branch=master)](https://github.com/mozilla/pdf.js/actions?query=workflow%3ACI+branch%3Amaster)
