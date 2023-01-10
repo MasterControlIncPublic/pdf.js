@@ -31,7 +31,7 @@ This should be done after syncing master as described above. The idea here is to
     $ git merge v3.1.81
     ```
 - make sure things still work, deploy snapshot, test, etc
-- Create a PR for `my-branch-name-for-a-pr-to-sync-mc-master` that will go in before your story branch PR goes in.
+- Create a PR for `my-branch-name-for-a-pr-to-sync-mc-master` that will go in before your story branch PR goes in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
 - Either base your story branch off this branch or merge it into your branch as you see fit.
 
 ### Building during development
