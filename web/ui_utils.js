@@ -611,27 +611,6 @@ function noContextMenuHandler(evt) {
   evt.preventDefault();
 }
 
-function getParameterByName(name, url) {
-  if (!url) { url = window.location.href;}
-  url = decodeURIComponent(url);
-  name = name.replace(/[\[\]]/g, '\\$&');
-  var regex = new RegExp('[?&]' + name + '(=([^&#]*)|&|#|$)');
-  var results = regex.exec(url);
-  if (!results) {return null;}
-  if (!results[2]) {return '';}
-  return decodeURIComponent(results[2].replace(/\+/g, ' '));
-}
-
-function getWatermarkText() {
-  return getParameterByName('watermark');
-}
-
-function getDocumentTitle() {
-  var defaultTitle = 'PDF Viewer';
-  return getParameterByName('documentTitle') || defaultTitle;
-}
-
-
 function normalizeWheelEventDirection(evt) {
   let delta = Math.hypot(evt.deltaX, evt.deltaY);
   const angle = Math.atan2(evt.deltaY, evt.deltaX);
@@ -860,10 +839,8 @@ export {
   DEFAULT_SCALE_VALUE,
   docStyle,
   getActiveOrFocusedElement,
-  getDocumentTitle,
   getPageSizeInches,
   getVisibleElements,
-  getWatermarkText,
   isPortraitOrientation,
   isValidRotation,
   isValidScrollMode,

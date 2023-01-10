@@ -48,7 +48,6 @@ import {
   RenderingStates,
   roundToDivide,
   TextLayerMode,
-  getWatermarkText,
 } from "./ui_utils.js";
 import { compatibilityParams } from "./app_options.js";
 import { NullL10n } from "./l10n_utils.js";
@@ -704,12 +703,6 @@ class PDFPageView {
       textLayerDiv.className = "textLayer";
       textLayerDiv.style.width = canvasWrapper.style.width;
       textLayerDiv.style.height = canvasWrapper.style.height;
-
-      var textLayerWatermark = document.createElement('p');
-      var waterMarkText = getWatermarkText();
-      textLayerWatermark.className = 'mcWatermark';
-      textLayerWatermark.innerHTML = waterMarkText;
-      textLayerDiv.appendChild(textLayerWatermark);
 
       if (lastDivBeforeTextDiv) {
         // The annotation layer needs to stay on top.

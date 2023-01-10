@@ -32,7 +32,6 @@ import {
   SidebarView,
   SpreadMode,
   TextLayerMode,
-  getDocumentTitle,
 } from "./ui_utils.js";
 import {
   AnnotationEditorType,
@@ -802,7 +801,7 @@ const PDFViewerApplication = {
     }
     const editorIndicator =
       this._hasAnnotationEditors && !this.pdfRenderingQueue.printing;
-    document.title = `${editorIndicator ? "* " : ""}${getDocumentTitle()}`;
+    document.title = `${editorIndicator ? "* " : ""}`;
   },
 
   get _docFilename() {
