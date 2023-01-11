@@ -150,7 +150,7 @@ const defaultOptions = {
   },
   printResolution: {
     /** @type {number} */
-    value: 150,
+    value: 300,
     kind: OptionKind.VIEWER,
   },
   sidebarViewOnLoad: {
