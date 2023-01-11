@@ -1763,6 +1763,7 @@ gulp.task(
   "mc-deploy-snapshot",
   gulp.series("mc-build", function deploySnapshot(done) {
     mcDeploy(getDeployUrl(), done);
+    done();
   })
 );
 
@@ -1770,6 +1771,7 @@ gulp.task(
   "mc-deploy-release",
   gulp.series("mc-build", function deployRelease(done) {
     mcDeploy(getDeployUrl(true), done);
+    done();
   })
 );
 
