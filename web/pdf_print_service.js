@@ -15,8 +15,8 @@
 
 import { AnnotationMode, PixelsPerInch } from "pdfjs-lib";
 import { PDFPrintServiceFactory, PDFViewerApplication } from "./app.js";
-import { MCOptions } from './mc_options';
 import { getXfaHtmlForPrinting } from "./print_utils.js";
+import { MCOptions } from "./mc_options.js";
 
 let activeService = null;
 let dialog = null;
@@ -234,7 +234,7 @@ PDFPrintService.prototype = {
 
 const print = window.print;
 window.print = function () {
-  if (!MCOptions.get('canPrint')) {
+  if (!MCOptions.get("canPrint")) {
     return; // Dont allow printing of Basic MC Refence PDF
   }
   if (activeService) {

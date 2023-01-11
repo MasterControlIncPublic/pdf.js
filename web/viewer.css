@@ -25,7 +25,7 @@
   --toolbar-icon-opacity: 1;
   --doorhanger-icon-opacity: 0.9;
 
-  --main-color: hsla(208, 28%, 20%);;
+  --main-color: hsla(208, 28%, 20%);
   --body-bg-color: rgba(237, 237, 240, 1);
   --progressBar-percent: 0%;
   --progressBar-end-offset: 0;
@@ -801,7 +801,7 @@ body {
 
 .dropdownToolbarButton > select {
   appearance: none;
-  width:calc(var(--scale-select-width) - 6px);
+  width: calc(var(--scale-select-width) - 6px);
   height: 24px;
   font-size: 12px;
   color: var(--main-color);
@@ -912,7 +912,8 @@ body {
   content: "\f067";
 }
 
-#presentationMode::before, #secondaryPresentationMode::before {
+#presentationMode::before,
+#secondaryPresentationMode::before {
   font: 14px FontAwesome;
   content: "\f0b2";
 }
@@ -1116,7 +1117,7 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 .toolbarField[type="checkbox"] {
-  margin: 10px 0px;
+  margin: 10px 0;
   margin-left: -3px;
 }
 
@@ -1523,7 +1524,7 @@ dialog :link {
 }
 
 .mcWatermark {
-  margin:50% auto;
+  margin: 50% auto;
   opacity: 0.6;
   font-size: 650%;
   text-align: center;
@@ -1536,16 +1537,16 @@ dialog :link {
   background-color: rgba(255, 255, 255, 1) !important;
 }
 
-.mcToolbar * button, .mcToolbar * a {
+.mcToolbar * button,
+.mcToolbar * a {
   box-sizing: border-box !important;
 }
 
-.mcToolbar option{
+.mcToolbar option {
   background-image: none !important;
   background-color: rgba(255, 255, 255, 1) !important;
-  color: hsl(208, 28%, 20%)
+  color: hsl(208, 28%, 20%);
 }
-
 
 .mcViewer {
   background-color: #243340 !important;
@@ -1555,19 +1556,19 @@ dialog :link {
   border-image: none;
 }
 
-.mcToolbar:after{
+.mcToolbar:after {
   border-bottom-color: #34495d;
 }
 
 .mcSidebar {
-  background-color: #202C37 !important;
+  background-color: #202c37 !important;
 }
 
 .mcThumbnail {
-  padding: 0px !important;
-  margin-bottom: 0px !important;
+  padding: 0 !important;
+  margin-bottom: 0 !important;
   line-height: 0 !important;
-  background-color: #202C37 !important;
+  background-color: #202c37 !important;
   border: none !important;
 }
 
@@ -1580,4 +1581,3 @@ dialog :link {
 * {
   box-sizing: initial !important;
 }
-
