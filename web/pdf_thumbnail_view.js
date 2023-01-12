@@ -131,7 +131,7 @@ class PDFThumbnailView {
 
     const div = document.createElement("div");
     div.className = "thumbnail";
-    div.classList.add('mcThumbnail');
+    div.classList.add("mcThumbnail");
     div.setAttribute("data-page-number", this.id);
     this.div = div;
 
