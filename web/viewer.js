@@ -16,9 +16,8 @@
 import { RenderingStates, ScrollMode, SpreadMode } from "./ui_utils.js";
 import { AppOptions } from "./app_options.js";
 import { LinkTarget } from "./pdf_link_service.js";
+import { MCOptions } from "./mc_options.js";
 import { PDFViewerApplication } from "./app.js";
-
-import { MCOptions } from './mc_options';
 
 /* eslint-disable-next-line no-unused-vars */
 const pdfjsVersion =
@@ -91,6 +90,7 @@ function getViewerConfiguration() {
           ? document.getElementById("openFile")
           : null,
       print: document.getElementById("print"),
+      presentationModeButton: document.getElementById("presentationMode"),
       editorFreeTextButton: document.getElementById("editorFreeText"),
       editorFreeTextParamsToolbar: document.getElementById(
         "editorFreeTextParamsToolbar"
@@ -102,7 +102,9 @@ function getViewerConfiguration() {
     secondaryToolbar: {
       toolbar: document.getElementById("secondaryToolbar"),
       toggleButton: document.getElementById("secondaryToolbarToggle"),
-      presentationModeButton: document.getElementById("presentationMode"),
+      presentationModeButton: document.getElementById(
+        "secondaryPresentationMode"
+      ),
       openFileButton:
         typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
           ? document.getElementById("secondaryOpenFile")
@@ -207,13 +209,13 @@ function getViewerConfiguration() {
 }
 
 function setMCOptions() {
-  let canPrint = new URL(location.href).searchParams.get('canPrint');
-  MCOptions.set('canPrint', canPrint === 'true');
+  const canPrint = new URL(location.href).searchParams.get("canPrint");
+  MCOptions.set("canPrint", canPrint === "true");
 }
 
 function enablePrintingIfCanPrint() {
-  if (MCOptions.get('canPrint')) {
-    document.getElementById('print').classList.remove('hidden');
+  if (MCOptions.get("canPrint")) {
+    document.getElementById("print").classList.remove("hidden");
   }
 }
 

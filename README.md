@@ -1,15 +1,69 @@
 # MasterControl Fork info
-We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch. **This project requires node version < 12 to build properly. The recommended node version is v11.15.0.**
+We forked PDF.js so that we could apply a few customizations to their viewer. We're working from a branch called mc-master. We've also added some gulp tasks to build and deploy to our artifactory instance. Follow the instructions from the original README below to install dependencies after you've checked out our branch.
+
+## Maintaining our fork
+The `master` branch in our fork should be identical to `master` on the upstream mozilla repo. Because of this it should always be safe to sync `master` with the upstream and push that to our repo without doing any special testing.
+
+### Synchronizing with upstream mozilla:pdf.js
+Since master is an untouched copy of Mozilla's master we can synchronize our fork as often as we'd like with no impacts to our MC functionality.
+
+You can either use the "Sync Fork" button in the github UI 
+
+OR 
+
+Perform the sync manually as described below:
+
+- add upstream remote to your working copy
+    ```
+    $ git remote add upstream git@github.com:mozilla/pdf.js.git
+    $ git fetch upstream
+    ```
+- merge `upstream/master` into our fork's master (`master` not `mc-master`)
+    ```
+    $ git switch master
+    $ git merge upstream/master
+    ```
+- push `master` up to our fork's repo
+    ```
+    $ git push master
+    ```
+
+### Updating `mc-master` with changes from the upstream master
+This should be done after syncing master as described above. The idea here is to separate this type of sync from your story/defect work for better history tracking. 
+
+- Pick a release that you want to merge. Note: choose a released tag rather than master, since there could be unreleased/untested functionality in the master branch.
+- Merge the tagged commit into our `mc-master`. The first command creates a new branch based on mc-master and switches you to it.
+    ```
+    $ git switch -c merge-v3.1.81-into-mc-master mc-master
+    $ git merge v3.1.81
+    ```
+- You're likely to have merge conflicts to resolve, good luck.
+- Make sure things still work and MC's customizations are still in place, deploy snapshot, test, etc
+- Create a merge commit PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in. **Make sure to use a merge commit PR (NOT a squash)** so that we retain Mozilla's commit history and future merges of this type are possible. In your PR title include which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
+
+### Feature Work
+New feature work can be done as normal on a feature branch based off `mc-master`.
+
+Use a **squash merge PR for new feature work** so that all your development commits don't bloat the history of `mc-master`.
 
 ### Building during development
-To build for use in MasterControl during developmental testing you can run
+To build for use in MasterControl during developmental testing you can either run
+
+    $ gulp generic
+
+Which will quickly build PDF.js for development purposes (not minified, packaged, etc)
+
+OR
 
     $ gulp mc-build
 
-This will build PDF.js in a minified form and zip it up in a file named `mcPDFjs-<version>.zip`.
+This will build PDF.js in a minified form and zip it up in a file named `mcPDFjs-<version>.zip`. This is the artifact that we deploy to artifactory.
 
-It's likely you're looking for the `mc-deploy-snapshot` below.
+You can copy the result (or unzip the mc artifact) into `<site>/services/StaticContent/js/PDFjs/` so that folder contains the `build` and `web` folders.
 
+### Testing
+
+The PRs will run automated testing. You can do that locally with commands like `gulp ci-test` (and possibly autofix some linting with the `--fix` argument)
 
 ### Deploying an artifact to Artifactory
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
@@ -20,15 +74,18 @@ You should be able to deploy a snapshot to artifactory by running the following 
     $ gulp mc-deploy-snapshot
 
 #### Deploying a release
-This will deploy straight to our libs-release-local repo, **you have been warned**.
+**Only release builds from mc-master!** This will deploy straight to our libs-release-local repo, **you have been warned**.
 
-First make sure the version is correct in pdfjs.config.  Then run:
+First make sure the version is correct in pdfjs.config. Then run:
 
     $ gulp mc-deploy-release
 
-Please don't forget to tag the commit you deployed and push the tags to the repository with a command similar to the following:
+Please don't forget to tag the commit you deployed and push the tags to the repository with commands similar to the following:
 
+    $ git tag -a v3.1.37-mc -m "Release v3.1.37-mc"
     $ git push --tags origin mc-master
+    
+We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to help differentiate our tags since we're building from a different branch and the commit counting (used in the automatic version number creation) will be different and likely _behind_ the Mozilla PDFjs numbers.
 
 # ORIGINAL README BELOW
 # PDF.js [![Build Status](https://github.com/mozilla/pdf.js/workflows/CI/badge.svg?branch=master)](https://github.com/mozilla/pdf.js/actions?query=workflow%3ACI+branch%3Amaster)

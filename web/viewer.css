@@ -22,10 +22,10 @@
   --sidebar-transition-timing-function: ease;
   --scale-select-width: 140px;
 
-  --toolbar-icon-opacity: 0.7;
+  --toolbar-icon-opacity: 1;
   --doorhanger-icon-opacity: 0.9;
 
-  --main-color: rgba(12, 12, 13, 1);
+  --main-color: hsla(208, 28%, 20%);
   --body-bg-color: rgba(237, 237, 240, 1);
   --progressBar-percent: 0%;
   --progressBar-end-offset: 0;
@@ -34,8 +34,9 @@
   --progressBar-indeterminate-blend-color: rgba(116, 177, 239, 1);
   --scrollbar-color: auto;
   --scrollbar-bg-color: auto;
-  --toolbar-icon-bg-color: rgba(0, 0, 0, 1);
-  --toolbar-icon-hover-bg-color: rgba(0, 0, 0, 1);
+  --toolbar-icon-bg-color: rgba(255, 255, 255, 1); /*TODO: consider 0 opacity*/
+  --toolbar-icon-hover-bg-color: rgba(0, 0, 0, 0);
+  --original-toolbar-icon-hover-bg-color: rgba(255, 255, 255, 1);
 
   --sidebar-narrow-bg-color: rgba(237, 237, 240, 0.9);
   --sidebar-toolbar-bg-color: rgba(245, 246, 247, 1);
@@ -48,13 +49,13 @@
     0 1px 0 rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1);
   --toolbarSidebar-border-bottom: none;
   --button-hover-color: rgba(221, 222, 223, 1);
-  --toggled-btn-color: rgba(0, 0, 0, 1);
+  --toggled-btn-color: none;
   --toggled-btn-bg-color: rgba(0, 0, 0, 0.3);
   --toggled-hover-active-btn-color: rgba(0, 0, 0, 0.4);
-  --dropdown-btn-bg-color: rgba(215, 215, 219, 1);
-  --dropdown-btn-border: none;
+  --dropdown-btn-bg-color: rgba(255, 255, 255, 1);
+  --dropdown-btn-border: 1px solid var(--field-border-color);
   --separator-color: rgba(0, 0, 0, 0.3);
-  --field-color: rgba(6, 6, 6, 1);
+  --field-color: var(--main-color);
   --field-bg-color: rgba(255, 255, 255, 1);
   --field-border-color: rgba(187, 187, 188, 1);
   --treeitem-color: rgba(0, 0, 0, 0.8);
@@ -118,6 +119,7 @@
   --dir-factor: -1;
 }
 
+/* mc removed dark scheme for forced consistency
 @media (prefers-color-scheme: dark) {
   :root {
     --main-color: rgba(249, 249, 250, 1);
@@ -158,10 +160,11 @@
 
     /* This image is used in <input> elements, which unfortunately means that
      * the `mask-image` approach used with all of the other images doesn't work
-     * here; hence why we still have two versions of this particular image. */
+     * here; hence why we still have two versions of this particular image. *!
     --loading-icon: url(images/loading-dark.svg);
   }
 }
+*/
 
 @media screen and (forced-colors: active) {
   :root {
@@ -473,10 +476,6 @@ body {
   height: auto;
 }
 
-.findbar input[type="checkbox"] {
-  pointer-events: none;
-}
-
 .findbar label {
   user-select: none;
 }
@@ -484,11 +483,9 @@ body {
 .findbar label:hover,
 .findbar input:focus-visible + label {
   color: var(--toggled-btn-color);
-  background-color: var(--button-hover-color);
 }
 
 .findbar .toolbarField[type="checkbox"]:checked + .toolbarLabel {
-  background-color: var(--toggled-btn-bg-color) !important;
   color: var(--toggled-btn-color);
 }
 
@@ -575,10 +572,6 @@ body {
   max-height: calc(var(--viewer-container-height) - 40px);
   overflow-y: auto;
   margin-bottom: -4px;
-}
-
-.secondaryToolbarButtonIcon {
-  padding-right: 7px;
 }
 
 #editorInkParamsToolbar {
@@ -804,13 +797,12 @@ body {
   top: 6px;
   inset-inline-end: 6px;
   pointer-events: none;
-  mask-image: var(--toolbarButton-menuArrow-icon);
 }
 
 .dropdownToolbarButton > select {
   appearance: none;
-  width: inherit;
-  height: 28px;
+  width: calc(var(--scale-select-width) - 6px);
+  height: 24px;
   font-size: 12px;
   color: var(--main-color);
   margin: 0;
@@ -823,6 +815,9 @@ body {
 .dropdownToolbarButton > select:focus-visible {
   background-color: var(--button-hover-color);
   color: var(--toggled-btn-color);
+  background-image: var(--toolbarButton-menuArrow-icon);
+  background-repeat: no-repeat;
+  background-position: center right;
 }
 .dropdownToolbarButton > select > option {
   background: var(--doorhanger-bg-color);
@@ -845,9 +840,8 @@ body {
   display: inline-block;
   width: 16px;
   height: 16px;
-
   content: "";
-  background-color: var(--toolbar-icon-bg-color);
+  /*background-color: var(--toolbar-icon-bg-color);*/ /*TODO: do we need this?*/
   mask-size: cover;
 }
 
@@ -878,40 +872,50 @@ body {
 
 #sidebarToggle::before {
   mask-image: var(--toolbarButton-sidebarToggle-icon);
+  background-color: rgba(1, 1, 1, 1); /*TODO: consider 0 opacity*/
   transform: scaleX(var(--dir-factor));
 }
 
 #secondaryToolbarToggle::before {
-  mask-image: var(--toolbarButton-secondaryToolbarToggle-icon);
+  font: 14px FontAwesome;
+  content: "\f101";
   transform: scaleX(var(--dir-factor));
 }
 
 #findPrevious::before {
-  mask-image: var(--findbarButton-previous-icon);
+  font: 14px FontAwesome;
+  content: "\f104";
 }
 
 #findNext::before {
-  mask-image: var(--findbarButton-next-icon);
+  font: 14px FontAwesome;
+  content: "\f105";
 }
 
 #previous::before {
-  mask-image: var(--toolbarButton-pageUp-icon);
+  font: 14px FontAwesome;
+  content: "\f062";
 }
 
 #next::before {
-  mask-image: var(--toolbarButton-pageDown-icon);
+  font: 14px FontAwesome;
+  content: "\f063";
 }
 
 #zoomOut::before {
-  mask-image: var(--toolbarButton-zoomOut-icon);
+  font: 14px FontAwesome;
+  content: "\f068";
 }
 
 #zoomIn::before {
-  mask-image: var(--toolbarButton-zoomIn-icon);
+  font: 14px FontAwesome;
+  content: "\f067";
 }
 
-#presentationMode::before {
-  mask-image: var(--toolbarButton-presentationMode-icon);
+#presentationMode::before,
+#secondaryPresentationMode::before {
+  font: 14px FontAwesome;
+  content: "\f0b2";
 }
 
 #editorFreeText::before {
@@ -924,7 +928,8 @@ body {
 
 #print::before,
 #secondaryPrint::before {
-  mask-image: var(--toolbarButton-print-icon);
+  font: 14px FontAwesome;
+  content: "\f02f";
 }
 
 /*#if GENERIC*/
@@ -950,7 +955,8 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 #viewBookmark::before {
-  mask-image: var(--toolbarButton-bookmark-icon);
+  font: 14px FontAwesome;
+  content: "\f02e";
 }
 
 #viewThumbnail::before {
@@ -976,7 +982,8 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 #viewFind::before {
-  mask-image: var(--toolbarButton-search-icon);
+  font: 14px FontAwesome;
+  content: "\f002";
 }
 
 .pdfSidebarNotification::after {
@@ -1012,27 +1019,33 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 #firstPage::before {
-  mask-image: var(--secondaryToolbarButton-firstPage-icon);
+  font: 14px FontAwesome;
+  content: "\f062";
 }
 
 #lastPage::before {
-  mask-image: var(--secondaryToolbarButton-lastPage-icon);
+  font: 14px FontAwesome;
+  content: "\f063";
 }
 
 #pageRotateCcw::before {
-  mask-image: var(--secondaryToolbarButton-rotateCcw-icon);
+  font: 14px FontAwesome;
+  content: "\f0e2";
 }
 
 #pageRotateCw::before {
-  mask-image: var(--secondaryToolbarButton-rotateCw-icon);
+  font: 14px FontAwesome;
+  content: "\f01e";
 }
 
 #cursorSelectTool::before {
-  mask-image: var(--secondaryToolbarButton-selectTool-icon);
+  font: 14px FontAwesome;
+  content: "\f245";
 }
 
 #cursorHandTool::before {
-  mask-image: var(--secondaryToolbarButton-handTool-icon);
+  font: 14px FontAwesome;
+  content: "\f256";
 }
 
 #scrollPage::before {
@@ -1040,15 +1053,18 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 #scrollVertical::before {
-  mask-image: var(--secondaryToolbarButton-scrollVertical-icon);
+  font: 14px FontAwesome;
+  content: "\f07d";
 }
 
 #scrollHorizontal::before {
-  mask-image: var(--secondaryToolbarButton-scrollHorizontal-icon);
+  font: 14px FontAwesome;
+  content: "\f07e";
 }
 
 #scrollWrapped::before {
-  mask-image: var(--secondaryToolbarButton-scrollWrapped-icon);
+  font: 14px FontAwesome;
+  content: "\f00a";
 }
 
 #spreadNone::before {
@@ -1061,6 +1077,10 @@ a.secondaryToolbarButton[href="#"] {
 
 #spreadEven::before {
   mask-image: var(--secondaryToolbarButton-spreadEven-icon);
+}
+
+#spreadModeButtons button::before {
+  background-color: var(--main-color);
 }
 
 #documentProperties::before {
@@ -1097,11 +1117,8 @@ a.secondaryToolbarButton[href="#"] {
 }
 
 .toolbarField[type="checkbox"] {
-  opacity: 0;
-  position: absolute !important;
-  left: 0;
-  margin: 10px 0 3px;
-  margin-inline-start: 7px;
+  margin: 10px 0;
+  margin-left: -3px;
 }
 
 #pageNumber {
@@ -1507,7 +1524,7 @@ dialog :link {
 }
 
 .mcWatermark {
-  margin:50% auto;
+  margin: 50% auto;
   opacity: 0.6;
   font-size: 650%;
   text-align: center;
@@ -1517,19 +1534,19 @@ dialog :link {
 
 .mcToolbar {
   background-image: none !important;
-  background-color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 1) !important;
 }
 
-.mcToolbar * button {
+.mcToolbar * button,
+.mcToolbar * a {
   box-sizing: border-box !important;
 }
 
-.mcToolbar option{
+.mcToolbar option {
   background-image: none !important;
-  background-color: #ffffff !important;
-  color: hsl(208, 28%, 20%)
+  background-color: rgba(255, 255, 255, 1) !important;
+  color: hsl(208, 28%, 20%);
 }
-
 
 .mcViewer {
   background-color: #243340 !important;
@@ -1539,19 +1556,19 @@ dialog :link {
   border-image: none;
 }
 
-.mcToolbar:after{
+.mcToolbar:after {
   border-bottom-color: #34495d;
 }
 
 .mcSidebar {
-  background-color: #202C37 !important;
+  background-color: #202c37 !important;
 }
 
 .mcThumbnail {
-  padding: 0px !important;
-  margin-bottom: 0px !important;
+  padding: 0 !important;
+  margin-bottom: 0 !important;
   line-height: 0 !important;
-  background-color: #202C37 !important;
+  background-color: #202c37 !important;
   border: none !important;
 }
 
@@ -1564,4 +1581,3 @@ dialog :link {
 * {
   box-sizing: initial !important;
 }
-
