@@ -3,10 +3,10 @@ name: Security Checks
 on:
   pull_request:
     branches:
-      - main
+      - mc-master
   push:
     branches:
-      - main
+      - mc-master
 
 permissions:
   contents: read
