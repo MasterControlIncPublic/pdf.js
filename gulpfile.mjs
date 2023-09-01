@@ -77,9 +77,9 @@ const MOZCENTRAL_DIFF_FILE = "mozcentral.diff";
 
 const DIST_REPO_URL = "https://github.com/mozilla/pdfjs-dist";
 const ARTIFACTORY_RELEASE_REPO_URL =
-    "https://labs.mastercontrol.com/artifactory/libs-release-local/";
+    "https://mastercontrol.jfrog.io/artifactory/libs-release-local/";
 const ARTIFACTORY_SNAPSHOT_REPO_URL =
-    "https://labs.mastercontrol.com/artifactory/libs-snapshot-local/";
+    "https://mastercontrol.jfrog.io/artifactory/libs-snapshot-local/";
 
 const CONFIG_FILE = "pdfjs.config";
 const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
@@ -1866,8 +1866,8 @@ function mcDeploy(deployUrl, done) {
     .pipe(
       artifactoryUpload({
         url: deployUrl,
-        username: process.env.artifactory_username,
-        password: process.env.artifactory_password,
+        username: process.env.mc_artifactory_user,
+        password: process.env.mc_artifactory_api_key,
       })
     )
     .on("error", console.log)
