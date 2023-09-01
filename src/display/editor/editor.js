@@ -146,7 +146,7 @@ class AnnotationEditor {
    * @param {string} mime
    * @returns {boolean}
    */
-  static isHandlingMimeForPasting(mime) {
+  static isHandlingMimeForPasting(_mime) {
     return false;
   }
 
@@ -998,7 +998,7 @@ class AnnotationEditor {
    * @param {boolean} isForCopying
    * @param {Object} [context]
    */
-  serialize(isForCopying = false, context = null) {
+  serialize(_isForCopying = false, _context = null) {
     unreachable("An editor must be serializable");
   }
 

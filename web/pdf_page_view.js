@@ -550,7 +550,7 @@ class PDFPageView {
 
   /**
    * Update e.g. the scale and/or rotation of the page.
-   * @param {PDFPageViewUpdateParameters} params
+   * @param {PDFPageViewUpdateParameters}
    */
   update({
     scale = 0,

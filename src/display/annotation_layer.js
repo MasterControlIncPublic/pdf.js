@@ -15,16 +15,12 @@
 
 /** @typedef {import("./api").PDFPageProxy} PDFPageProxy */
 /** @typedef {import("./display_utils").PageViewport} PageViewport */
-// eslint-disable-next-line max-len
-/** @typedef {import("../../web/text_accessibility.js").TextAccessibilityManager} TextAccessibilityManager */
-// eslint-disable-next-line max-len
-/** @typedef {import("../../web/interfaces").IDownloadManager} IDownloadManager */
+/** @typedef {import("./interfaces").IDownloadManager} IDownloadManager */
 /** @typedef {import("../../web/interfaces").IPDFLinkService} IPDFLinkService */
 
 import {
   AnnotationBorderStyleType,
   AnnotationEditorType,
-  AnnotationPrefix,
   AnnotationType,
   FeatureTest,
   LINE_FACTOR,
@@ -34,6 +30,7 @@ import {
   warn,
 } from "../shared/util.js";
 import {
+  AnnotationPrefix,
   DOMSVGFactory,
   getFilenameFromUrl,
   PDFDateString,
@@ -1957,10 +1954,7 @@ class PopupAnnotationElement extends AnnotationElement {
       element.addHighlightArea();
     }
 
-    this.container.setAttribute(
-      "aria-controls",
-      elementIds.map(id => `${AnnotationPrefix}${id}`).join(",")
-    );
+    this.container.setAttribute("aria-controls", elementIds.join(","));
 
     return this.container;
   }

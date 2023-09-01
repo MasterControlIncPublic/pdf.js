@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-/** @typedef {import("./api").TextContent} TextContent */
-
 class XfaText {
   /**
    * Walk an XFA tree and create an array of text nodes that is compatible

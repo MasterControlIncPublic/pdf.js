@@ -195,7 +195,7 @@ function watchScroll(viewAreaElement, callback) {
 
 /**
  * Helper function to parse query string (e.g. ?param1=value&param2=...).
- * @param {string} query
+ * @param {string}
  * @returns {Map}
  */
 function parseQueryString(query) {
@@ -461,7 +461,7 @@ function backtrackBeforeAllVisibleElements(index, views, top) {
  * rendering canvas. Earlier and later refer to index in `views`, not page
  * layout.)
  *
- * @param {GetVisibleElementsParameters} params
+ * @param {GetVisibleElementsParameters}
  * @returns {Object} `{ first, last, views: [{ id, x, y, view, percent }] }`
  */
 function getVisibleElements({
@@ -802,7 +802,7 @@ function getActiveOrFocusedElement() {
 
 /**
  * Converts API PageLayout values to the format used by `BaseViewer`.
- * @param {string} layout - The API PageLayout value.
+ * @param {string} mode - The API PageLayout value.
  * @returns {Object}
  */
 function apiPageLayoutToViewerModes(layout) {

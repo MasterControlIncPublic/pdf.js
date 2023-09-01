@@ -13,11 +13,6 @@
  * limitations under the License.
  */
 
-/** @typedef {import("../interfaces").IPDFStream} IPDFStream */
-/** @typedef {import("../interfaces").IPDFStreamReader} IPDFStreamReader */
-// eslint-disable-next-line max-len
-/** @typedef {import("../interfaces").IPDFStreamRangeReader} IPDFStreamRangeReader */
-
 import { assert, PromiseCapability } from "../shared/util.js";
 import { isPdfFile } from "./display_utils.js";
 

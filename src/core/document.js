@@ -651,9 +651,6 @@ class Page {
     if (!structTreeRoot) {
       return null;
     }
-    // Ensure that the structTree will contain the page's annotations.
-    await this._parsedAnnotations;
-
     const structTree = await this.pdfManager.ensure(this, "_parseStructTree", [
       structTreeRoot,
     ]);
@@ -665,7 +662,7 @@ class Page {
    */
   _parseStructTree(structTreeRoot) {
     const tree = new StructTreePage(structTreeRoot, this.pageDict);
-    tree.parse(this.ref);
+    tree.parse();
     return tree;
   }
 
@@ -743,8 +740,7 @@ class Page {
               annotationRef,
               this.pdfManager,
               this._localIdFactory,
-              /* collectFields */ false,
-              this.ref
+              /* collectFields */ false
             ).catch(function (reason) {
               warn(`_parsedAnnotations: "${reason}".`);
               return null;
@@ -1723,8 +1719,7 @@ class PDFDocument {
         fieldRef,
         this.pdfManager,
         this._localIdFactory,
-        /* collectFields */ true,
-        /* pageRef */ null
+        /* collectFields */ true
       )
         .then(annotation => annotation?.getFieldObject())
         .catch(function (reason) {
