@@ -51,6 +51,7 @@ class TextLayerBuilder {
     accessibilityManager = null,
     isOffscreenCanvasSupported = true,
     enablePermissions = false,
+    waterMarkText = null,
   }) {
     this.textContentItemsStr = [];
     this.renderingDone = false;
@@ -64,6 +65,11 @@ class TextLayerBuilder {
 
     this.div = document.createElement("div");
     this.div.className = "textLayer";
+
+    this.textLayerWatermark = document.createElement("p");
+    this.textLayerWatermark.className = "mcWatermark";
+    this.textLayerWatermark.textContent = waterMarkText;
+    this.div.append(this.textLayerWatermark);
     this.hide();
   }
 

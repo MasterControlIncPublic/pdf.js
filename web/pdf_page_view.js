@@ -851,31 +851,13 @@ class PDFPageView {
       !pdfPage.isPureXfa
     ) {
       this._accessibilityManager ||= new TextAccessibilityManager();
-      // TODO: NEED TO UPDATE THIS TO INCLUDE MC STUFF (WATERMARK, ETC)
-      // const textLayerDiv = document.createElement("div");
-      // textLayerDiv.className = "textLayer";
-      // textLayerDiv.style.width = canvasWrapper.style.width;
-      // textLayerDiv.style.height = canvasWrapper.style.height;
-      //
-      // const textLayerWatermark = document.createElement("p");
-      // const waterMarkText = getWatermarkText();
-      // textLayerWatermark.className = "mcWatermark";
-      // textLayerWatermark.textContent = waterMarkText;
-      // textLayerDiv.append(textLayerWatermark);
-      //
-      // if (lastDivBeforeTextDiv) {
-      //   // The annotation layer needs to stay on top.
-      //   lastDivBeforeTextDiv.before(textLayerDiv);
-      // } else {
-      //   div.append(textLayerDiv);
-      // }
-
       this.textLayer = new TextLayerBuilder({
         highlighter: this._textHighlighter,
         accessibilityManager: this._accessibilityManager,
         isOffscreenCanvasSupported: this.isOffscreenCanvasSupported,
         enablePermissions:
           this.#textLayerMode === TextLayerMode.ENABLE_PERMISSIONS,
+        waterMarkText: getWatermarkText(),
       });
       div.append(this.textLayer.div);
     }
