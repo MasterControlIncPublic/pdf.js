@@ -34,7 +34,6 @@ import {
 import {
   approximateFraction,
   DEFAULT_SCALE,
-  docStyle,
   getWatermarkText,
   OutputScale,
   RenderingStates,

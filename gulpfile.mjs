@@ -16,6 +16,7 @@
 
 import * as builder from "./external/builder/builder.mjs";
 import { exec, spawn, spawnSync } from "child_process";
+import artifactoryUpload from "gulp-artifactory-upload";
 import autoprefixer from "autoprefixer";
 import babel from "@babel/core";
 import crypto from "crypto";
@@ -39,7 +40,6 @@ import Vinyl from "vinyl";
 import webpack2 from "webpack";
 import webpackStream from "webpack-stream";
 import zip from "gulp-zip";
-import artifactoryUpload from "gulp-artifactory-upload";
 
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
