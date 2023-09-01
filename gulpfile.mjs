@@ -41,7 +41,6 @@ import webpack2 from "webpack";
 import webpackStream from "webpack-stream";
 import zip from "gulp-zip";
 
-
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const BUILD_DIR = "build/";
