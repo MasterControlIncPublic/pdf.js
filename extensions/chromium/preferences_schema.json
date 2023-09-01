@@ -28,6 +28,12 @@
       ],
       "default": 0
     },
+    "defaultZoomDelay": {
+      "title": "Default zoom delay",
+      "description": "Delay (in ms) to wait before redrawing the canvas.",
+      "type": "integer",
+      "default": 400
+    },
     "defaultZoomValue": {
       "title": "Default zoom level",
       "description": "Default zoom level of the viewer. Accepted values: 'auto', 'page-actual', 'page-width', 'page-height', 'page-fit', or a zoom level in percents.",
@@ -75,6 +81,10 @@
       "description": "Whether to allow execution of active content (JavaScript) by PDF files.",
       "default": false
     },
+    "enableStampEditor": {
+      "type": "boolean",
+      "default": true
+    },
     "disableRange": {
       "title": "Disable range requests",
       "description": "Whether to disable range requests (not recommended).",
@@ -111,10 +121,6 @@
         1
       ],
       "default": 1
-    },
-    "useOnlyCssZoom": {
-      "type": "boolean",
-      "default": false
     },
     "externalLinkTarget": {
       "title": "External links target window",

@@ -12,19 +12,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/* globals process */
 
-// Skip compatibility checks for modern builds and if we already ran the module.
-if (
-  typeof PDFJSDev !== "undefined" &&
-  !PDFJSDev.test("SKIP_BABEL") &&
-  !globalThis._pdfjsCompatibilityChecked
-) {
-  globalThis._pdfjsCompatibilityChecked = true;
-  require("./compatibility.js");
-}
+// NW.js / Electron is a browser context, but copies some Node.js objects; see
+// http://docs.nwjs.io/en/latest/For%20Users/Advanced/JavaScript%20Contexts%20in%20NW.js/#access-nodejs-and-nwjs-api-in-browser-context
+// https://www.electronjs.org/docs/api/process#processversionselectron-readonly
+// https://www.electronjs.org/docs/api/process#processtype-readonly
+const isNodeJS =
+  (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) &&
+  typeof process === "object" &&
+  process + "" === "[object process]" &&
+  !process.versions.nw &&
+  !(process.versions.electron && process.type && process.type !== "browser");
 
 const IDENTITY_MATRIX = [1, 0, 0, 1, 0, 0];
 const FONT_IDENTITY_MATRIX = [0.001, 0, 0, 0.001, 0, 0];
+
+const MAX_IMAGE_SIZE_TO_CACHE = 10e6; // Ten megabytes.
 
 // Represent the percentage of the height of a single-line field over
 // the font size. Acrobat seems to use this value.
@@ -68,16 +72,19 @@ const AnnotationEditorType = {
   DISABLE: -1,
   NONE: 0,
   FREETEXT: 3,
+  STAMP: 13,
   INK: 15,
 };
 
 const AnnotationEditorParamsType = {
-  FREETEXT_SIZE: 1,
-  FREETEXT_COLOR: 2,
-  FREETEXT_OPACITY: 3,
-  INK_COLOR: 11,
-  INK_THICKNESS: 12,
-  INK_OPACITY: 13,
+  RESIZE: 1,
+  CREATE: 2,
+  FREETEXT_SIZE: 11,
+  FREETEXT_COLOR: 12,
+  FREETEXT_OPACITY: 13,
+  INK_COLOR: 21,
+  INK_THICKNESS: 22,
+  INK_OPACITY: 23,
 };
 
 // Permission flags from Table 22, Section 7.6.3.2 of the PDF specification.
@@ -138,24 +145,6 @@ const AnnotationType = {
   WATERMARK: 24,
   THREED: 25,
   REDACT: 26,
-};
-
-const AnnotationStateModelType = {
-  MARKED: "Marked",
-  REVIEW: "Review",
-};
-
-const AnnotationMarkedState = {
-  MARKED: "Marked",
-  UNMARKED: "Unmarked",
-};
-
-const AnnotationReviewState = {
-  ACCEPTED: "Accepted",
-  REJECTED: "Rejected",
-  CANCELLED: "Cancelled",
-  COMPLETED: "Completed",
-  NONE: "None",
 };
 
 const AnnotationReplyType = {
@@ -234,34 +223,6 @@ const DocumentActionEventType = {
 const PageActionEventType = {
   O: "PageOpen",
   C: "PageClose",
-};
-
-const StreamType = {
-  UNKNOWN: "UNKNOWN",
-  FLATE: "FLATE",
-  LZW: "LZW",
-  DCT: "DCT",
-  JPX: "JPX",
-  JBIG: "JBIG",
-  A85: "A85",
-  AHX: "AHX",
-  CCF: "CCF",
-  RLX: "RLX", // PDF short name is 'RL', but telemetry requires three chars.
-};
-
-const FontType = {
-  UNKNOWN: "UNKNOWN",
-  TYPE1: "TYPE1",
-  TYPE1STANDARD: "TYPE1STANDARD",
-  TYPE1C: "TYPE1C",
-  CIDFONTTYPE0: "CIDFONTTYPE0",
-  CIDFONTTYPE0C: "CIDFONTTYPE0C",
-  TRUETYPE: "TRUETYPE",
-  CIDFONTTYPE2: "CIDFONTTYPE2",
-  TYPE3: "TYPE3",
-  OPENTYPE: "OPENTYPE",
-  TYPE0: "TYPE0",
-  MMTYPE1: "MMTYPE1",
 };
 
 const VerbosityLevel = {
@@ -374,29 +335,6 @@ const OPS = {
   constructPath: 91,
 };
 
-const UNSUPPORTED_FEATURES = {
-  forms: "forms",
-  javaScript: "javaScript",
-  signatures: "signatures",
-  smask: "smask",
-  shadingPattern: "shadingPattern",
-  errorTilingPattern: "errorTilingPattern",
-  errorExtGState: "errorExtGState",
-  errorXObject: "errorXObject",
-  errorFontLoadType3: "errorFontLoadType3",
-  errorFontState: "errorFontState",
-  errorFontMissing: "errorFontMissing",
-  errorFontTranslate: "errorFontTranslate",
-  errorColorSpace: "errorColorSpace",
-  errorOperatorList: "errorOperatorList",
-  errorFontToUnicode: "errorFontToUnicode",
-  errorFontLoadNative: "errorFontLoadNative",
-  errorFontBuildPath: "errorFontBuildPath",
-  errorFontGetPath: "errorFontGetPath",
-  errorMarkedContent: "errorMarkedContent",
-  errorContentSubStream: "errorContentSubStream",
-};
-
 const PasswordResponses = {
   NEED_PASSWORD: 1,
   INCORRECT_PASSWORD: 2,
@@ -442,10 +380,7 @@ function assert(cond, msg) {
 
 // Checks if URLs use one of the allowed protocols, e.g. to avoid XSS.
 function _isValidProtocol(url) {
-  if (!url) {
-    return false;
-  }
-  switch (url.protocol) {
+  switch (url?.protocol) {
     case "http:":
     case "https:":
     case "ftp:":
@@ -476,7 +411,7 @@ function createValidAbsoluteUrl(url, baseUrl = null, options = null) {
         const dots = url.match(/\./g);
         // Avoid accidentally matching a *relative* URL pointing to a file named
         // e.g. "www.pdf" or similar.
-        if (dots && dots.length >= 2) {
+        if (dots?.length >= 2) {
           url = `http://${url}`;
         }
       }
@@ -486,7 +421,7 @@ function createValidAbsoluteUrl(url, baseUrl = null, options = null) {
       if (options.tryConvertEncoding) {
         try {
           url = stringToUTF8String(url);
-        } catch (ex) {}
+        } catch {}
       }
     }
 
@@ -494,17 +429,14 @@ function createValidAbsoluteUrl(url, baseUrl = null, options = null) {
     if (_isValidProtocol(absoluteUrl)) {
       return absoluteUrl;
     }
-  } catch (ex) {
+  } catch {
     /* `new URL()` will throw on incorrect data. */
   }
   return null;
 }
 
 function shadow(obj, prop, value, nonSerializable = false) {
-  if (
-    typeof PDFJSDev === "undefined" ||
-    PDFJSDev.test("!PRODUCTION || TESTING")
-  ) {
+  if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
     assert(
       prop in obj,
       `shadow: Property "${prop && prop.toString()}" not found in object.`
@@ -589,11 +521,7 @@ class AbortException extends BaseException {
 }
 
 function bytesToString(bytes) {
-  if (
-    typeof bytes !== "object" ||
-    bytes === null ||
-    bytes.length === undefined
-  ) {
+  if (typeof bytes !== "object" || bytes?.length === undefined) {
     unreachable("Invalid argument for bytesToString");
   }
   const length = bytes.length;
@@ -622,61 +550,8 @@ function stringToBytes(str) {
   return bytes;
 }
 
-/**
- * Gets length of the array (Array, Uint8Array, or string) in bytes.
- * @param {Array<any>|Uint8Array|string} arr
- * @returns {number}
- */
-// eslint-disable-next-line consistent-return
-function arrayByteLength(arr) {
-  if (arr.length !== undefined) {
-    return arr.length;
-  }
-  if (arr.byteLength !== undefined) {
-    return arr.byteLength;
-  }
-  unreachable("Invalid argument for arrayByteLength");
-}
-
-/**
- * Combines array items (arrays) into single Uint8Array object.
- * @param {Array<Array<any>|Uint8Array|string>} arr - the array of the arrays
- *   (Array, Uint8Array, or string).
- * @returns {Uint8Array}
- */
-function arraysToBytes(arr) {
-  const length = arr.length;
-  // Shortcut: if first and only item is Uint8Array, return it.
-  if (length === 1 && arr[0] instanceof Uint8Array) {
-    return arr[0];
-  }
-  let resultLength = 0;
-  for (let i = 0; i < length; i++) {
-    resultLength += arrayByteLength(arr[i]);
-  }
-  let pos = 0;
-  const data = new Uint8Array(resultLength);
-  for (let i = 0; i < length; i++) {
-    let item = arr[i];
-    if (!(item instanceof Uint8Array)) {
-      if (typeof item === "string") {
-        item = stringToBytes(item);
-      } else {
-        item = new Uint8Array(item);
-      }
-    }
-    const itemLength = item.byteLength;
-    data.set(item, pos);
-    pos += itemLength;
-  }
-  return data;
-}
-
 function string32(value) {
-  if (
-    typeof PDFJSDev === "undefined" ||
-    PDFJSDev.test("!PRODUCTION || TESTING")
-  ) {
+  if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
     assert(
       typeof value === "number" && Math.abs(value) < 2 ** 32,
       `string32: Unexpected input "${value}".`
@@ -717,7 +592,7 @@ function isEvalSupported() {
   try {
     new Function(""); // eslint-disable-line no-new, no-new-func
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
@@ -736,6 +611,27 @@ class FeatureTest {
       this,
       "isOffscreenCanvasSupported",
       typeof OffscreenCanvas !== "undefined"
+    );
+  }
+
+  static get platform() {
+    if (
+      (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) &&
+      typeof navigator === "undefined"
+    ) {
+      return shadow(this, "platform", { isWin: false, isMac: false });
+    }
+    return shadow(this, "platform", {
+      isWin: navigator.platform.includes("Win"),
+      isMac: navigator.platform.includes("Mac"),
+    });
+  }
+
+  static get isCSSRoundSupported() {
+    return shadow(
+      this,
+      "isCSSRoundSupported",
+      globalThis.CSS?.supports?.("width: round(1.5px, 1px)")
     );
   }
 }
@@ -829,10 +725,10 @@ class Util {
   // Applies the transform to the rectangle and finds the minimum axially
   // aligned bounding box.
   static getAxialAlignedBoundingBox(r, m) {
-    const p1 = Util.applyTransform(r, m);
-    const p2 = Util.applyTransform(r.slice(2, 4), m);
-    const p3 = Util.applyTransform([r[0], r[3]], m);
-    const p4 = Util.applyTransform([r[2], r[1]], m);
+    const p1 = this.applyTransform(r, m);
+    const p2 = this.applyTransform(r.slice(2, 4), m);
+    const p3 = this.applyTransform([r[0], r[3]], m);
+    const p4 = this.applyTransform([r[2], r[1]], m);
     return [
       Math.min(p1[0], p2[0], p3[0], p4[0]),
       Math.min(p1[1], p2[1], p3[1], p4[1]),
@@ -1046,7 +942,7 @@ function utf8StringToString(str) {
 }
 
 function isArrayBuffer(v) {
-  return typeof v === "object" && v !== null && v.byteLength !== undefined;
+  return typeof v === "object" && v?.byteLength !== undefined;
 }
 
 function isArrayEqual(arr1, arr2) {
@@ -1074,42 +970,81 @@ function getModificationDate(date = new Date()) {
   return buffer.join("");
 }
 
-/**
- * Promise Capability object.
- *
- * @typedef {Object} PromiseCapability
- * @property {Promise<any>} promise - A Promise object.
- * @property {boolean} settled - If the Promise has been fulfilled/rejected.
- * @property {function} resolve - Fulfills the Promise.
- * @property {function} reject - Rejects the Promise.
- */
+class PromiseCapability {
+  #settled = false;
 
-/**
- * Creates a promise capability object.
- * @alias createPromiseCapability
- *
- * @returns {PromiseCapability}
- */
-function createPromiseCapability() {
-  const capability = Object.create(null);
-  let isSettled = false;
+  constructor() {
+    /**
+     * @type {Promise<any>} The Promise object.
+     */
+    this.promise = new Promise((resolve, reject) => {
+      /**
+       * @type {function} Fulfills the Promise.
+       */
+      this.resolve = data => {
+        this.#settled = true;
+        resolve(data);
+      };
 
-  Object.defineProperty(capability, "settled", {
-    get() {
-      return isSettled;
-    },
+      /**
+       * @type {function} Rejects the Promise.
+       */
+      this.reject = reason => {
+        if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
+          assert(reason instanceof Error, 'Expected valid "reason" argument.');
+        }
+        this.#settled = true;
+        reject(reason);
+      };
+    });
+  }
+
+  /**
+   * @type {boolean} If the Promise has been fulfilled/rejected.
+   */
+  get settled() {
+    return this.#settled;
+  }
+}
+
+let NormalizeRegex = null;
+let NormalizationMap = null;
+function normalizeUnicode(str) {
+  if (!NormalizeRegex) {
+    // In order to generate the following regex:
+    //  - create a PDF containing all the chars in the range 0000-FFFF with
+    //    a NFKC which is different of the char.
+    //  - copy and paste all those chars and get the ones where NFKC is
+    //    required.
+    // It appears that most the chars here contain some ligatures.
+    NormalizeRegex =
+      /([\u00a0\u00b5\u037e\u0eb3\u2000-\u200a\u202f\u2126\ufb00-\ufb04\ufb06\ufb20-\ufb36\ufb38-\ufb3c\ufb3e\ufb40-\ufb41\ufb43-\ufb44\ufb46-\ufba1\ufba4-\ufba9\ufbae-\ufbb1\ufbd3-\ufbdc\ufbde-\ufbe7\ufbea-\ufbf8\ufbfc-\ufbfd\ufc00-\ufc5d\ufc64-\ufcf1\ufcf5-\ufd3d\ufd88\ufdf4\ufdfa-\ufdfb\ufe71\ufe77\ufe79\ufe7b\ufe7d]+)|(\ufb05+)/gu;
+    NormalizationMap = new Map([["ﬅ", "ſt"]]);
+  }
+  return str.replaceAll(NormalizeRegex, (_, p1, p2) => {
+    return p1 ? p1.normalize("NFKC") : NormalizationMap.get(p2);
   });
-  capability.promise = new Promise(function (resolve, reject) {
-    capability.resolve = function (data) {
-      isSettled = true;
-      resolve(data);
-    };
-    capability.reject = function (reason) {
-      isSettled = true;
-      reject(reason);
-    };
-  });
-  return capability;
+}
+
+function getUuid() {
+  if (
+    (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+    (typeof crypto !== "undefined" && typeof crypto?.randomUUID === "function")
+  ) {
+    return crypto.randomUUID();
+  }
+  const buf = new Uint8Array(32);
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto?.getRandomValues === "function"
+  ) {
+    crypto.getRandomValues(buf);
+  } else {
+    for (let i = 0; i < 32; i++) {
+      buf[i] = Math.floor(Math.random() * 255);
+    }
+  }
+  return bytesToString(buf);
 }
 
 export {
@@ -1121,27 +1056,21 @@ export {
   AnnotationEditorType,
   AnnotationFieldFlag,
   AnnotationFlag,
-  AnnotationMarkedState,
   AnnotationMode,
   AnnotationReplyType,
-  AnnotationReviewState,
-  AnnotationStateModelType,
   AnnotationType,
-  arrayByteLength,
-  arraysToBytes,
   assert,
   BaseException,
   BASELINE_FACTOR,
   bytesToString,
   CMapCompressionType,
-  createPromiseCapability,
   createValidAbsoluteUrl,
   DocumentActionEventType,
   FeatureTest,
   FONT_IDENTITY_MATRIX,
-  FontType,
   FormatError,
   getModificationDate,
+  getUuid,
   getVerbosityLevel,
   IDENTITY_MATRIX,
   ImageKind,
@@ -1149,9 +1078,12 @@ export {
   InvalidPDFException,
   isArrayBuffer,
   isArrayEqual,
+  isNodeJS,
   LINE_DESCENT_FACTOR,
   LINE_FACTOR,
+  MAX_IMAGE_SIZE_TO_CACHE,
   MissingPDFException,
+  normalizeUnicode,
   objectFromMap,
   objectSize,
   OPS,
@@ -1159,10 +1091,10 @@ export {
   PasswordException,
   PasswordResponses,
   PermissionFlag,
+  PromiseCapability,
   RenderingIntentFlag,
   setVerbosityLevel,
   shadow,
-  StreamType,
   string32,
   stringToBytes,
   stringToPDFString,
@@ -1171,7 +1103,6 @@ export {
   UnexpectedResponseException,
   UnknownErrorException,
   unreachable,
-  UNSUPPORTED_FEATURES,
   utf8StringToString,
   Util,
   VerbosityLevel,
