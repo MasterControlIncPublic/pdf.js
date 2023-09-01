@@ -1549,7 +1549,7 @@ dialog :link {
   border-image: none;
 }
 
-.mcToolbar:after {
+.mcToolbar::after {
   border-bottom-color: #34495d;
 }
 
