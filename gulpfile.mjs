@@ -75,10 +75,8 @@ const COMMON_WEB_FILES = [
 const MOZCENTRAL_DIFF_FILE = "mozcentral.diff";
 
 const DIST_REPO_URL = "https://github.com/mozilla/pdfjs-dist";
-const ARTIFACTORY_RELEASE_REPO_URL =
-    "https://mastercontrol.jfrog.io/artifactory/libs-release-local/";
-const ARTIFACTORY_SNAPSHOT_REPO_URL =
-    "https://mastercontrol.jfrog.io/artifactory/libs-snapshot-local/";
+const ARTIFACTORY_RELEASE_REPO_URL = "https://mastercontrol.jfrog.io/artifactory/libs-release-local/";
+const ARTIFACTORY_SNAPSHOT_REPO_URL = "https://mastercontrol.jfrog.io/artifactory/libs-snapshot-local/";
 
 const CONFIG_FILE = "pdfjs.config";
 const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
