@@ -16,6 +16,7 @@
 import { createActionsMap } from "./common.js";
 import { PDFObject } from "./pdf_object.js";
 import { PrintParams } from "./print_params.js";
+import { serializeError } from "./app_utils.js";
 import { ZoomType } from "./constants.js";
 
 const DOC_EXTERNAL = false;
@@ -101,39 +102,54 @@ class Doc extends PDFObject {
     this._disableSaving = false;
   }
 
-  _dispatchDocEvent(name) {
-    if (name === "Open") {
-      const dontRun = new Set([
-        "WillClose",
-        "WillSave",
-        "DidSave",
-        "WillPrint",
-        "DidPrint",
-        "OpenAction",
-      ]);
-      // When a pdf has just been opened it doesn't really make sense
-      // to save it: it's up to the user to decide if they want to do that.
-      // A pdf can contain an action /FooBar which will trigger a save
-      // even if there are no WillSave/DidSave (which are themselves triggered
-      // after a save).
-      this._disableSaving = true;
-      for (const actionName of this._actions.keys()) {
-        if (!dontRun.has(actionName)) {
-          this._runActions(actionName);
-        }
+  _initActions() {
+    const dontRun = new Set([
+      "WillClose",
+      "WillSave",
+      "DidSave",
+      "WillPrint",
+      "DidPrint",
+      "OpenAction",
+    ]);
+    // When a pdf has just been opened it doesn't really make sense
+    // to save it: it's up to the user to decide if they want to do that.
+    // A pdf can contain an action /FooBar which will trigger a save
+    // even if there are no WillSave/DidSave (which are themselves triggered
+    // after a save).
+    this._disableSaving = true;
+    for (const actionName of this._actions.keys()) {
+      if (!dontRun.has(actionName)) {
+        this._runActions(actionName);
       }
-      this._runActions("OpenAction");
-      this._disableSaving = false;
-    } else if (name === "WillPrint") {
-      this._disablePrinting = true;
-      this._runActions(name);
-      this._disablePrinting = false;
-    } else if (name === "WillSave") {
-      this._disableSaving = true;
-      this._runActions(name);
-      this._disableSaving = false;
-    } else {
-      this._runActions(name);
+    }
+    this._runActions("OpenAction");
+    this._disableSaving = false;
+  }
+
+  _dispatchDocEvent(name) {
+    switch (name) {
+      case "Open":
+        this._disableSaving = true;
+        this._runActions("OpenAction");
+        this._disableSaving = false;
+        break;
+      case "WillPrint":
+        this._disablePrinting = true;
+        try {
+          this._runActions(name);
+        } catch (error) {
+          this._send(serializeError(error));
+        }
+        this._send({ command: "WillPrintFinished" });
+        this._disablePrinting = false;
+        break;
+      case "WillSave":
+        this._disableSaving = true;
+        this._runActions(name);
+        this._disableSaving = false;
+        break;
+      default:
+        this._runActions(name);
     }
   }
 
@@ -1120,17 +1136,9 @@ class Doc extends PDFObject {
       nEnd = printParams.lastPage;
     }
 
-    if (typeof nStart === "number") {
-      nStart = Math.max(0, Math.trunc(nStart));
-    } else {
-      nStart = 0;
-    }
+    nStart = typeof nStart === "number" ? Math.max(0, Math.trunc(nStart)) : 0;
 
-    if (typeof nEnd === "number") {
-      nEnd = Math.max(0, Math.trunc(nEnd));
-    } else {
-      nEnd = -1;
-    }
+    nEnd = typeof nEnd === "number" ? Math.max(0, Math.trunc(nEnd)) : -1;
 
     this._send({ command: "print", start: nStart, end: nEnd });
   }
@@ -1177,7 +1185,7 @@ class Doc extends PDFObject {
 
   resetForm(aFields = null) {
     // Handle the case resetForm({ aFields: ... })
-    if (aFields && typeof aFields === "object") {
+    if (aFields && typeof aFields === "object" && !Array.isArray(aFields)) {
       aFields = aFields.aFields;
     }
 

@@ -46,6 +46,22 @@ New feature work can be done as normal on a feature branch based off `mc-master`
 
 Use a **squash merge PR for new feature work** so that all your development commits don't bloat the history of `mc-master`.
 
+### Changes We Have Made From Mainline
+
+* These README updates
+* The additional gulp tasks that detailed below
+* We set the browser title differently (web/app.js, web/ui_utils.js)
+* We don't allow download (web/app.js)
+* We don't allow save (web/app.js)
+* We change the print resolution (web/app_options.js)
+* Configurably can allow printing (web/pdf_print_service.js)
+* Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
+* Removed dark theme (web/viewer.css)
+* Added watermark handling code (web/text_layer_builder.js, web_pdf_page_view.js, web/ui_utils.js)
+* Added presentation mode to the toolbar (web/toolbar.js)
+* Include Global-complete styles (web/viewer.html)
+* Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware accelleration on in Chromium browsers (the default) (core/annotation.js)
+
 ### Building during development
 To build for use in MasterControl during developmental testing you can either run
 
@@ -113,9 +129,8 @@ Feel free to stop by our [Matrix room](https://chat.mozilla.org/#/room/#pdfjs:mo
 
 ### Online demo
 
-Please note that the "Modern browsers" version assumes native support for
-features such as optional chaining, nullish coalescing,
-and private `class` fields/methods; please also see [this wiki page](https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions#faq-support).
+Please note that the "Modern browsers" version assumes native support for the
+latest JavaScript features; please also see [this wiki page](https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions#faq-support).
 
 + Modern browsers: https://mozilla.github.io/pdf.js/web/viewer.html
 
@@ -129,6 +144,8 @@ PDF.js is built into version 19+ of Firefox.
 
 #### Chrome
 
++ The official extension for Chrome can be installed from the [Chrome Web Store](https://chrome.google.com/webstore/detail/pdf-viewer/oemmndcbldboiebfnladdacbdfmadadm).
+*This extension is maintained by [@Rob--W](https://github.com/Rob--W).*
 + Build Your Own - Get the code as explained below and issue `gulp chromium`. Then open
 Chrome, go to `Tools > Extension` and load the (unpackaged) extension from the
 directory `build/chromium`.
@@ -159,7 +176,7 @@ and then you can open:
 
 + http://localhost:8888/web/viewer.html
 
-Please keep in mind that this requires a modern and fully up-to-date browser; refer to [Building PDF.js](https://github.com/mozilla/pdf.js/blob/master/README.md#building-pdfjs) for non-development usage of the PDF.js library.
+Please keep in mind that this assumes the latest version of Mozilla Firefox; refer to [Building PDF.js](https://github.com/mozilla/pdf.js/blob/master/README.md#building-pdfjs) for non-development usage of the PDF.js library.
 
 It is also possible to view all test PDF files on the right side by opening:
 
@@ -228,7 +245,3 @@ Talk to us on Matrix:
 File an issue:
 
 + https://github.com/mozilla/pdf.js/issues/new
-
-Follow us on Twitter: @pdfjs
-
-+ https://twitter.com/pdfjs

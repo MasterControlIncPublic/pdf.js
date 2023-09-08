@@ -265,7 +265,7 @@ class Type1CharString {
             subrNumber = this.stack.pop();
             const numArgs = this.stack.pop();
             if (subrNumber === 0 && numArgs === 3) {
-              const flexArgs = this.stack.splice(this.stack.length - 17, 17);
+              const flexArgs = this.stack.splice(-17, 17);
               this.stack.push(
                 flexArgs[2] + flexArgs[0], // bcp1x + rpx
                 flexArgs[3] + flexArgs[1], // bcp1y + rpy
@@ -654,8 +654,13 @@ class Type1Parser {
         case "BlueFuzz":
         case "BlueScale":
         case "LanguageGroup":
-        case "ExpansionFactor":
           program.properties.privateData[token] = this.readNumber();
+          break;
+        case "ExpansionFactor":
+          // Firefox doesn't render correctly a font with a null factor on
+          // Windows (see issue 15289), hence we just reset it to its default
+          // value (0.06).
+          program.properties.privateData[token] = this.readNumber() || 0.06;
           break;
         case "ForceBold":
           program.properties.privateData[token] = this.readBoolean();

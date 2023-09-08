@@ -15,22 +15,21 @@
 
 // eslint-disable-next-line max-len
 /** @typedef {import("../src/display/display_utils").PageViewport} PageViewport */
-/** @typedef {import("./event_utils").EventBus} EventBus */
+/** @typedef {import("../src/display/api").TextContent} TextContent */
 /** @typedef {import("./text_highlighter").TextHighlighter} TextHighlighter */
 // eslint-disable-next-line max-len
 /** @typedef {import("./text_accessibility.js").TextAccessibilityManager} TextAccessibilityManager */
 
-import { renderTextLayer } from "pdfjs-lib";
+import { normalizeUnicode, renderTextLayer, updateTextLayer } from "pdfjs-lib";
+import { removeNullCharacters } from "./ui_utils.js";
 
 /**
  * @typedef {Object} TextLayerBuilderOptions
- * @property {HTMLDivElement} textLayerDiv - The text layer container.
- * @property {EventBus} eventBus - The application event bus.
- * @property {number} pageIndex - The page index.
- * @property {PageViewport} viewport - The viewport of the text layer.
  * @property {TextHighlighter} highlighter - Optional object that will handle
  *   highlighting text from the find controller.
  * @property {TextAccessibilityManager} [accessibilityManager]
+ * @property {boolean} [isOffscreenCanvasSupported] - Allows to use an
+ *   OffscreenCanvas if needed.
  */
 
 /**
@@ -39,28 +38,39 @@ import { renderTextLayer } from "pdfjs-lib";
  * contain text that matches the PDF text they are overlaying.
  */
 class TextLayerBuilder {
+  #enablePermissions = false;
+
+  #rotation = 0;
+
+  #scale = 0;
+
+  #textContentSource = null;
+
   constructor({
-    textLayerDiv,
-    eventBus,
-    pageIndex,
-    viewport,
     highlighter = null,
     accessibilityManager = null,
+    isOffscreenCanvasSupported = true,
+    enablePermissions = false,
+    waterMarkText = null,
   }) {
-    this.textLayerDiv = textLayerDiv;
-    this.eventBus = eventBus;
-    this.textContent = null;
     this.textContentItemsStr = [];
-    this.textContentStream = null;
     this.renderingDone = false;
-    this.pageNumber = pageIndex + 1;
-    this.viewport = viewport;
     this.textDivs = [];
+    this.textDivProperties = new WeakMap();
     this.textLayerRenderTask = null;
     this.highlighter = highlighter;
     this.accessibilityManager = accessibilityManager;
+    this.isOffscreenCanvasSupported = isOffscreenCanvasSupported;
+    this.#enablePermissions = enablePermissions === true;
 
-    this.#bindMouse();
+    this.div = document.createElement("div");
+    this.div.className = "textLayer";
+
+    this.textLayerWatermark = document.createElement("p");
+    this.textLayerWatermark.className = "mcWatermark";
+    this.textLayerWatermark.textContent = waterMarkText;
+    this.div.append(this.textLayerWatermark);
+    this.hide();
   }
 
   #finishRendering() {
@@ -68,52 +78,83 @@ class TextLayerBuilder {
 
     const endOfContent = document.createElement("div");
     endOfContent.className = "endOfContent";
-    this.textLayerDiv.append(endOfContent);
+    this.div.append(endOfContent);
 
-    this.eventBus.dispatch("textlayerrendered", {
-      source: this,
-      pageNumber: this.pageNumber,
-      numTextDivs: this.textDivs.length,
-    });
+    this.#bindMouse();
+  }
+
+  get numTextDivs() {
+    return this.textDivs.length;
   }
 
   /**
    * Renders the text layer.
-   *
-   * @param {number} [timeout] - Wait for a specified amount of milliseconds
-   *                             before rendering.
+   * @param {PageViewport} viewport
    */
-  render(timeout = 0) {
-    if (!(this.textContent || this.textContentStream) || this.renderingDone) {
+  async render(viewport) {
+    if (!this.#textContentSource) {
+      throw new Error('No "textContentSource" parameter specified.');
+    }
+
+    const scale = viewport.scale * (globalThis.devicePixelRatio || 1);
+    const { rotation } = viewport;
+    if (this.renderingDone) {
+      const mustRotate = rotation !== this.#rotation;
+      const mustRescale = scale !== this.#scale;
+      if (mustRotate || mustRescale) {
+        this.hide();
+        updateTextLayer({
+          container: this.div,
+          viewport,
+          textDivs: this.textDivs,
+          textDivProperties: this.textDivProperties,
+          isOffscreenCanvasSupported: this.isOffscreenCanvasSupported,
+          mustRescale,
+          mustRotate,
+        });
+        this.#scale = scale;
+        this.#rotation = rotation;
+      }
+      this.show();
       return;
     }
-    this.cancel();
 
-    this.textDivs.length = 0;
+    this.cancel();
     this.highlighter?.setTextMapping(this.textDivs, this.textContentItemsStr);
     this.accessibilityManager?.setTextMapping(this.textDivs);
 
-    const textLayerFrag = document.createDocumentFragment();
     this.textLayerRenderTask = renderTextLayer({
-      textContent: this.textContent,
-      textContentStream: this.textContentStream,
-      container: textLayerFrag,
-      viewport: this.viewport,
+      textContentSource: this.#textContentSource,
+      container: this.div,
+      viewport,
       textDivs: this.textDivs,
+      textDivProperties: this.textDivProperties,
       textContentItemsStr: this.textContentItemsStr,
-      timeout,
+      isOffscreenCanvasSupported: this.isOffscreenCanvasSupported,
     });
-    this.textLayerRenderTask.promise.then(
-      () => {
-        this.textLayerDiv.append(textLayerFrag);
-        this.#finishRendering();
-        this.highlighter?.enable();
-        this.accessibilityManager?.enable();
-      },
-      function (reason) {
-        // Cancelled or failed to render text layer; skipping errors.
-      }
-    );
+
+    await this.textLayerRenderTask.promise;
+    this.#finishRendering();
+    this.#scale = scale;
+    this.#rotation = rotation;
+    this.show();
+    this.accessibilityManager?.enable();
+  }
+
+  hide() {
+    if (!this.div.hidden) {
+      // We turn off the highlighter in order to avoid to scroll into view an
+      // element of the text layer which could be hidden.
+      this.highlighter?.disable();
+      this.div.hidden = true;
+    }
+  }
+
+  show() {
+    if (this.div.hidden && this.renderingDone) {
+      this.div.hidden = false;
+      this.highlighter?.enable();
+    }
   }
 
   /**
@@ -126,16 +167,17 @@ class TextLayerBuilder {
     }
     this.highlighter?.disable();
     this.accessibilityManager?.disable();
+    this.textContentItemsStr.length = 0;
+    this.textDivs.length = 0;
+    this.textDivProperties = new WeakMap();
   }
 
-  setTextContentStream(readableStream) {
+  /**
+   * @param {ReadableStream | TextContent} source
+   */
+  setTextContentSource(source) {
     this.cancel();
-    this.textContentStream = readableStream;
-  }
-
-  setTextContent(textContent) {
-    this.cancel();
-    this.textContent = textContent;
+    this.#textContentSource = source;
   }
 
   /**
@@ -144,7 +186,7 @@ class TextLayerBuilder {
    * dragged up or down.
    */
   #bindMouse() {
-    const div = this.textLayerDiv;
+    const { div } = this;
 
     div.addEventListener("mousedown", evt => {
       const end = div.querySelector(".endOfContent");
@@ -180,6 +222,18 @@ class TextLayerBuilder {
         end.style.top = "";
       }
       end.classList.remove("active");
+    });
+
+    div.addEventListener("copy", event => {
+      if (!this.#enablePermissions) {
+        const selection = document.getSelection();
+        event.clipboardData.setData(
+          "text/plain",
+          removeNullCharacters(normalizeUnicode(selection.toString()))
+        );
+      }
+      event.preventDefault();
+      event.stopPropagation();
     });
   }
 }

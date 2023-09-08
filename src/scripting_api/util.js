@@ -65,7 +65,7 @@ class Util extends PDFObject {
     const ZERO = 4;
     const HASH = 8;
     let i = 0;
-    return args[0].replace(
+    return args[0].replaceAll(
       pattern,
       function (match, nDecSep, cFlags, nWidth, nPrecision, cConvChar) {
         // cConvChar must be one of d, f, s, x
@@ -148,17 +148,17 @@ class Util extends PDFObject {
 
         let decPart = "";
         if (cConvChar === "f") {
-          if (nPrecision !== undefined) {
-            decPart = Math.abs(arg - intPart).toFixed(nPrecision);
-          } else {
-            decPart = Math.abs(arg - intPart).toString();
-          }
+          decPart =
+            nPrecision !== undefined
+              ? Math.abs(arg - intPart).toFixed(nPrecision)
+              : Math.abs(arg - intPart).toString();
           if (decPart.length > 2) {
             decPart = `${decimalSep}${decPart.substring(2)}`;
-          } else if (cFlags & HASH) {
-            decPart = ".";
           } else {
-            decPart = "";
+            if (decPart === "1") {
+              intPart += Math.sign(arg);
+            }
+            decPart = cFlags & HASH ? "." : "";
           }
         }
 
@@ -286,7 +286,7 @@ class Util extends PDFObject {
 
     const patterns =
       /(mmmm|mmm|mm|m|dddd|ddd|dd|d|yyyy|yy|HH|H|hh|h|MM|M|ss|s|tt|t|\\.)/g;
-    return cFormat.replace(patterns, function (match, pattern) {
+    return cFormat.replaceAll(patterns, function (match, pattern) {
       if (pattern in handlers) {
         return handlers[pattern](data);
       }
@@ -296,6 +296,7 @@ class Util extends PDFObject {
 
   printx(cFormat, cSource) {
     // case
+    cSource = (cSource ?? "").toString();
     const handlers = [x => x, x => x.toUpperCase(), x => x.toLowerCase()];
     const buf = [];
     let i = 0;
@@ -521,12 +522,12 @@ class Util extends PDFObject {
       };
 
       // escape the string
-      const escapedFormat = cFormat.replace(/[.*+\-?^${}()|[\]\\]/g, "\\$&");
+      const escapedFormat = cFormat.replaceAll(/[.*+\-?^${}()|[\]\\]/g, "\\$&");
       const patterns =
         /(mmmm|mmm|mm|m|dddd|ddd|dd|d|yyyy|yy|HH|H|hh|h|MM|M|ss|s|tt|t)/g;
       const actions = [];
 
-      const re = escapedFormat.replace(
+      const re = escapedFormat.replaceAll(
         patterns,
         function (match, patternElement) {
           const { pattern, action } = handlers[patternElement];
