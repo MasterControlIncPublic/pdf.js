@@ -2585,7 +2585,7 @@ class TextWidgetAnnotation extends WidgetAnnotation {
     super(params);
 
     // this.data.hasOwnCanvas = this.data.readOnly && !this.data.noHTML;
-    // MasterControl turned this off to avoid issues with chromium 
+    // MasterControl turned this off to avoid issues with chromium
     // browsers with hardware accelleration on.
     this.data.hasOwnCanvas = false;
     this._hasText = true;
