@@ -46,6 +46,22 @@ New feature work can be done as normal on a feature branch based off `mc-master`
 
 Use a **squash merge PR for new feature work** so that all your development commits don't bloat the history of `mc-master`.
 
+### Changes We Have Made From Mainline
+
+* These README updates
+* The additional gulp tasks that detailed below
+* We set the browser title differently (web/app.js, web/ui_utils.js)
+* We don't allow download (web/app.js)
+* We don't allow save (web/app.js)
+* We change the print resolution (web/app_options.js)
+* Configurably can allow printing (web/pdf_print_service.js)
+* Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
+* Removed dark theme (web/viewer.css)
+* Added watermark handling code (web/text_layer_builder.js, web_pdf_page_view.js, web/ui_utils.js)
+* Added presentation mode to the toolbar (web/toolbar.js)
+* Include Global-complete styles (web/viewer.html)
+* Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware accelleration on in Chromium browsers (the default) (core/annotation.js)
+
 ### Building during development
 To build for use in MasterControl during developmental testing you can either run
 

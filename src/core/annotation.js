@@ -2584,7 +2584,9 @@ class TextWidgetAnnotation extends WidgetAnnotation {
   constructor(params) {
     super(params);
 
-    this.data.hasOwnCanvas = this.data.readOnly && !this.data.noHTML;
+    //this.data.hasOwnCanvas = this.data.readOnly && !this.data.noHTML;
+    // MasterControl turned this off to avoid issues with chromium browsers with hardware accelleration on.
+    this.data.hasOwnCanvas = false;
     this._hasText = true;
 
     const dict = params.dict;

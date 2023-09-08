@@ -1622,9 +1622,7 @@ const PDFViewerApplication = {
       }
     }
     if (pdfTitle) {
-      this.setTitle(
-        `${pdfTitle} - ${this._contentDispositionFilename || this._title}`
-      );
+      this.setTitle(`${this._contentDispositionFilename || this._title}`);
     } else if (this._contentDispositionFilename) {
       this.setTitle(this._contentDispositionFilename);
     }
