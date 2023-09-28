@@ -60,7 +60,7 @@ const defaultOptions = {
   },
   annotationMode: {
     /** @type {number} */
-    value: 2,
+    value: 1,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   cursorToolOnLoad: {
