@@ -60,7 +60,9 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * Added watermark handling code (web/text_layer_builder.js, web_pdf_page_view.js, web/ui_utils.js)
 * Added presentation mode to the toolbar (web/toolbar.js)
 * Include Global-complete styles (web/viewer.html)
-* Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware accelleration on in Chromium browsers (the default) (core/annotation.js)
+* Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
+* Changed AnnotationMode to "ENABLE" which disables interactive form fields. This setting may be dependent on the form field rendering change above. (web/app_options.js)
+
 
 ### Building during development
 To build for use in MasterControl during developmental testing you can either run
