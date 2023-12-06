@@ -59,21 +59,6 @@ function fetchDestination(dest) {
   return Array.isArray(dest) ? dest : null;
 }
 
-function fetchRemoteDest(action) {
-  let dest = action.get("D");
-  if (dest) {
-    if (dest instanceof Name) {
-      dest = dest.name;
-    }
-    if (typeof dest === "string") {
-      return stringToPDFString(dest);
-    } else if (Array.isArray(dest)) {
-      return JSON.stringify(dest);
-    }
-  }
-  return null;
-}
-
 class Catalog {
   constructor(pdfManager, xref) {
     this.pdfManager = pdfManager;
@@ -97,10 +82,6 @@ class Catalog {
     this.pageIndexCache = new RefSetCache();
     this.nonBlendModesSet = new RefSet();
     this.systemFontCache = new Map();
-  }
-
-  cloneDict() {
-    return this._catDict.clone();
   }
 
   get version() {
@@ -264,13 +245,11 @@ class Catalog {
    * @private
    */
   _readStructTreeRoot() {
-    const rawObj = this._catDict.getRaw("StructTreeRoot");
-    const obj = this.xref.fetchIfRef(rawObj);
+    const obj = this._catDict.get("StructTreeRoot");
     if (!(obj instanceof Dict)) {
       return null;
     }
-
-    const root = new StructTreeRoot(obj, rawObj);
+    const root = new StructTreeRoot(obj);
     root.init();
     return root;
   }
@@ -331,7 +310,7 @@ class Catalog {
       Catalog.parseDestDictionary({
         destDict: outlineDict,
         resultObj: data,
-        docBaseUrl: this.baseUrl,
+        docBaseUrl: this.pdfManager.docBaseUrl,
         docAttachments: this.attachments,
       });
       const title = outlineDict.get("Title");
@@ -438,14 +417,14 @@ class Catalog {
         return shadow(this, "optionalContentConfig", null);
       }
       const groups = [];
-      const groupRefs = new RefSet();
+      const groupRefs = [];
       // Ensure all the optional content groups are valid.
       for (const groupRef of groupsData) {
-        if (!(groupRef instanceof Ref) || groupRefs.has(groupRef)) {
+        if (!(groupRef instanceof Ref)) {
           continue;
         }
-        groupRefs.put(groupRef);
-        const group = this.xref.fetch(groupRef);
+        groupRefs.push(groupRef);
+        const group = this.xref.fetchIfRef(groupRef);
         groups.push({
           id: groupRef.toString(),
           name:
@@ -477,7 +456,7 @@ class Catalog {
           if (!(value instanceof Ref)) {
             continue;
           }
-          if (contentGroupRefs.has(value)) {
+          if (contentGroupRefs.includes(value)) {
             onParsed.push(value.toString());
           }
         }
@@ -492,7 +471,7 @@ class Catalog {
       const order = [];
 
       for (const value of refs) {
-        if (value instanceof Ref && contentGroupRefs.has(value)) {
+        if (value instanceof Ref && contentGroupRefs.includes(value)) {
           parsedOrderRefs.put(value); // Handle "hidden" groups, see below.
 
           order.push(value.toString());
@@ -1426,7 +1405,7 @@ class Catalog {
         }
       }
     }
-    return shadow(this, "baseUrl", this.pdfManager.docBaseUrl);
+    return shadow(this, "baseUrl", null);
   }
 
   /**
@@ -1444,16 +1423,19 @@ class Catalog {
    * Helper function used to parse the contents of destination dictionaries.
    * @param {ParseDestDictionaryParameters} params
    */
-  static parseDestDictionary({
-    destDict,
-    resultObj,
-    docBaseUrl = null,
-    docAttachments = null,
-  }) {
+  static parseDestDictionary(params) {
+    const destDict = params.destDict;
     if (!(destDict instanceof Dict)) {
       warn("parseDestDictionary: `destDict` must be a dictionary.");
       return;
     }
+    const resultObj = params.resultObj;
+    if (typeof resultObj !== "object") {
+      warn("parseDestDictionary: `resultObj` must be an object.");
+      return;
+    }
+    const docBaseUrl = params.docBaseUrl || null;
+    const docAttachments = params.docAttachments || null;
 
     let action = destDict.get("A"),
       url,
@@ -1529,9 +1511,19 @@ class Catalog {
           }
 
           // NOTE: the destination is relative to the *remote* document.
-          const remoteDest = fetchRemoteDest(action);
-          if (remoteDest && typeof url === "string") {
-            url = /* baseUrl = */ url.split("#", 1)[0] + "#" + remoteDest;
+          let remoteDest = action.get("D");
+          if (remoteDest) {
+            if (remoteDest instanceof Name) {
+              remoteDest = remoteDest.name;
+            }
+            if (typeof url === "string") {
+              const baseUrl = url.split("#")[0];
+              if (typeof remoteDest === "string") {
+                url = baseUrl + "#" + remoteDest;
+              } else if (Array.isArray(remoteDest)) {
+                url = baseUrl + "#" + JSON.stringify(remoteDest);
+              }
+            }
           }
           // The 'NewWindow' property, equal to `LinkTarget.BLANK`.
           const newWindow = action.get("NewWindow");
@@ -1555,12 +1547,6 @@ class Catalog {
 
           if (attachment) {
             resultObj.attachment = attachment;
-
-            // NOTE: the destination is relative to the *attachment*.
-            const attachmentDest = fetchRemoteDest(action);
-            if (attachmentDest) {
-              resultObj.attachmentDest = attachmentDest;
-            }
           } else {
             warn(`parseDestDictionary - unimplemented "GoToE" action.`);
           }

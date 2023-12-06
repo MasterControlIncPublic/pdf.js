@@ -33,7 +33,7 @@ var mimeTypes = {
   ".png": "image/png",
   ".log": "text/plain",
   ".bcmap": "application/octet-stream",
-  ".ftl": "text/plain",
+  ".properties": "text/plain",
 };
 
 var defaultMimeType = "application/octet-stream";

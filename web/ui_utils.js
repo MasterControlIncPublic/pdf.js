@@ -206,20 +206,19 @@ function parseQueryString(query) {
   return params;
 }
 
-const InvisibleCharactersRegExp = /[\x00-\x1F]/g;
+const InvisibleCharactersRegExp = /[\x01-\x1F]/g;
 
 /**
  * @param {string} str
  * @param {boolean} [replaceInvisible]
  */
 function removeNullCharacters(str, replaceInvisible = false) {
-  if (!InvisibleCharactersRegExp.test(str)) {
+  if (typeof str !== "string") {
+    console.error(`The argument must be a string.`);
     return str;
   }
   if (replaceInvisible) {
-    return str.replaceAll(InvisibleCharactersRegExp, m => {
-      return m === "\x00" ? "" : " ";
-    });
+    str = str.replaceAll(InvisibleCharactersRegExp, " ");
   }
   return str.replaceAll("\x00", "");
 }
@@ -605,6 +604,13 @@ function getVisibleElements({
   return { first, last, views: visible, ids };
 }
 
+/**
+ * Event handler to suppress context menu.
+ */
+function noContextMenuHandler(evt) {
+  evt.preventDefault();
+}
+
 function normalizeWheelEventDirection(evt) {
   let delta = Math.hypot(evt.deltaX, evt.deltaY);
   const angle = Math.atan2(evt.deltaY, evt.deltaX);
@@ -875,6 +881,7 @@ export {
   MAX_AUTO_SCALE,
   MAX_SCALE,
   MIN_SCALE,
+  noContextMenuHandler,
   normalizeWheelEventDelta,
   normalizeWheelEventDirection,
   OutputScale,

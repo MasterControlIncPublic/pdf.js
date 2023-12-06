@@ -32,8 +32,6 @@ class StampEditor extends AnnotationEditor {
 
   #bitmapFile = null;
 
-  #bitmapFileName = "";
-
   #canvas = null;
 
   #observer = null;
@@ -46,17 +44,10 @@ class StampEditor extends AnnotationEditor {
 
   static _type = "stamp";
 
-  static _editorType = AnnotationEditorType.STAMP;
-
   constructor(params) {
     super({ ...params, name: "stampEditor" });
     this.#bitmapUrl = params.bitmapUrl;
     this.#bitmapFile = params.bitmapFile;
-  }
-
-  /** @inheritdoc */
-  static initialize(l10n) {
-    AnnotationEditor.initialize(l10n);
   }
 
   static get supportedTypes() {
@@ -105,9 +96,6 @@ class StampEditor extends AnnotationEditor {
     if (!fromId) {
       this.#bitmapId = data.id;
       this.#isSvg = data.isSvg;
-    }
-    if (data.file) {
-      this.#bitmapFileName = data.file.name;
     }
     this.#createCanvas();
   }
@@ -195,10 +183,6 @@ class StampEditor extends AnnotationEditor {
       this.#canvas = null;
       this.#observer?.disconnect();
       this.#observer = null;
-      if (this.#resizeTimeoutId) {
-        clearTimeout(this.#resizeTimeoutId);
-        this.#resizeTimeoutId = null;
-      }
     }
     super.remove();
   }
@@ -322,24 +306,6 @@ class StampEditor extends AnnotationEditor {
       this.parent.addUndoableEditor(this);
       this.#hasBeenAddedInUndoStack = true;
     }
-
-    // There are multiple ways to add an image to the page, so here we just
-    // count the number of times an image is added to the page whatever the way
-    // is.
-    this._uiManager._eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.editorType,
-        data: {
-          action: "inserted_image",
-        },
-      },
-    });
-    this.addAltTextButton();
-    if (this.#bitmapFileName) {
-      canvas.setAttribute("aria-label", this.#bitmapFileName);
-    }
   }
 
   /**
@@ -446,11 +412,6 @@ class StampEditor extends AnnotationEditor {
     );
   }
 
-  /** @inheritdoc */
-  getImageForAltText() {
-    return this.#canvas;
-  }
-
   #serializeBitmap(toUrl) {
     if (toUrl) {
       if (this.#isSvg) {
@@ -517,7 +478,7 @@ class StampEditor extends AnnotationEditor {
       return null;
     }
     const editor = super.deserialize(data, parent, uiManager);
-    const { rect, bitmapUrl, bitmapId, isSvg, accessibilityData } = data;
+    const { rect, bitmapUrl, bitmapId, isSvg } = data;
     if (bitmapId && uiManager.imageManager.isValidId(bitmapId)) {
       editor.#bitmapId = bitmapId;
     } else {
@@ -528,10 +489,6 @@ class StampEditor extends AnnotationEditor {
     const [parentWidth, parentHeight] = editor.pageDimensions;
     editor.width = (rect[2] - rect[0]) / parentWidth;
     editor.height = (rect[3] - rect[1]) / parentHeight;
-
-    if (accessibilityData) {
-      editor.altTextData = accessibilityData;
-    }
 
     return editor;
   }
@@ -549,7 +506,6 @@ class StampEditor extends AnnotationEditor {
       rect: this.getRect(0, 0),
       rotation: this.rotation,
       isSvg: this.#isSvg,
-      structTreeParentId: this._structTreeParentId,
     };
 
     if (isForCopying) {
@@ -557,13 +513,7 @@ class StampEditor extends AnnotationEditor {
       // of this annotation and the clipboard doesn't support ImageBitmaps,
       // hence we serialize the bitmap to a data url.
       serialized.bitmapUrl = this.#serializeBitmap(/* toUrl = */ true);
-      serialized.accessibilityData = this.altTextData;
       return serialized;
-    }
-
-    const { decorative, altText } = this.altTextData;
-    if (!decorative && altText) {
-      serialized.accessibilityData = { type: "Figure", alt: altText };
     }
 
     if (context === null) {

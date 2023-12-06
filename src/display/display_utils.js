@@ -387,7 +387,7 @@ class DOMCanvasFactory extends BaseCanvasFactory {
   }
 }
 
-async function fetchData(url, type = "text") {
+async function fetchData(url, asTypedArray = false) {
   if (
     (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
     isValidFetchUrl(url, document.baseURI)
@@ -396,38 +396,29 @@ async function fetchData(url, type = "text") {
     if (!response.ok) {
       throw new Error(response.statusText);
     }
-    switch (type) {
-      case "arraybuffer":
-        return response.arrayBuffer();
-      case "blob":
-        return response.blob();
-      case "json":
-        return response.json();
-    }
-    return response.text();
+    return asTypedArray
+      ? new Uint8Array(await response.arrayBuffer())
+      : stringToBytes(await response.text());
   }
 
   // The Fetch API is not supported.
   return new Promise((resolve, reject) => {
     const request = new XMLHttpRequest();
-    request.open("GET", url, /* async = */ true);
-    request.responseType = type;
+    request.open("GET", url, /* asTypedArray = */ true);
 
+    if (asTypedArray) {
+      request.responseType = "arraybuffer";
+    }
     request.onreadystatechange = () => {
       if (request.readyState !== XMLHttpRequest.DONE) {
         return;
       }
       if (request.status === 200 || request.status === 0) {
         let data;
-        switch (type) {
-          case "arraybuffer":
-          case "blob":
-          case "json":
-            data = request.response;
-            break;
-          default:
-            data = request.responseText;
-            break;
+        if (asTypedArray && request.response) {
+          data = new Uint8Array(request.response);
+        } else if (!asTypedArray && request.responseText) {
+          data = stringToBytes(request.responseText);
         }
         if (data) {
           resolve(data);
@@ -446,17 +437,8 @@ class DOMCMapReaderFactory extends BaseCMapReaderFactory {
    * @ignore
    */
   _fetchData(url, compressionType) {
-    return fetchData(
-      url,
-      /* type = */ this.isCompressed ? "arraybuffer" : "text"
-    ).then(data => {
-      return {
-        cMapData:
-          data instanceof ArrayBuffer
-            ? new Uint8Array(data)
-            : stringToBytes(data),
-        compressionType,
-      };
+    return fetchData(url, /* asTypedArray = */ this.isCompressed).then(data => {
+      return { cMapData: data, compressionType };
     });
   }
 }
@@ -466,9 +448,7 @@ class DOMStandardFontDataFactory extends BaseStandardFontDataFactory {
    * @ignore
    */
   _fetchData(url) {
-    return fetchData(url, /* type = */ "arraybuffer").then(data => {
-      return new Uint8Array(data);
-    });
+    return fetchData(url, /* asTypedArray = */ true);
   }
 }
 
@@ -810,10 +790,26 @@ function isValidFetchUrl(url, baseUrl) {
 }
 
 /**
- * Event handler to suppress context menu.
+ * @param {string} src
+ * @param {boolean} [removeScriptElement]
+ * @returns {Promise<void>}
  */
-function noContextMenu(e) {
-  e.preventDefault();
+function loadScript(src, removeScriptElement = false) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+
+    script.onload = function (evt) {
+      if (removeScriptElement) {
+        script.remove();
+      }
+      resolve(evt);
+    };
+    script.onerror = function () {
+      reject(new Error(`Cannot load script at: ${script.src}`));
+    };
+    (document.head || document.documentElement).append(script);
+  });
 }
 
 // Deprecated API function -- display regardless of the `verbosity` setting.
@@ -1013,7 +1009,6 @@ export {
   DOMFilterFactory,
   DOMStandardFontDataFactory,
   DOMSVGFactory,
-  fetchData,
   getColorValues,
   getCurrentTransform,
   getCurrentTransformInverse,
@@ -1024,7 +1019,7 @@ export {
   isDataScheme,
   isPdfFile,
   isValidFetchUrl,
-  noContextMenu,
+  loadScript,
   PageViewport,
   PDFDateString,
   PixelsPerInch,

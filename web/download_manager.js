@@ -67,7 +67,7 @@ class DownloadManager {
   /**
    * @returns {boolean} Indicating if the data was opened.
    */
-  openOrDownloadData(data, filename, dest = null) {
+  openOrDownloadData(element, data, filename) {
     const isPdfData = isPdfFile(filename);
     const contentType = isPdfData ? "application/pdf" : "";
 
@@ -75,10 +75,10 @@ class DownloadManager {
       (typeof PDFJSDev === "undefined" || !PDFJSDev.test("COMPONENTS")) &&
       isPdfData
     ) {
-      let blobUrl = this.#openBlobUrls.get(data);
+      let blobUrl = this.#openBlobUrls.get(element);
       if (!blobUrl) {
         blobUrl = URL.createObjectURL(new Blob([data], { type: contentType }));
-        this.#openBlobUrls.set(data, blobUrl);
+        this.#openBlobUrls.set(element, blobUrl);
       }
       let viewerUrl;
       if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
@@ -93,9 +93,6 @@ class DownloadManager {
           "?file=" +
           encodeURIComponent(blobUrl + "#" + filename);
       }
-      if (dest) {
-        viewerUrl += `#${escape(dest)}`;
-      }
 
       try {
         window.open(viewerUrl);
@@ -105,7 +102,7 @@ class DownloadManager {
         // Release the `blobUrl`, since opening it failed, and fallback to
         // downloading the PDF file.
         URL.revokeObjectURL(blobUrl);
-        this.#openBlobUrls.delete(data);
+        this.#openBlobUrls.delete(element);
       }
     }
 

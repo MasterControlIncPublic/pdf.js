@@ -18,12 +18,6 @@ import { Page, PDFDocument } from "../../src/core/document.js";
 import { isNodeJS } from "../../src/shared/util.js";
 import { Ref } from "../../src/core/primitives.js";
 
-let fs;
-if (isNodeJS) {
-  // Native packages.
-  fs = await __non_webpack_import__("fs");
-}
-
 const TEST_PDFS_PATH = isNodeJS ? "./test/pdfs/" : "../pdfs/";
 
 const CMAP_URL = isNodeJS ? "./external/bcmaps/" : "../../external/bcmaps/";
@@ -44,6 +38,8 @@ class DOMFileReaderFactory {
 
 class NodeFileReaderFactory {
   static async fetch(params) {
+    const fs = require("fs");
+
     return new Promise((resolve, reject) => {
       fs.readFile(params.path, (error, data) => {
         if (error || !data) {
@@ -144,22 +140,11 @@ function createIdFactory(pageIndex) {
   return page._localIdFactory;
 }
 
-function getNodeVersion() {
-  if (!isNodeJS) {
-    throw new Error("getNodeVersion - only valid in Node.js environments.");
-  }
-  const [major, minor, patch] = process.versions.node
-    .split(".")
-    .map(parseFloat);
-  return { major, minor, patch };
-}
-
 export {
   buildGetDocumentParams,
   CMAP_URL,
   createIdFactory,
   DefaultFileReaderFactory,
-  getNodeVersion,
   STANDARD_FONT_DATA_URL,
   TEST_PDFS_PATH,
   XRefMock,

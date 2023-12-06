@@ -80,7 +80,7 @@ class FontLoader {
     }
   }
 
-  async loadSystemFont({ systemFontInfo: info, _inspectFont }) {
+  async loadSystemFont(info) {
     if (!info || this.#systemFonts.has(info.loadedName)) {
       return;
     }
@@ -96,7 +96,6 @@ class FontLoader {
       try {
         await fontFace.load();
         this.#systemFonts.add(loadedName);
-        _inspectFont?.(info);
       } catch {
         warn(
           `Cannot load system font: ${info.baseFontName}, installing it could help to improve PDF rendering.`
@@ -120,7 +119,7 @@ class FontLoader {
     font.attached = true;
 
     if (font.systemFontInfo) {
-      await this.loadSystemFont(font);
+      await this.loadSystemFont(font.systemFontInfo);
       return;
     }
 
@@ -184,7 +183,6 @@ class FontLoader {
         supported = true;
       } else if (
         typeof navigator !== "undefined" &&
-        typeof navigator?.userAgent === "string" &&
         // User agent string sniffing is bad, but there is no reliable way to
         // tell if the font is fully loaded and ready to be used with canvas.
         /Mozilla\/5.0.*?rv:\d+.*? Gecko/.test(navigator.userAgent)

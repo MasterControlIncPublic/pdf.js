@@ -111,8 +111,11 @@ class PDFSidebar {
     this._currentOutlineItemButton = elements.currentOutlineItemButton;
 
     this.eventBus = eventBus;
+    this.l10n = l10n;
 
-    this.#isRTL = l10n.getDirection() === "rtl";
+    l10n.getDirection().then(dir => {
+      this.#isRTL = dir === "rtl";
+    });
     this.#addEventListeners();
   }
 
@@ -300,8 +303,9 @@ class PDFSidebar {
   #showUINotification() {
     this.toggleButton.setAttribute(
       "data-l10n-id",
-      "pdfjs-toggle-sidebar-notification-button"
+      "toggle_sidebar_notification2"
     );
+    this.l10n.translate(this.toggleButton);
 
     if (!this.isOpen) {
       // Only show the notification on the `toggleButton` if the sidebar is
@@ -318,10 +322,8 @@ class PDFSidebar {
     }
 
     if (reset) {
-      this.toggleButton.setAttribute(
-        "data-l10n-id",
-        "pdfjs-toggle-sidebar-button"
-      );
+      this.toggleButton.setAttribute("data-l10n-id", "toggle_sidebar");
+      this.l10n.translate(this.toggleButton);
     }
   }
 
@@ -329,8 +331,6 @@ class PDFSidebar {
     this.sidebarContainer.addEventListener("transitionend", evt => {
       if (evt.target === this.sidebarContainer) {
         this.outerContainer.classList.remove("sidebarMoving");
-        // Ensure that rendering is triggered after opening/closing the sidebar.
-        this.eventBus.dispatch("resize", { source: this });
       }
     });
 

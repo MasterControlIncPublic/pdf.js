@@ -158,12 +158,12 @@ class IDownloadManager {
   downloadData(data, filename, contentType) {}
 
   /**
+   * @param {HTMLElement} element
    * @param {Uint8Array} data
    * @param {string} filename
-   * @param {string | null} [dest]
    * @returns {boolean} Indicating if the data was opened.
    */
-  openOrDownloadData(data, filename, dest = null) {}
+  openOrDownloadData(element, data, filename) {}
 
   /**
    * @param {Blob} blob
@@ -179,25 +179,25 @@ class IDownloadManager {
  */
 class IL10n {
   /**
-   * @returns {string} - The current locale.
+   * @returns {Promise<string>} - Resolves to the current locale.
    */
-  getLanguage() {}
+  async getLanguage() {}
 
   /**
-   * @returns {string} - 'rtl' or 'ltr'.
+   * @returns {Promise<string>} - Resolves to 'rtl' or 'ltr'.
    */
-  getDirection() {}
+  async getDirection() {}
 
   /**
    * Translates text identified by the key and adds/formats data using the args
    * property bag. If the key was not found, translation falls back to the
    * fallback text.
-   * @param {Array | string} ids
+   * @param {string} key
    * @param {Object | null} [args]
    * @param {string} [fallback]
    * @returns {Promise<string>}
    */
-  async get(ids, args = null, fallback) {}
+  async get(key, args = null, fallback) {}
 
   /**
    * Translates HTML element.
@@ -205,16 +205,6 @@ class IL10n {
    * @returns {Promise<void>}
    */
   async translate(element) {}
-
-  /**
-   * Pause the localization.
-   */
-  pause() {}
-
-  /**
-   * Resume the localization.
-   */
-  resume() {}
 }
 
 export { IDownloadManager, IL10n, IPDFLinkService, IRenderableView };

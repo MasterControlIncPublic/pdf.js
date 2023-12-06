@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { bytesToString, info, warn } from "../shared/util.js";
+import { bytesToString, info, stringToBytes, warn } from "../shared/util.js";
 import { Dict, isName, Name, Ref } from "./primitives.js";
 import {
   escapePDFName,
@@ -25,15 +25,12 @@ import { SimpleDOMNode, SimpleXMLParser } from "./xml_parser.js";
 import { BaseStream } from "./base_stream.js";
 import { calculateMD5 } from "./crypto.js";
 
-async function writeObject(ref, obj, buffer, { encrypt = null }) {
-  const transform = encrypt?.createCipherTransform(ref.num, ref.gen);
+async function writeObject(ref, obj, buffer, transform) {
   buffer.push(`${ref.num} ${ref.gen} obj\n`);
   if (obj instanceof Dict) {
     await writeDict(obj, buffer, transform);
   } else if (obj instanceof BaseStream) {
     await writeStream(obj, buffer, transform);
-  } else if (Array.isArray(obj)) {
-    await writeArray(obj, buffer, transform);
   }
   buffer.push("\nendobj\n");
 }
@@ -48,7 +45,7 @@ async function writeDict(dict, buffer, transform) {
 }
 
 async function writeStream(stream, buffer, transform) {
-  let bytes = stream.getBytes();
+  let string = stream.getString();
   const { dict } = stream;
 
   const [filter, params] = await Promise.all([
@@ -67,17 +64,18 @@ async function writeStream(stream, buffer, transform) {
 
   if (
     typeof CompressionStream !== "undefined" &&
-    (bytes.length >= MIN_LENGTH_FOR_COMPRESSING || isFilterZeroFlateDecode)
+    (string.length >= MIN_LENGTH_FOR_COMPRESSING || isFilterZeroFlateDecode)
   ) {
     try {
+      const byteArray = stringToBytes(string);
       const cs = new CompressionStream("deflate");
       const writer = cs.writable.getWriter();
-      writer.write(bytes);
+      writer.write(byteArray);
       writer.close();
 
       // Response::text doesn't return the correct data.
       const buf = await new Response(cs.readable).arrayBuffer();
-      bytes = new Uint8Array(buf);
+      string = bytesToString(new Uint8Array(buf));
 
       let newFilter, newParams;
       if (!filter) {
@@ -103,8 +101,7 @@ async function writeStream(stream, buffer, transform) {
     }
   }
 
-  let string = bytesToString(bytes);
-  if (transform) {
+  if (transform !== null) {
     string = transform.encryptString(string);
   }
 
@@ -135,7 +132,7 @@ async function writeValue(value, buffer, transform) {
   } else if (Array.isArray(value)) {
     await writeArray(value, buffer, transform);
   } else if (typeof value === "string") {
-    if (transform) {
+    if (transform !== null) {
       value = transform.encryptString(value);
     }
     buffer.push(`(${escapeString(value)})`);
@@ -235,7 +232,11 @@ async function updateAcroform({
     return;
   }
 
-  const dict = acroForm.clone();
+  // Clone the acroForm.
+  const dict = new Dict(xref);
+  for (const key of acroForm.getKeys()) {
+    dict.set(key, acroForm.getRaw(key));
+  }
 
   if (hasXfa && !hasXfaDatasetsEntry) {
     // We've a XFA array which doesn't contain a datasets entry.
@@ -252,8 +253,14 @@ async function updateAcroform({
     dict.set("NeedAppearances", true);
   }
 
+  const encrypt = xref.encrypt;
+  let transform = null;
+  if (encrypt) {
+    transform = encrypt.createCipherTransform(acroFormRef.num, acroFormRef.gen);
+  }
+
   const buffer = [];
-  await writeObject(acroFormRef, dict, buffer, xref);
+  await writeObject(acroFormRef, dict, buffer, transform);
 
   newRefs.push({ ref: acroFormRef, data: buffer.join("") });
 }

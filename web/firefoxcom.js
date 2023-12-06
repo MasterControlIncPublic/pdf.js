@@ -13,11 +13,12 @@
  * limitations under the License.
  */
 
+import "../extensions/firefox/tools/l10n.js";
 import { DefaultExternalServices, PDFViewerApplication } from "./app.js";
-import { isPdfFile, PDFDataRangeTransport } from "pdfjs-lib";
+import { isPdfFile, PDFDataRangeTransport, shadow } from "pdfjs-lib";
 import { BasePreferences } from "./preferences.js";
 import { DEFAULT_SCALE_VALUE } from "./ui_utils.js";
-import { L10n } from "./l10n.js";
+import { getL10nFallback } from "./l10n_utils.js";
 
 if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
   throw new Error(
@@ -26,6 +27,35 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
 }
 
 class FirefoxCom {
+  /**
+   * Creates an event that the extension is listening for and will
+   * synchronously respond to.
+   * NOTE: It is recommended to use requestAsync() instead since one day we may
+   *       not be able to synchronously reply.
+   * @param {string} action - The action to trigger.
+   * @param {Object|string} [data] - The data to send.
+   * @returns {*} The response.
+   */
+  static requestSync(action, data) {
+    const request = document.createTextNode("");
+    document.documentElement.append(request);
+
+    const sender = new CustomEvent("pdf.js.message", {
+      bubbles: true,
+      cancelable: false,
+      detail: {
+        action,
+        data,
+        sync: true,
+      },
+    });
+    request.dispatchEvent(sender);
+    const response = sender.detail.response;
+    request.remove();
+
+    return response;
+  }
+
   /**
    * Creates an event that the extension is listening for and will
    * asynchronously respond to.
@@ -67,6 +97,7 @@ class FirefoxCom {
       detail: {
         action,
         data,
+        sync: false,
         responseExpected: !!callback,
       },
     });
@@ -101,23 +132,18 @@ class DownloadManager {
   /**
    * @returns {boolean} Indicating if the data was opened.
    */
-  openOrDownloadData(data, filename, dest = null) {
+  openOrDownloadData(element, data, filename) {
     const isPdfData = isPdfFile(filename);
     const contentType = isPdfData ? "application/pdf" : "";
 
     if (isPdfData) {
-      let blobUrl = this.#openBlobUrls.get(data);
+      let blobUrl = this.#openBlobUrls.get(element);
       if (!blobUrl) {
         blobUrl = URL.createObjectURL(new Blob([data], { type: contentType }));
-        this.#openBlobUrls.set(data, blobUrl);
+        this.#openBlobUrls.set(element, blobUrl);
       }
       // Let Firefox's content handler catch the URL and display the PDF.
-      // NOTE: This cannot use a query string for the filename, see
-      //       https://bugzilla.mozilla.org/show_bug.cgi?id=1632644#c5
-      let viewerUrl = blobUrl + "#filename=" + encodeURIComponent(filename);
-      if (dest) {
-        viewerUrl += `&filedest=${escape(dest)}`;
-      }
+      const viewerUrl = blobUrl + "#filename=" + encodeURIComponent(filename);
 
       try {
         window.open(viewerUrl);
@@ -127,7 +153,7 @@ class DownloadManager {
         // Release the `blobUrl`, since opening it failed, and fallback to
         // downloading the PDF file.
         URL.revokeObjectURL(blobUrl);
-        this.#openBlobUrls.delete(data);
+        this.#openBlobUrls.delete(element);
       }
     }
 
@@ -150,6 +176,28 @@ class DownloadManager {
 class FirefoxPreferences extends BasePreferences {
   async _readFromStorage(prefObj) {
     return FirefoxCom.requestAsync("getPreferences", prefObj);
+  }
+}
+
+class MozL10n {
+  constructor(mozL10n) {
+    this.mozL10n = mozL10n;
+  }
+
+  async getLanguage() {
+    return this.mozL10n.getLanguage();
+  }
+
+  async getDirection() {
+    return this.mozL10n.getDirection();
+  }
+
+  async get(key, args = null, fallback = getL10nFallback(key, args)) {
+    return this.mozL10n.get(key, args, fallback);
+  }
+
+  async translate(element) {
+    this.mozL10n.translate(element);
   }
 }
 
@@ -286,9 +334,9 @@ class FirefoxComDataRangeTransport extends PDFDataRangeTransport {
     FirefoxCom.request("requestDataRange", { begin, end });
   }
 
-  // NOTE: This method is currently not invoked in the Firefox PDF Viewer.
   abort() {
-    FirefoxCom.request("abortLoading", null);
+    // Sync call to ensure abort is really started.
+    FirefoxCom.requestSync("abortLoading", null);
   }
 }
 
@@ -375,7 +423,7 @@ class FirefoxExternalServices extends DefaultExternalServices {
           break;
       }
     });
-    FirefoxCom.request("initPassiveLoading", null);
+    FirefoxCom.requestSync("initPassiveLoading", null);
   }
 
   static reportTelemetry(data) {
@@ -394,16 +442,48 @@ class FirefoxExternalServices extends DefaultExternalServices {
     FirefoxCom.request("updateEditorStates", data);
   }
 
-  static async createL10n() {
-    const [localeProperties] = await Promise.all([
-      FirefoxCom.requestAsync("getLocaleProperties", null),
-      document.l10n.ready,
-    ]);
-    return new L10n(localeProperties, document.l10n);
+  static createL10n(options) {
+    const mozL10n = document.mozL10n;
+    // TODO refactor mozL10n.setExternalLocalizerServices
+    return new MozL10n(mozL10n);
   }
 
   static createScripting(options) {
     return FirefoxScripting;
+  }
+
+  static get supportsPinchToZoom() {
+    const support = FirefoxCom.requestSync("supportsPinchToZoom");
+    return shadow(this, "supportsPinchToZoom", support);
+  }
+
+  static get supportsIntegratedFind() {
+    const support = FirefoxCom.requestSync("supportsIntegratedFind");
+    return shadow(this, "supportsIntegratedFind", support);
+  }
+
+  static get supportsDocumentFonts() {
+    const support = FirefoxCom.requestSync("supportsDocumentFonts");
+    return shadow(this, "supportsDocumentFonts", support);
+  }
+
+  static get supportedMouseWheelZoomModifierKeys() {
+    const support = FirefoxCom.requestSync(
+      "supportedMouseWheelZoomModifierKeys"
+    );
+    return shadow(this, "supportedMouseWheelZoomModifierKeys", support);
+  }
+
+  static get isInAutomation() {
+    // Returns the value of `Cu.isInAutomation`, which is only `true` when e.g.
+    // various test-suites are running in mozilla-central.
+    const isInAutomation = FirefoxCom.requestSync("isInAutomation");
+    return shadow(this, "isInAutomation", isInAutomation);
+  }
+
+  static get canvasMaxAreaInBytes() {
+    const maxArea = FirefoxCom.requestSync("getCanvasMaxArea");
+    return shadow(this, "canvasMaxAreaInBytes", maxArea);
   }
 
   static async getNimbusExperimentData() {
@@ -415,5 +495,16 @@ class FirefoxExternalServices extends DefaultExternalServices {
   }
 }
 PDFViewerApplication.externalServices = FirefoxExternalServices;
+
+// l10n.js for Firefox extension expects services to be set.
+document.mozL10n.setExternalLocalizerServices({
+  getLocale() {
+    return FirefoxCom.requestSync("getLocale", null);
+  },
+
+  getStrings(key) {
+    return FirefoxCom.requestSync("getStrings", null);
+  },
+});
 
 export { DownloadManager, FirefoxCom };

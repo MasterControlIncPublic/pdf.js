@@ -52,14 +52,14 @@ function getViewerConfiguration() {
       zoomIn: document.getElementById("zoomIn"),
       zoomOut: document.getElementById("zoomOut"),
       viewFind: document.getElementById("viewFind"),
+      openFile:
+        typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
+          ? document.getElementById("openFile")
+          : null,
       print: document.getElementById("print"),
       editorFreeTextButton: document.getElementById("editorFreeText"),
       editorFreeTextParamsToolbar: document.getElementById(
         "editorFreeTextParamsToolbar"
-      ),
-      editorHighlightButton: document.getElementById("editorHighlight"),
-      editorHighlightParamsToolbar: document.getElementById(
-        "editorHighlightParamsToolbar"
       ),
       editorInkButton: document.getElementById("editorInk"),
       editorInkParamsToolbar: document.getElementById("editorInkParamsToolbar"),
@@ -157,19 +157,9 @@ function getViewerConfiguration() {
         linearized: document.getElementById("linearizedField"),
       },
     },
-    altTextDialog: {
-      dialog: document.getElementById("altTextDialog"),
-      optionDescription: document.getElementById("descriptionButton"),
-      optionDecorative: document.getElementById("decorativeButton"),
-      textarea: document.getElementById("descriptionTextarea"),
-      cancelButton: document.getElementById("altTextCancel"),
-      saveButton: document.getElementById("altTextSave"),
-    },
     annotationEditorParams: {
       editorFreeTextFontSize: document.getElementById("editorFreeTextFontSize"),
       editorFreeTextColor: document.getElementById("editorFreeTextColor"),
-      editorHighlightColor: document.getElementById("editorHighlightColor"),
-      editorHighlightOpacity: document.getElementById("editorHighlightOpacity"),
       editorInkColor: document.getElementById("editorInkColor"),
       editorInkThickness: document.getElementById("editorInkThickness"),
       editorInkOpacity: document.getElementById("editorInkOpacity"),
@@ -180,7 +170,7 @@ function getViewerConfiguration() {
       typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
         ? document.getElementById("fileInput")
         : null,
-    debuggerScriptPath: "./debugger.mjs",
+    debuggerScriptPath: "./debugger.js",
   };
 }
 

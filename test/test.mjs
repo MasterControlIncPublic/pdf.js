@@ -99,12 +99,6 @@ function parseOptions() {
       describe: "Uses default answers (intended for CLOUD TESTS only!).",
       type: "boolean",
     })
-    .option("headless", {
-      default: false,
-      describe:
-        "Run the tests in headless mode, i.e. without visible browser windows.",
-      type: "boolean",
-    })
     .option("port", {
       default: 0,
       describe: "The port the HTTP server should listen on.",
@@ -256,11 +250,8 @@ function updateRefImages() {
 function examineRefImages() {
   startServer();
 
-  startBrowser({
-    browserName: "firefox",
-    headless: false,
-    startUrl: `http://${host}:${server.port}/test/resources/reftest-analyzer.html#web=/test/eq.log`,
-  }).then(function (browser) {
+  const startUrl = `http://${host}:${server.port}/test/resources/reftest-analyzer.html#web=/test/eq.log`;
+  startBrowser("firefox", startUrl).then(function (browser) {
     browser.on("disconnected", function () {
       stopServer();
       process.exit(0);
@@ -348,28 +339,26 @@ function startRefTest(masterMode, showRefImages) {
     server.hooks.POST.push(refTestPostHandler);
     onAllSessionsClosed = finalize;
 
-    await startBrowsers({
-      baseUrl: `http://${host}:${server.port}/test/test_slave.html`,
-      initializeSession: session => {
-        session.masterMode = masterMode;
-        session.taskResults = {};
-        session.tasks = {};
-        session.remaining = manifest.length;
-        manifest.forEach(function (item) {
-          var rounds = item.rounds || 1;
-          var roundsResults = [];
-          roundsResults.length = rounds;
-          session.taskResults[item.id] = roundsResults;
-          session.tasks[item.id] = item;
-        });
-        session.numRuns = 0;
-        session.numErrors = 0;
-        session.numFBFFailures = 0;
-        session.numEqNoSnapshot = 0;
-        session.numEqFailures = 0;
-        monitorBrowserTimeout(session, handleSessionTimeout);
-      },
-    });
+    const startUrl = `http://${host}:${server.port}/test/test_slave.html`;
+    await startBrowsers(function (session) {
+      session.masterMode = masterMode;
+      session.taskResults = {};
+      session.tasks = {};
+      session.remaining = manifest.length;
+      manifest.forEach(function (item) {
+        var rounds = item.rounds || 1;
+        var roundsResults = [];
+        roundsResults.length = rounds;
+        session.taskResults[item.id] = roundsResults;
+        session.tasks[item.id] = item;
+      });
+      session.numRuns = 0;
+      session.numErrors = 0;
+      session.numFBFFailures = 0;
+      session.numEqNoSnapshot = 0;
+      session.numEqFailures = 0;
+      monitorBrowserTimeout(session, handleSessionTimeout);
+    }, makeTestUrl(startUrl));
   }
   function checkRefsTmp() {
     if (masterMode && fs.existsSync(refsTmpDir)) {
@@ -471,7 +460,7 @@ function checkEq(task, results, browser, masterMode) {
     }
     const pageResult = pageResults[page];
     let testSnapshot = pageResult.snapshot;
-    if (testSnapshot?.startsWith("data:image/png;base64,")) {
+    if (testSnapshot && testSnapshot.startsWith("data:image/png;base64,")) {
       testSnapshot = Buffer.from(testSnapshot.substring(22), "base64");
     } else {
       console.error("Valid snapshot was not found.");
@@ -670,7 +659,6 @@ function checkRefTestResults(browser, id, results) {
   switch (task.type) {
     case "eq":
     case "text":
-    case "highlight":
       checkEq(task, results, browser, session.masterMode);
       break;
     case "fbf":
@@ -771,7 +759,7 @@ function refTestPostHandler(req, res) {
       });
     }
 
-    var isDone = taskResults.at(-1)?.[lastPageNum - 1];
+    var isDone = taskResults.at(-1) && taskResults.at(-1)[lastPageNum - 1];
     if (isDone) {
       checkRefTestResults(browser, id, taskResults);
       session.remaining--;
@@ -805,18 +793,29 @@ function onAllSessionsClosedAfterTests(name) {
   };
 }
 
+function makeTestUrl(startUrl) {
+  return function (browserName) {
+    const queryParameters =
+      `?browser=${encodeURIComponent(browserName)}` +
+      `&manifestFile=${encodeURIComponent("/test/" + options.manifestFile)}` +
+      `&testFilter=${JSON.stringify(options.testfilter)}` +
+      `&xfaOnly=${options.xfaOnly}` +
+      `&delay=${options.statsDelay}` +
+      `&masterMode=${options.masterMode}`;
+    return startUrl + queryParameters;
+  };
+}
+
 async function startUnitTest(testUrl, name) {
   onAllSessionsClosed = onAllSessionsClosedAfterTests(name);
   startServer();
   server.hooks.POST.push(unitTestPostHandler);
 
-  await startBrowsers({
-    baseUrl: `http://${host}:${server.port}${testUrl}`,
-    initializeSession: session => {
-      session.numRuns = 0;
-      session.numErrors = 0;
-    },
-  });
+  const startUrl = `http://${host}:${server.port}${testUrl}`;
+  await startBrowsers(function (session) {
+    session.numRuns = 0;
+    session.numErrors = 0;
+  }, makeTestUrl(startUrl));
 }
 
 async function startIntegrationTest() {
@@ -824,12 +823,9 @@ async function startIntegrationTest() {
   startServer();
 
   const { runTests } = await import("./integration-boot.mjs");
-  await startBrowsers({
-    baseUrl: null,
-    initializeSession: session => {
-      session.numRuns = 0;
-      session.numErrors = 0;
-    },
+  await startBrowsers(function (session) {
+    session.numRuns = 0;
+    session.numErrors = 0;
   });
   global.integrationBaseUrl = `http://${host}:${server.port}/build/generic/web/viewer.html`;
   global.integrationSessions = sessions;
@@ -905,22 +901,12 @@ function unitTestPostHandler(req, res) {
   return true;
 }
 
-async function startBrowser({ browserName, headless, startUrl }) {
+async function startBrowser(browserName, startUrl = "") {
   const options = {
     product: browserName,
-    // Note that using `headless: true` gives a deprecation warning; see
-    // https://github.com/puppeteer/puppeteer#default-runtime-settings.
-    headless: headless === true ? "new" : false,
+    headless: false,
     defaultViewport: null,
     ignoreDefaultArgs: ["--disable-extensions"],
-    // The timeout for individual protocol (CDP) calls should always be lower
-    // than the Jasmine timeout. This way protocol errors are always raised in
-    // the context of the tests that actually triggered them and don't leak
-    // through to other tests (causing unrelated failures or tracebacks). The
-    // timeout is set to 75% of the Jasmine timeout to catch operation errors
-    // later in the test run and because if a single operation takes that long
-    // it can't possibly succeed anymore.
-    protocolTimeout: 0.75 * /* jasmine.DEFAULT_TIMEOUT_INTERVAL = */ 30000,
   };
 
   if (!tempDir) {
@@ -961,8 +947,6 @@ async function startBrowser({ browserName, headless, startUrl }) {
       "gfx.canvas.accelerated": false,
       // Enable the `round` CSS function.
       "layout.css.round.enabled": true,
-      // This allow to copy some data in the clipboard.
-      "dom.events.asyncClipboard.clipboardItem": true,
     };
   }
 
@@ -977,7 +961,7 @@ async function startBrowser({ browserName, headless, startUrl }) {
   return browser;
 }
 
-async function startBrowsers({ baseUrl, initializeSession }) {
+async function startBrowsers(initSessionCallback, makeStartUrl = null) {
   // Remove old browser revisions from Puppeteer's cache. Updating Puppeteer can
   // cause new browser revisions to be downloaded, so trimming the cache will
   // prevent the disk from filling up over time.
@@ -1001,25 +985,12 @@ async function startBrowsers({ baseUrl, initializeSession }) {
       closed: false,
     };
     sessions.push(session);
+    const startUrl = makeStartUrl ? makeStartUrl(browserName) : "";
 
-    // Construct the start URL from the base URL by appending query parameters
-    // for the runner if necessary.
-    let startUrl = "";
-    if (baseUrl) {
-      const queryParameters =
-        `?browser=${encodeURIComponent(browserName)}` +
-        `&manifestFile=${encodeURIComponent("/test/" + options.manifestFile)}` +
-        `&testFilter=${JSON.stringify(options.testfilter)}` +
-        `&xfaOnly=${options.xfaOnly}` +
-        `&delay=${options.statsDelay}` +
-        `&masterMode=${options.masterMode}`;
-      startUrl = baseUrl + queryParameters;
-    }
-
-    await startBrowser({ browserName, headless: options.headless, startUrl })
+    await startBrowser(browserName, startUrl)
       .then(function (browser) {
         session.browser = browser;
-        initializeSession(session);
+        initSessionCallback?.(session);
       })
       .catch(function (ex) {
         console.log(`Error while starting ${browserName}: ${ex.message}`);
@@ -1071,23 +1042,23 @@ async function closeSession(browser) {
 
 function ensurePDFsDownloaded(callback) {
   var manifest = getTestManifest();
-  downloadManifestFiles(manifest, async function () {
-    try {
-      await verifyManifestFiles(manifest);
-    } catch {
-      console.log(
-        "Unable to verify the checksum for the files that are " +
-          "used for testing."
-      );
-      console.log(
-        "Please re-download the files, or adjust the MD5 " +
-          "checksum in the manifest for the files listed above.\n"
-      );
-      if (options.strictVerify) {
-        process.exit(1);
+  downloadManifestFiles(manifest, function () {
+    verifyManifestFiles(manifest, function (hasErrors) {
+      if (hasErrors) {
+        console.log(
+          "Unable to verify the checksum for the files that are " +
+            "used for testing."
+        );
+        console.log(
+          "Please re-download the files, or adjust the MD5 " +
+            "checksum in the manifest for the files listed above.\n"
+        );
+        if (options.strictVerify) {
+          process.exit(1);
+        }
       }
-    }
-    callback();
+      callback();
+    });
   });
 }
 

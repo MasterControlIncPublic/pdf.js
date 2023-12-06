@@ -23,7 +23,6 @@ import {
   FeatureTest,
   ImageKind,
   InvalidPDFException,
-  isNodeJS,
   MissingPDFException,
   normalizeUnicode,
   OPS,
@@ -40,17 +39,16 @@ import {
   getDocument,
   PDFDataRangeTransport,
   PDFWorker,
+  SVGGraphics,
   version,
 } from "../../src/display/api.js";
 import {
-  DOMSVGFactory,
-  fetchData,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
   getXfaPageViewport,
   isDataScheme,
   isPdfFile,
-  noContextMenu,
+  loadScript,
   PDFDateString,
   PixelsPerInch,
   RenderingCancelledException,
@@ -63,58 +61,8 @@ import {
 import { AnnotationEditorLayer } from "../../src/display/editor/annotation_editor_layer.js";
 import { AnnotationEditorUIManager } from "../../src/display/editor/tools.js";
 import { AnnotationLayer } from "../../src/display/annotation_layer.js";
-import { DrawLayer } from "../../src/display/draw_layer.js";
 import { GlobalWorkerOptions } from "../../src/display/worker_options.js";
-import { Outliner } from "../../src/display/editor/outliner.js";
 import { XfaLayer } from "../../src/display/xfa_layer.js";
-
-const expectedAPI = Object.freeze({
-  AbortException,
-  AnnotationEditorLayer,
-  AnnotationEditorParamsType,
-  AnnotationEditorType,
-  AnnotationEditorUIManager,
-  AnnotationLayer,
-  AnnotationMode,
-  build,
-  CMapCompressionType,
-  createValidAbsoluteUrl,
-  DOMSVGFactory,
-  DrawLayer,
-  FeatureTest,
-  fetchData,
-  getDocument,
-  getFilenameFromUrl,
-  getPdfFilenameFromUrl,
-  getXfaPageViewport,
-  GlobalWorkerOptions,
-  ImageKind,
-  InvalidPDFException,
-  isDataScheme,
-  isPdfFile,
-  MissingPDFException,
-  noContextMenu,
-  normalizeUnicode,
-  OPS,
-  Outliner,
-  PasswordResponses,
-  PDFDataRangeTransport,
-  PDFDateString,
-  PDFWorker,
-  PermissionFlag,
-  PixelsPerInch,
-  PromiseCapability,
-  RenderingCancelledException,
-  renderTextLayer,
-  setLayerDimensions,
-  shadow,
-  UnexpectedResponseException,
-  updateTextLayer,
-  Util,
-  VerbosityLevel,
-  version,
-  XfaLayer,
-});
 
 describe("pdfjs_api", function () {
   it("checks that the *official* PDF.js API exposes the expected functionality", async function () {
@@ -127,22 +75,49 @@ describe("pdfjs_api", function () {
 
     // The imported Object contains an (automatically) inserted Symbol,
     // hence we copy the data to allow using a simple comparison below.
-    expect({ ...pdfjsAPI }).toEqual(expectedAPI);
-  });
-});
-
-describe("web_pdfjsLib", function () {
-  it("checks that the viewer re-exports the expected API functionality", async function () {
-    if (isNodeJS) {
-      pending("loadScript is not supported in Node.js.");
-    }
-    const apiPath = "../../build/generic/build/pdf.mjs";
-    await import(apiPath);
-
-    const webPdfjsLib = await import("../../web/pdfjs.js");
-
-    expect(Object.keys(webPdfjsLib).sort()).toEqual(
-      Object.keys(expectedAPI).sort()
-    );
+    expect({ ...pdfjsAPI }).toEqual({
+      AbortException,
+      AnnotationEditorLayer,
+      AnnotationEditorParamsType,
+      AnnotationEditorType,
+      AnnotationEditorUIManager,
+      AnnotationLayer,
+      AnnotationMode,
+      build,
+      CMapCompressionType,
+      createValidAbsoluteUrl,
+      FeatureTest,
+      getDocument,
+      getFilenameFromUrl,
+      getPdfFilenameFromUrl,
+      getXfaPageViewport,
+      GlobalWorkerOptions,
+      ImageKind,
+      InvalidPDFException,
+      isDataScheme,
+      isPdfFile,
+      loadScript,
+      MissingPDFException,
+      normalizeUnicode,
+      OPS,
+      PasswordResponses,
+      PDFDataRangeTransport,
+      PDFDateString,
+      PDFWorker,
+      PermissionFlag,
+      PixelsPerInch,
+      PromiseCapability,
+      RenderingCancelledException,
+      renderTextLayer,
+      setLayerDimensions,
+      shadow,
+      SVGGraphics,
+      UnexpectedResponseException,
+      updateTextLayer,
+      Util,
+      VerbosityLevel,
+      version,
+      XfaLayer,
+    });
   });
 });

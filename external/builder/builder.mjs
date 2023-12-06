@@ -42,12 +42,6 @@ function preprocess(inFilename, outFilename, defines) {
     return content.replaceAll(
       /^\s*@import\s+url\(([^)]+)\);\s*$/gm,
       function (all, url) {
-        if (defines.GECKOVIEW) {
-          switch (url) {
-            case "annotation_editor_layer_builder.css":
-              return "";
-          }
-        }
         const file = path.join(path.dirname(baseUrl), url);
         const imported = fs.readFileSync(file, "utf8").toString();
         return expandCssImports(imported, file);
@@ -229,4 +223,19 @@ function preprocess(inFilename, outFilename, defines) {
   }
 }
 
-export { preprocess };
+/**
+ * Merge two defines arrays. Values in the second param will override values in
+ * the first.
+ */
+function merge(defaults, defines) {
+  const ret = Object.create(null);
+  for (const key in defaults) {
+    ret[key] = defaults[key];
+  }
+  for (const key in defines) {
+    ret[key] = defines[key];
+  }
+  return ret;
+}
+
+export { merge, preprocess };

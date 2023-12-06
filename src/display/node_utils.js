@@ -12,6 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/* globals __non_webpack_require__ */
 
 import {
   BaseCanvasFactory,
@@ -27,30 +28,15 @@ if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
   );
 }
 
-let fs, canvas, path2d_polyfill;
-if (isNodeJS) {
-  // Native packages.
-  fs = await __non_webpack_import__("fs");
-  // Optional, third-party, packages.
-  try {
-    canvas = await __non_webpack_import__("canvas");
-  } catch {}
-  try {
-    path2d_polyfill = await __non_webpack_import__("path2d-polyfill");
-  } catch {}
-}
-
 if (typeof PDFJSDev !== "undefined" && !PDFJSDev.test("SKIP_BABEL")) {
   (function checkDOMMatrix() {
     if (globalThis.DOMMatrix || !isNodeJS) {
       return;
     }
-    const DOMMatrix = canvas?.DOMMatrix;
-
-    if (DOMMatrix) {
-      globalThis.DOMMatrix = DOMMatrix;
-    } else {
-      warn("Cannot polyfill `DOMMatrix`, rendering may be broken.");
+    try {
+      globalThis.DOMMatrix = __non_webpack_require__("canvas").DOMMatrix;
+    } catch (ex) {
+      warn(`Cannot polyfill \`DOMMatrix\`, rendering may be broken: "${ex}".`);
     }
   })();
 
@@ -58,20 +44,21 @@ if (typeof PDFJSDev !== "undefined" && !PDFJSDev.test("SKIP_BABEL")) {
     if (globalThis.Path2D || !isNodeJS) {
       return;
     }
-    const CanvasRenderingContext2D = canvas?.CanvasRenderingContext2D;
-    const polyfillPath2D = path2d_polyfill?.polyfillPath2D;
+    try {
+      const { CanvasRenderingContext2D } = __non_webpack_require__("canvas");
+      const { polyfillPath2D } = __non_webpack_require__("path2d-polyfill");
 
-    if (CanvasRenderingContext2D && polyfillPath2D) {
       globalThis.CanvasRenderingContext2D = CanvasRenderingContext2D;
       polyfillPath2D(globalThis);
-    } else {
-      warn("Cannot polyfill `Path2D`, rendering may be broken.");
+    } catch (ex) {
+      warn(`Cannot polyfill \`Path2D\`, rendering may be broken: "${ex}".`);
     }
   })();
 }
 
 const fetchData = function (url) {
   return new Promise((resolve, reject) => {
+    const fs = __non_webpack_require__("fs");
     fs.readFile(url, (error, data) => {
       if (error || !data) {
         reject(new Error(error));
@@ -89,7 +76,8 @@ class NodeCanvasFactory extends BaseCanvasFactory {
    * @ignore
    */
   _createCanvas(width, height) {
-    return canvas.createCanvas(width, height);
+    const Canvas = __non_webpack_require__("canvas");
+    return Canvas.createCanvas(width, height);
   }
 }
 

@@ -13,12 +13,10 @@
  * limitations under the License.
  */
 
-import { clearPatternCaches } from "./pattern.js";
 import { clearPrimitiveCaches } from "./primitives.js";
 import { clearUnicodeCaches } from "./unicode.js";
 
 function clearGlobalCaches() {
-  clearPatternCaches();
   clearPrimitiveCaches();
   clearUnicodeCaches();
 }

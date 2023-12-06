@@ -352,7 +352,7 @@ class ChromePreferences extends BasePreferences {
           defaultPrefs = this.defaults;
         }
         storageArea.get(defaultPrefs, function (readPrefs) {
-          resolve({ prefs: readPrefs });
+          resolve(readPrefs);
         });
       };
 
@@ -435,7 +435,7 @@ class ChromeExternalServices extends DefaultExternalServices {
     return new ChromePreferences();
   }
 
-  static async createL10n() {
+  static createL10n(options) {
     return new GenericL10n(navigator.language);
   }
 

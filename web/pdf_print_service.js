@@ -69,7 +69,8 @@ class PDFPrintService {
     printContainer,
     printResolution,
     optionalContentConfigPromise = null,
-    printAnnotationStoragePromise = null
+    printAnnotationStoragePromise = null,
+    l10n
   ) {
     this.pdfDocument = pdfDocument;
     this.pagesOverview = pagesOverview;
@@ -79,6 +80,7 @@ class PDFPrintService {
       optionalContentConfigPromise || pdfDocument.getOptionalContentConfig();
     this._printAnnotationStoragePromise =
       printAnnotationStoragePromise || Promise.resolve();
+    this.l10n = l10n;
     this.currentPage = -1;
     // The temporary canvas where renderPage paints one page at a time.
     this.scratchCanvas = document.createElement("canvas");
@@ -149,12 +151,12 @@ class PDFPrintService {
     const renderNextPage = (resolve, reject) => {
       this.throwIfInactive();
       if (++this.currentPage >= pageCount) {
-        renderProgress(pageCount, pageCount);
+        renderProgress(pageCount, pageCount, this.l10n);
         resolve();
         return;
       }
       const index = this.currentPage;
-      renderProgress(index, pageCount);
+      renderProgress(index, pageCount, this.l10n);
       renderPage(
         this,
         this.pdfDocument,
@@ -286,7 +288,7 @@ function abort() {
   }
 }
 
-function renderProgress(index, total) {
+function renderProgress(index, total, l10n) {
   if (typeof PDFJSDev === "undefined" && window.isGECKOVIEW) {
     return;
   }
@@ -295,7 +297,9 @@ function renderProgress(index, total) {
   const progressBar = dialog.querySelector("progress");
   const progressPerc = dialog.querySelector(".relative-progress");
   progressBar.value = progress;
-  progressPerc.setAttribute("data-l10n-args", JSON.stringify({ progress }));
+  l10n.get("print_progress_percent", { progress }).then(msg => {
+    progressPerc.textContent = msg;
+  });
 }
 
 window.addEventListener(
@@ -364,7 +368,8 @@ PDFPrintServiceFactory.instance = {
     printContainer,
     printResolution,
     optionalContentConfigPromise,
-    printAnnotationStoragePromise
+    printAnnotationStoragePromise,
+    l10n
   ) {
     if (activeService) {
       throw new Error("The print service is created and active.");
@@ -375,7 +380,8 @@ PDFPrintServiceFactory.instance = {
       printContainer,
       printResolution,
       optionalContentConfigPromise,
-      printAnnotationStoragePromise
+      printAnnotationStoragePromise,
+      l10n
     );
     return activeService;
   },
