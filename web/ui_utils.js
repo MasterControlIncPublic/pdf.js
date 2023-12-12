@@ -894,7 +894,6 @@ export {
   MAX_AUTO_SCALE,
   MAX_SCALE,
   MIN_SCALE,
-  noContextMenuHandler,
   normalizeWheelEventDelta,
   normalizeWheelEventDirection,
   OutputScale,
