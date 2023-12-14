@@ -20,6 +20,7 @@ import {
 } from "../../shared/util.js";
 import { AnnotationEditor } from "./editor.js";
 import { InkAnnotationElement } from "../annotation_layer.js";
+import { noContextMenu } from "../display_utils.js";
 import { opacityToHex } from "./tools.js";
 
 /**
@@ -29,8 +30,6 @@ class InkEditor extends AnnotationEditor {
   #baseHeight = 0;
 
   #baseWidth = 0;
-
-  #boundCanvasContextMenu = this.canvasContextMenu.bind(this);
 
   #boundCanvasPointermove = this.canvasPointermove.bind(this);
 
@@ -62,8 +61,6 @@ class InkEditor extends AnnotationEditor {
 
   static _defaultThickness = 1;
 
-  static _l10nPromise;
-
   static _type = "ink";
 
   constructor(params) {
@@ -84,12 +81,9 @@ class InkEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   static initialize(l10n) {
-    this._l10nPromise = new Map(
-      ["editor_ink_canvas_aria_label", "editor_ink2_aria_label"].map(str => [
-        str,
-        l10n.get(str),
-      ])
-    );
+    AnnotationEditor.initialize(l10n, {
+      strings: ["editor_ink_canvas_aria_label", "editor_ink2_aria_label"],
+    });
   }
 
   /** @inheritdoc */
@@ -365,7 +359,7 @@ class InkEditor extends AnnotationEditor {
    * @param {number} y
    */
   #startDrawing(x, y) {
-    this.canvas.addEventListener("contextmenu", this.#boundCanvasContextMenu);
+    this.canvas.addEventListener("contextmenu", noContextMenu);
     this.canvas.addEventListener("pointerleave", this.#boundCanvasPointerleave);
     this.canvas.addEventListener("pointermove", this.#boundCanvasPointermove);
     this.canvas.addEventListener("pointerup", this.#boundCanvasPointerup);
@@ -667,14 +661,6 @@ class InkEditor extends AnnotationEditor {
   }
 
   /**
-   * oncontextmenu callback for the canvas we're drawing on.
-   * @param {PointerEvent} event
-   */
-  canvasContextMenu(event) {
-    event.preventDefault();
-  }
-
-  /**
    * onpointermove callback for the canvas we're drawing on.
    * @param {PointerEvent} event
    */
@@ -719,10 +705,7 @@ class InkEditor extends AnnotationEditor {
     // Slight delay to avoid the context menu to appear (it can happen on a long
     // tap with a pen).
     setTimeout(() => {
-      this.canvas.removeEventListener(
-        "contextmenu",
-        this.#boundCanvasContextMenu
-      );
+      this.canvas.removeEventListener("contextmenu", noContextMenu);
     }, 10);
 
     this.#stopDrawing(event.offsetX, event.offsetY);
@@ -742,7 +725,7 @@ class InkEditor extends AnnotationEditor {
     this.canvas.width = this.canvas.height = 0;
     this.canvas.className = "inkEditorCanvas";
 
-    InkEditor._l10nPromise
+    AnnotationEditor._l10nPromise
       .get("editor_ink_canvas_aria_label")
       .then(msg => this.canvas?.setAttribute("aria-label", msg));
     this.div.append(this.canvas);
@@ -781,7 +764,7 @@ class InkEditor extends AnnotationEditor {
 
     super.render();
 
-    InkEditor._l10nPromise
+    AnnotationEditor._l10nPromise
       .get("editor_ink2_aria_label")
       .then(msg => this.div?.setAttribute("aria-label", msg));
 
@@ -1199,6 +1182,7 @@ class InkEditor extends AnnotationEditor {
       pageIndex: this.pageIndex,
       rect,
       rotation: this.rotation,
+      structTreeParentId: this._structTreeParentId,
     };
   }
 }

@@ -219,7 +219,7 @@ function createWebpackConfig(
     : [
         [
           "@babel/preset-env",
-          { corejs: "3.32.1", shippedProposals: true, useBuiltIns: "usage" },
+          { corejs: "3.32.2", shippedProposals: true, useBuiltIns: "usage" },
         ],
       ];
   const babelPlugins = ["@babel/plugin-transform-modules-commonjs"];
@@ -251,6 +251,7 @@ function createWebpackConfig(
     "display-svg": "src/display/stubs.js",
   };
   const viewerAlias = {
+    "web-alt_text_manager": "web/alt_text_manager.js",
     "web-annotation_editor_params": "web/annotation_editor_params.js",
     "web-com": "",
     "web-pdf_attachment_viewer": "web/pdf_attachment_viewer.js",
@@ -273,6 +274,9 @@ function createWebpackConfig(
     viewerAlias["web-com"] = "web/chromecom.js";
     viewerAlias["web-print_service"] = "web/pdf_print_service.js";
   } else if (bundleDefines.GENERIC) {
+    // Aliases defined here must also be replicated in the paths section of
+    // the tsconfig.json file for the type generation to work.
+    // In the tsconfig.json files, the .js extension must be omitted.
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-l10n_utils"] = "web/l10n_utils.js";
     libraryAlias["display-network"] = "src/display/network.js";
@@ -1373,6 +1377,7 @@ gulp.task(
       console.log();
       console.log("### Building mozilla-central extension");
       const defines = builder.merge(DEFINES, { MOZCENTRAL: true });
+      const gvDefines = builder.merge(defines, { GECKOVIEW: true });
 
       const MOZCENTRAL_DIR = BUILD_DIR + "mozcentral/",
         MOZCENTRAL_EXTENSION_DIR = MOZCENTRAL_DIR + "browser/extensions/pdfjs/",
@@ -1424,7 +1429,7 @@ gulp.task(
         preprocessHTML("web/viewer.html", defines).pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
         ),
-        preprocessHTML("web/viewer-geckoview.html", defines).pipe(
+        preprocessHTML("web/viewer-geckoview.html", gvDefines).pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
         ),
 
@@ -1433,7 +1438,7 @@ gulp.task(
           .pipe(replaceMozcentralCSS())
           .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")),
 
-        preprocessCSS("web/viewer-geckoview.css", defines)
+        preprocessCSS("web/viewer-geckoview.css", gvDefines)
           .pipe(postcss([autoprefixer(MOZCENTRAL_AUTOPREFIXER_CONFIG)]))
           .pipe(replaceMozcentralCSS())
           .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")),
@@ -1572,20 +1577,11 @@ gulp.task("jsdoc", function (done) {
 
 gulp.task("types", function (done) {
   console.log("### Generating TypeScript definitions using `tsc`");
-  const args = [
-    "target ESNext",
-    "allowJS",
-    "declaration",
-    `outDir ${TYPES_DIR}`,
-    "strict",
-    "esModuleInterop",
-    "forceConsistentCasingInFileNames",
-    "emitDeclarationOnly",
-    "moduleResolution node",
-  ].join(" --");
   exec(
-    `"node_modules/.bin/tsc" --${args} src/pdf.js web/pdf_viewer.component.js`,
-    done
+    `"node_modules/.bin/tsc" --outDir ${TYPES_DIR} --project .`,
+    function () {
+      exec(`"node_modules/.bin/tsc-alias" --outDir ${TYPES_DIR}`, done);
+    }
   );
 });
 
@@ -2553,6 +2549,7 @@ gulp.task(
   "ci-test",
   gulp.series(
     gulp.parallel("lint", "externaltest", "unittestcli"),
-    "lint-chromium"
+    "lint-chromium",
+    "typestest"
   )
 );
