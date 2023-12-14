@@ -604,13 +604,6 @@ function getVisibleElements({
   return { first, last, views: visible, ids };
 }
 
-/**
- * Event handler to suppress context menu.
- */
-function noContextMenuHandler(evt) {
-  evt.preventDefault();
-}
-
 function getWatermarkText() {
   const urlParams = new URLSearchParams(window.location.search);
   return urlParams.get("watermark");
