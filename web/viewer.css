@@ -1555,7 +1555,7 @@ dialog :link {
 
 .mcToolbar {
   background-image: none !important;
-  background-color: rgba(255, 255, 255, 1) !important;
+  background-color: rgb(255 255 255) !important;
 }
 
 .mcToolbar * button,
@@ -1565,8 +1565,8 @@ dialog :link {
 
 .mcToolbar option {
   background-image: none !important;
-  background-color: rgba(255, 255, 255, 1) !important;
-  color: hsl(208, 28%, 20%);
+  background-color: rgb(255 255 255) !important;
+  color: hsl(208 28% 20%);
 }
 
 .mcViewer {
