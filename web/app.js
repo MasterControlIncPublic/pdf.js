@@ -381,7 +381,6 @@ const PDFViewerApplication = {
         console.error(`_parseHashParams: "${ex.message}".`);
       }
     }
-
     // It is not possible to change locale for the (various) extension builds.
     if (
       (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) &&
