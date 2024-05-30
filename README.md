@@ -23,9 +23,9 @@ Perform the sync manually as described below:
     $ git switch master
     $ git merge upstream/master
     ```
-- push `master` up to our fork's repo
+- push `master` up to our fork's repo (include the new tags)
     ```
-    $ git push master
+    $ git push --tags master
     ```
 
 ### Updating `mc-master` with changes from the upstream master
@@ -37,9 +37,12 @@ This should be done after syncing master as described above. The idea here is to
     $ git switch -c merge-v3.1.81-into-mc-master mc-master
     $ git merge v3.1.81
     ```
-- You're likely to have merge conflicts to resolve, good luck.
+- You're likely to have merge conflicts to resolve, good luck. Consider the suggestions below. 
+  - It can be helpful to compare our mc-master with the most recent tag it was based off of in order to see _only_ what MC has changed. Github's compare tool is could be handy but beware of how git histories are treated: https://github.com/MasterControlIncPublic/pdf.js/compare/v4.3.136...MasterControlIncPublic:pdf.js:mc-master
+  - An alternative would be to use a simple git-diff command `git diff v4.3.136 mc-master`
 - Make sure things still work and MC's customizations are still in place, deploy snapshot, test, etc
-- Create a merge commit PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in. **Make sure to use a merge commit PR (NOT a squash)** so that we retain Mozilla's commit history and future merges of this type are possible. In your PR title include which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
+- Create a merge commit PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in.
+  - **Make sure to use a merge commit PR (NOT a squash)** so that we retain Mozilla's commit history and future merges of this type are possible. In your PR title include which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
 
 ### Feature Work
 New feature work can be done as normal on a feature branch based off `mc-master`.
@@ -57,7 +60,6 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * Configurably can allow printing (web/pdf_print_service.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
 * Removed dark theme (web/viewer.css)
-* Added watermark handling code (web/text_layer_builder.js, web_pdf_page_view.js, web/ui_utils.js)
 * Added presentation mode to the toolbar (web/toolbar.js)
 * Include Global-complete styles (web/viewer.html)
 * Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
@@ -104,6 +106,8 @@ Please don't forget to tag the commit you deployed and push the tags to the repo
     $ git push --tags origin mc-master
     
 We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to help differentiate our tags since we're building from a different branch and the commit counting (used in the automatic version number creation) will be different and likely _behind_ the Mozilla PDFjs numbers.
+
+TODO: Consider changing our tagging practice to show both which mozilla tag we're based off of and which version the mc-build process built. Perhaps something like v4.3.136-moz_v4.3.238-mc or v4.3.136-mc238
 
 # ORIGINAL README BELOW
 # PDF.js [![Build Status](https://github.com/mozilla/pdf.js/workflows/CI/badge.svg?branch=master)](https://github.com/mozilla/pdf.js/actions?query=workflow%3ACI+branch%3Amaster)
