@@ -1764,61 +1764,6 @@ gulp.task(
 );
 
 gulp.task(
-  "mc-build",
-  gulp.series("minified", function packageMcBuild(done) {
-    const targetName = getTargetName();
-    gulp
-      .src(BUILD_DIR + "minified/**")
-      .pipe(gulp.dest(MC_DIR))
-      .on("end", function () {
-        gulp
-          .src(MC_DIR + "**", { base: BUILD_DIR })
-          .pipe(zip(targetName))
-          .pipe(gulp.dest(BUILD_DIR))
-          .on("end", function () {
-            console.log("Built distribution file: " + targetName);
-            done();
-          });
-      });
-  })
-);
-
-gulp.task(
-  "mc-deploy-snapshot",
-  gulp.series("mc-build", function deploySnapshot(done) {
-    mcDeploy(getDeployUrl(), done);
-    done();
-  })
-);
-
-gulp.task(
-  "mc-deploy-release",
-  gulp.series("mc-build", function deployRelease(done) {
-    mcDeploy(getDeployUrl(true), done);
-    done();
-  })
-);
-
-function mcDeploy(deployUrl, done) {
-  console.log("### Deploying " + getTargetName() + " to " + deployUrl);
-  gulp
-    .src(BUILD_DIR + getTargetName())
-    .pipe(
-      artifactoryUpload({
-        url: deployUrl,
-        username: process.env.mc_artifactory_user,
-        password: process.env.mc_artifactory_api_key,
-      })
-    )
-    .on("error", console.log)
-    .on("end", function () {
-      console.log("Done uploading " + getTargetName() + " to " + deployUrl);
-      console.log("### Please make sure to tag and push!");
-      done();
-    });
-}
-
-gulp.task(
   "botxfatest",
   gulp.series(setTestEnv, "generic", "components", function runBotXfaTest() {
     return streamqueue(
@@ -2140,6 +2085,62 @@ gulp.task("clean", function (done) {
   fs.rmSync(BUILD_DIR, { recursive: true, force: true });
   done();
 });
+
+gulp.task(
+  "mc-build",
+  gulp.series("clean","minified", function packageMcBuild(done) {
+    const targetName = getTargetName();
+    gulp
+      .src(BUILD_DIR + "minified/**")
+      .pipe(gulp.dest(MC_DIR))
+      .on("end", function () {
+        gulp
+          .src(MC_DIR + "**", { base: BUILD_DIR })
+          .pipe(zip(targetName))
+          .pipe(gulp.dest(BUILD_DIR))
+          .on("end", function () {
+            console.log("Built distribution file: " + targetName);
+            done();
+          });
+      });
+  })
+);
+
+gulp.task(
+  "mc-deploy-snapshot",
+  gulp.series("mc-build", function deploySnapshot(done) {
+    mcDeploy(getDeployUrl(), done);
+    done();
+  })
+);
+
+gulp.task(
+  "mc-deploy-release",
+  gulp.series("mc-build", function deployRelease(done) {
+    mcDeploy(getDeployUrl(true), done);
+    done();
+  })
+);
+
+function mcDeploy(deployUrl, done) {
+  console.log("### Deploying " + getTargetName() + " to " + deployUrl);
+  gulp
+    .src(BUILD_DIR + getTargetName())
+    .pipe(
+      artifactoryUpload({
+        url: deployUrl,
+        username: process.env.mc_artifactory_user,
+        password: process.env.mc_artifactory_api_key,
+      })
+    )
+    .on("error", console.log)
+    .on("end", function () {
+      console.log("Done uploading " + getTargetName() + " to " + deployUrl);
+      console.log("### Please make sure to tag and push!");
+      done();
+    });
+}
+
 
 gulp.task("importl10n", async function () {
   const { downloadL10n } = await import("./external/importL10n/locales.mjs");
