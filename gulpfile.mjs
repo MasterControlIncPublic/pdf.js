@@ -2088,10 +2088,10 @@ gulp.task("clean", function (done) {
 
 gulp.task(
   "mc-build",
-  gulp.series("clean","minified", function packageMcBuild(done) {
+  gulp.series("clean","generic", function packageMcBuild(done) {
     const targetName = getTargetName();
     gulp
-      .src(BUILD_DIR + "minified/**")
+      .src(BUILD_DIR + "generic/**")
       .pipe(gulp.dest(MC_DIR))
       .on("end", function () {
         gulp
