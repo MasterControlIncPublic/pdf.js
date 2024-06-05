@@ -53,7 +53,6 @@ Use a **squash merge PR for new feature work** so that all your development comm
 
 * These README updates
 * The additional gulp tasks that detailed below
-* We set the browser title differently (web/app.js, web/ui_utils.js)
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
 * We don't allow annotating/inking the pdf (web/viewer.html) (currently just hiding the button, we may want to find a more pdf.js way to disable editing)

@@ -27,7 +27,6 @@ import {
   CursorTool,
   DEFAULT_SCALE_VALUE,
   getActiveOrFocusedElement,
-  getDocumentTitle,
   isValidRotation,
   isValidScrollMode,
   isValidSpreadMode,
@@ -874,7 +873,7 @@ const PDFViewerApplication = {
     }
     const editorIndicator =
       this._hasAnnotationEditors && !this.pdfRenderingQueue.printing;
-    document.title = `${editorIndicator ? "* " : ""}${getDocumentTitle()}`;
+    document.title = `${editorIndicator ? "* " : ""}${title}`;
   },
 
   get _docFilename() {

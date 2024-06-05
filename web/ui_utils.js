@@ -603,12 +603,6 @@ function getVisibleElements({
   return { first, last, views: visible, ids };
 }
 
-function getDocumentTitle() {
-  const defaultTitle = "PDF Viewer";
-  const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get("documentTitle") || defaultTitle;
-}
-
 function normalizeWheelEventDirection(evt) {
   let delta = Math.hypot(evt.deltaX, evt.deltaY);
   const angle = Math.atan2(evt.deltaY, evt.deltaX);
@@ -870,7 +864,6 @@ export {
   DEFAULT_SCALE_VALUE,
   docStyle,
   getActiveOrFocusedElement,
-  getDocumentTitle,
   getPageSizeInches,
   getVisibleElements,
   isPortraitOrientation,
