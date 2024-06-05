@@ -56,6 +56,7 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * We set the browser title differently (web/app.js, web/ui_utils.js)
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
+* We don't allow annotating/inking the pdf (web/viewer.html) (currently just hiding the button, we may want to find a more pdf.js way to disable editing)
 * We change the print resolution (web/app_options.js)
 * Configurably can allow printing (web/pdf_print_service.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
