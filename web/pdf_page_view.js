@@ -34,7 +34,6 @@ import {
 import {
   approximateFraction,
   DEFAULT_SCALE,
-  getWatermarkText,
   OutputScale,
   RenderingStates,
   roundToDivide,
@@ -549,7 +548,7 @@ class PDFPageView {
 
   /**
    * Update e.g. the scale and/or rotation of the page.
-   * @param {PDFPageViewUpdateParameters}
+   * @param {PDFPageViewUpdateParameters} params
    */
   update({
     scale = 0,
@@ -850,13 +849,13 @@ class PDFPageView {
       !pdfPage.isPureXfa
     ) {
       this._accessibilityManager ||= new TextAccessibilityManager();
+
       this.textLayer = new TextLayerBuilder({
         highlighter: this._textHighlighter,
         accessibilityManager: this._accessibilityManager,
         isOffscreenCanvasSupported: this.isOffscreenCanvasSupported,
         enablePermissions:
           this.#textLayerMode === TextLayerMode.ENABLE_PERMISSIONS,
-        waterMarkText: getWatermarkText(),
       });
       div.append(this.textLayer.div);
     }

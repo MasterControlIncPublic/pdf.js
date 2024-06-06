@@ -173,7 +173,8 @@
 
     /* This image is used in <input> elements, which unfortunately means that
      * the `mask-image` approach used with all of the other images doesn't work
-     * here; hence why we still have two versions of this particular image. *!
+     * here; hence why we still have two versions of this particular image. */
+/* mc continue comment
     --loading-icon: url(images/loading-dark.svg);
   }
 }
@@ -475,6 +476,12 @@ body {
 .findbar.wrapContainers > div#findbarMessageContainer {
   height: auto;
 }
+
+/* mc styles with checkboxes so we need to comment out this removal of checkbox click events
+.findbar input[type="checkbox"] {
+  pointer-events: none;
+}
+*/
 
 .findbar label {
   user-select: none;

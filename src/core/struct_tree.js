@@ -13,18 +13,19 @@
  * limitations under the License.
  */
 
-import { Dict, isName, Name, Ref } from "./primitives.js";
-import { stringToPDFString, warn } from "../shared/util.js";
+import { AnnotationPrefix, stringToPDFString, warn } from "../shared/util.js";
+import { Dict, isName, Name, Ref, RefSetCache } from "./primitives.js";
 import { NumberTree } from "./name_number_tree.js";
 import { writeObject } from "./writer.js";
 
 const MAX_DEPTH = 40;
 
 const StructElementType = {
-  PAGE_CONTENT: "PAGE_CONTENT",
-  STREAM_CONTENT: "STREAM_CONTENT",
-  OBJECT: "OBJECT",
-  ELEMENT: "ELEMENT",
+  PAGE_CONTENT: 1,
+  STREAM_CONTENT: 2,
+  OBJECT: 3,
+  ANNOTATION: 4,
+  ELEMENT: 5,
 };
 
 class StructTreeRoot {
@@ -32,10 +33,28 @@ class StructTreeRoot {
     this.dict = rootDict;
     this.ref = rootRef instanceof Ref ? rootRef : null;
     this.roleMap = new Map();
+    this.structParentIds = null;
   }
 
   init() {
     this.readRoleMap();
+  }
+
+  #addIdToPage(pageRef, id, type) {
+    if (!(pageRef instanceof Ref) || id < 0) {
+      return;
+    }
+    this.structParentIds ||= new RefSetCache();
+    let ids = this.structParentIds.get(pageRef);
+    if (!ids) {
+      ids = [];
+      this.structParentIds.put(pageRef, ids);
+    }
+    ids.push([id, type]);
+  }
+
+  addAnnotationIdToPage(pageRef, id) {
+    this.#addIdToPage(pageRef, id, StructElementType.ANNOTATION);
   }
 
   readRoleMap() {
@@ -544,12 +563,10 @@ class StructElementNode {
       if (this.tree.pageDict.objId !== pageObjId) {
         return null;
       }
+      const kidRef = kidDict.getRaw("Stm");
       return new StructElement({
         type: StructElementType.STREAM_CONTENT,
-        refObjId:
-          kidDict.getRaw("Stm") instanceof Ref
-            ? kidDict.getRaw("Stm").toString()
-            : null,
+        refObjId: kidRef instanceof Ref ? kidRef.toString() : null,
         pageObjId,
         mcid: kidDict.get("MCID"),
       });
@@ -559,12 +576,10 @@ class StructElementNode {
       if (this.tree.pageDict.objId !== pageObjId) {
         return null;
       }
+      const kidRef = kidDict.getRaw("Obj");
       return new StructElement({
         type: StructElementType.OBJECT,
-        refObjId:
-          kidDict.getRaw("Obj") instanceof Ref
-            ? kidDict.getRaw("Obj").toString()
-            : null,
+        refObjId: kidRef instanceof Ref ? kidRef.toString() : null,
         pageObjId,
       });
     }
@@ -601,7 +616,7 @@ class StructTreePage {
     this.nodes = [];
   }
 
-  parse() {
+  parse(pageRef) {
     if (!this.root || !this.rootDict) {
       return;
     }
@@ -611,18 +626,42 @@ class StructTreePage {
       return;
     }
     const id = this.pageDict.get("StructParents");
-    if (!Number.isInteger(id)) {
+    const ids =
+      pageRef instanceof Ref && this.root.structParentIds?.get(pageRef);
+    if (!Number.isInteger(id) && !ids) {
       return;
     }
-    const numberTree = new NumberTree(parentTree, this.rootDict.xref);
-    const parentArray = numberTree.get(id);
-    if (!Array.isArray(parentArray)) {
-      return;
-    }
+
     const map = new Map();
-    for (const ref of parentArray) {
-      if (ref instanceof Ref) {
-        this.addNode(this.rootDict.xref.fetch(ref), map);
+    const numberTree = new NumberTree(parentTree, this.rootDict.xref);
+
+    if (Number.isInteger(id)) {
+      const parentArray = numberTree.get(id);
+      if (Array.isArray(parentArray)) {
+        for (const ref of parentArray) {
+          if (ref instanceof Ref) {
+            this.addNode(this.rootDict.xref.fetch(ref), map);
+          }
+        }
+      }
+    }
+
+    if (!ids) {
+      return;
+    }
+    for (const [elemId, type] of ids) {
+      const obj = numberTree.get(elemId);
+      if (obj) {
+        const elem = this.addNode(this.rootDict.xref.fetchIfRef(obj), map);
+        if (
+          elem?.kids?.length === 1 &&
+          elem.kids[0].type === StructElementType.OBJECT
+        ) {
+          // The node in the struct tree is wrapping an object (annotation
+          // or xobject), so we need to update the type of the node to match
+          // the type of the object.
+          elem.kids[0].type = type;
+        }
       }
     }
   }
@@ -736,6 +775,11 @@ class StructTreePage {
           obj.children.push({
             type: "object",
             id: kid.refObjId,
+          });
+        } else if (kid.type === StructElementType.ANNOTATION) {
+          obj.children.push({
+            type: "annotation",
+            id: `${AnnotationPrefix}${kid.refObjId}`,
           });
         }
       }
