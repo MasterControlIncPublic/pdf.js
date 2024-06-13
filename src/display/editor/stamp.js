@@ -32,6 +32,8 @@ class StampEditor extends AnnotationEditor {
 
   #bitmapFile = null;
 
+  #bitmapFileName = "";
+
   #canvas = null;
 
   #observer = null;
@@ -44,6 +46,8 @@ class StampEditor extends AnnotationEditor {
 
   static _type = "stamp";
 
+  static _editorType = AnnotationEditorType.STAMP;
+
   constructor(params) {
     super({ ...params, name: "stampEditor" });
     this.#bitmapUrl = params.bitmapUrl;
@@ -51,8 +55,8 @@ class StampEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  static initialize(l10n) {
-    AnnotationEditor.initialize(l10n);
+  static initialize(l10n, uiManager) {
+    AnnotationEditor.initialize(l10n, uiManager);
   }
 
   static get supportedTypes() {
@@ -101,6 +105,9 @@ class StampEditor extends AnnotationEditor {
     if (!fromId) {
       this.#bitmapId = data.id;
       this.#isSvg = data.isSvg;
+    }
+    if (data.file) {
+      this.#bitmapFileName = data.file.name;
     }
     this.#createCanvas();
   }
@@ -188,6 +195,10 @@ class StampEditor extends AnnotationEditor {
       this.#canvas = null;
       this.#observer?.disconnect();
       this.#observer = null;
+      if (this.#resizeTimeoutId) {
+        clearTimeout(this.#resizeTimeoutId);
+        this.#resizeTimeoutId = null;
+      }
     }
     super.remove();
   }
@@ -207,7 +218,7 @@ class StampEditor extends AnnotationEditor {
       return;
     }
 
-    if (this.#bitmapId) {
+    if (this.#bitmapId && this.#canvas === null) {
       this.#getBitmap();
     }
 
@@ -230,7 +241,8 @@ class StampEditor extends AnnotationEditor {
       this.#bitmapPromise ||
       this.#bitmap ||
       this.#bitmapUrl ||
-      this.#bitmapFile
+      this.#bitmapFile ||
+      this.#bitmapId
     );
   }
 
@@ -253,6 +265,8 @@ class StampEditor extends AnnotationEditor {
 
     super.render();
     this.div.hidden = true;
+
+    this.addAltTextButton();
 
     if (this.#bitmap) {
       this.#createCanvas();
@@ -315,17 +329,12 @@ class StampEditor extends AnnotationEditor {
     // There are multiple ways to add an image to the page, so here we just
     // count the number of times an image is added to the page whatever the way
     // is.
-    this._uiManager._eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.editorType,
-        data: {
-          action: "inserted_image",
-        },
-      },
+    this._reportTelemetry({
+      action: "inserted_image",
     });
-    this.addAltTextButton();
+    if (this.#bitmapFileName) {
+      canvas.setAttribute("aria-label", this.#bitmapFileName);
+    }
   }
 
   /**
@@ -417,6 +426,38 @@ class StampEditor extends AnnotationEditor {
     const bitmap = this.#isSvg
       ? this.#bitmap
       : this.#scaleBitmap(width, height);
+
+    if (this._uiManager.hasMLManager && !this.hasAltText()) {
+      const offscreen = new OffscreenCanvas(width, height);
+      const ctx = offscreen.getContext("2d");
+      ctx.drawImage(
+        bitmap,
+        0,
+        0,
+        bitmap.width,
+        bitmap.height,
+        0,
+        0,
+        width,
+        height
+      );
+      this._uiManager
+        .mlGuess({
+          service: "image-to-text",
+          request: {
+            data: ctx.getImageData(0, 0, width, height).data,
+            width,
+            height,
+            channels: 4,
+          },
+        })
+        .then(response => {
+          const altText = response?.output || "";
+          if (this.parent && altText && !this.hasAltText()) {
+            this.altTextData = { altText, decorative: false };
+          }
+        });
+    }
     const ctx = canvas.getContext("2d");
     ctx.filter = this._uiManager.hcmFilter;
     ctx.drawImage(
@@ -430,6 +471,11 @@ class StampEditor extends AnnotationEditor {
       width,
       height
     );
+  }
+
+  /** @inheritdoc */
+  getImageForAltText() {
+    return this.#canvas;
   }
 
   #serializeBitmap(toUrl) {

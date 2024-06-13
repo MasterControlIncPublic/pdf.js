@@ -13,8 +13,6 @@
  * limitations under the License.
  */
 
-import "web-com";
-import "web-print_service";
 import { RenderingStates, ScrollMode, SpreadMode } from "./ui_utils.js";
 import { AppOptions } from "./app_options.js";
 import { LinkTarget } from "./pdf_link_service.js";
@@ -53,15 +51,18 @@ function getViewerConfiguration() {
       zoomIn: document.getElementById("zoomIn"),
       zoomOut: document.getElementById("zoomOut"),
       viewFind: document.getElementById("viewFind"),
-      openFile:
-        typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
-          ? document.getElementById("openFile")
-          : null,
       print: document.getElementById("print"),
       presentationModeButton: document.getElementById("presentationMode"),
       editorFreeTextButton: document.getElementById("editorFreeText"),
       editorFreeTextParamsToolbar: document.getElementById(
         "editorFreeTextParamsToolbar"
+      ),
+      editorHighlightButton: document.getElementById("editorHighlight"),
+      editorHighlightParamsToolbar: document.getElementById(
+        "editorHighlightParamsToolbar"
+      ),
+      editorHighlightColorPicker: document.getElementById(
+        "editorHighlightColorPicker"
       ),
       editorInkButton: document.getElementById("editorInk"),
       editorInkParamsToolbar: document.getElementById("editorInkParamsToolbar"),
@@ -116,9 +117,6 @@ function getViewerConfiguration() {
       attachmentsView: document.getElementById("attachmentsView"),
       layersView: document.getElementById("layersView"),
       // View-specific options
-      outlineOptionsContainer: document.getElementById(
-        "outlineOptionsContainer"
-      ),
       currentOutlineItemButton: document.getElementById("currentOutlineItem"),
     },
     findBar: {
@@ -176,13 +174,12 @@ function getViewerConfiguration() {
       editorInkThickness: document.getElementById("editorInkThickness"),
       editorInkOpacity: document.getElementById("editorInkOpacity"),
       editorStampAddImage: document.getElementById("editorStampAddImage"),
+      editorFreeHighlightThickness: document.getElementById(
+        "editorFreeHighlightThickness"
+      ),
+      editorHighlightShowAll: document.getElementById("editorHighlightShowAll"),
     },
     printContainer: document.getElementById("printContainer"),
-    openFileInput:
-      typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
-        ? document.getElementById("fileInput")
-        : null,
-    debuggerScriptPath: "./debugger.js",
   };
 }
 
