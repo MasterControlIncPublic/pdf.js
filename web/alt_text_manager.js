@@ -248,22 +248,18 @@ class AltTextManager {
   }
 
   #close() {
-    this.#eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.#currentEditor.editorType,
-        data: this.#telemetryData || {
-          action: "alt_text_cancel",
-          alt_text_keyboard: !this.#hasUsedPointer,
-        },
-      },
-    });
+    this.#currentEditor._reportTelemetry(
+      this.#telemetryData || {
+        action: "alt_text_cancel",
+        alt_text_keyboard: !this.#hasUsedPointer,
+      }
+    );
     this.#telemetryData = null;
 
     this.#removeOnClickListeners();
     this.#uiManager?.addEditListeners();
     this.#eventBus._off("resize", this.#boundSetPosition);
+    this.#currentEditor.altTextFinish();
     this.#currentEditor = null;
     this.#uiManager = null;
   }
