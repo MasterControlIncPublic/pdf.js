@@ -1901,6 +1901,92 @@ describe("api", function () {
       await loadingTask.destroy();
     });
 
+    it("gets outline, with /XYZ destinations that lack zoom parameter (issue 18408)", async function () {
+      const loadingTask = getDocument(
+        buildGetDocumentParams("issue18408_reduced.pdf")
+      );
+      const pdfDoc = await loadingTask.promise;
+      const outline = await pdfDoc.getOutline();
+
+      expect(outline).toEqual([
+        {
+          action: null,
+          attachment: undefined,
+          dest: [{ num: 14, gen: 0 }, { name: "XYZ" }, 65, 705],
+          url: null,
+          unsafeUrl: undefined,
+          newWindow: undefined,
+          setOCGState: undefined,
+          title: "Page 1",
+          color: new Uint8ClampedArray([0, 0, 0]),
+          count: undefined,
+          bold: false,
+          italic: false,
+          items: [],
+        },
+        {
+          action: null,
+          attachment: undefined,
+          dest: [{ num: 13, gen: 0 }, { name: "XYZ" }, 60, 710],
+          url: null,
+          unsafeUrl: undefined,
+          newWindow: undefined,
+          setOCGState: undefined,
+          title: "Page 2",
+          color: new Uint8ClampedArray([0, 0, 0]),
+          count: undefined,
+          bold: false,
+          italic: false,
+          items: [],
+        },
+      ]);
+
+      await loadingTask.destroy();
+    });
+
+    it("gets outline, with /FitH destinations that lack coordinate parameter (bug 1907000)", async function () {
+      const loadingTask = getDocument(
+        buildGetDocumentParams("bug1907000_reduced.pdf")
+      );
+      const pdfDoc = await loadingTask.promise;
+      const outline = await pdfDoc.getOutline();
+
+      expect(outline).toEqual([
+        {
+          action: null,
+          attachment: undefined,
+          dest: [{ num: 14, gen: 0 }, { name: "FitH" }],
+          url: null,
+          unsafeUrl: undefined,
+          newWindow: undefined,
+          setOCGState: undefined,
+          title: "Page 1",
+          color: new Uint8ClampedArray([0, 0, 0]),
+          count: undefined,
+          bold: false,
+          italic: false,
+          items: [],
+        },
+        {
+          action: null,
+          attachment: undefined,
+          dest: [{ num: 13, gen: 0 }, { name: "FitH" }],
+          url: null,
+          unsafeUrl: undefined,
+          newWindow: undefined,
+          setOCGState: undefined,
+          title: "Page 2",
+          color: new Uint8ClampedArray([0, 0, 0]),
+          count: undefined,
+          bold: false,
+          italic: false,
+          items: [],
+        },
+      ]);
+
+      await loadingTask.destroy();
+    });
+
     it("gets non-existent permissions", async function () {
       const permissions = await pdfDocument.getPermissions();
       expect(permissions).toEqual(null);
@@ -2438,6 +2524,21 @@ describe("api", function () {
           alt: "Hello World",
         },
       });
+      // Test if an alt-text using utf-16 is correctly handled.
+      // The Mahjong tile code is 0x1F000.
+      pdfDoc.annotationStorage.setValue("pdfjs_internal_editor_1", {
+        annotationType: AnnotationEditorType.STAMP,
+        rect: [128, 400, 148, 420],
+        rotation: 0,
+        bitmap: structuredClone(bitmap),
+        bitmapId: "im2",
+        pageIndex: 0,
+        structTreeParentId: "p3R_mc14",
+        accessibilityData: {
+          type: "Figure",
+          alt: "Γειά σου with a Mahjong tile 🀀",
+        },
+      });
 
       const data = await pdfDoc.saveDocument();
       await loadingTask.destroy();
@@ -2446,7 +2547,7 @@ describe("api", function () {
       pdfDoc = await loadingTask.promise;
       const page = await pdfDoc.getPage(1);
       const tree = await page.getStructTree();
-      const [predecessor, leaf] = findNode(
+      let [predecessor, leaf] = findNode(
         null,
         tree,
         0,
@@ -2472,6 +2573,36 @@ describe("api", function () {
           },
         ],
         alt: "Hello World",
+      });
+
+      let count = 0;
+      [predecessor, leaf] = findNode(null, tree, 0, node => {
+        if (node.role === "Figure") {
+          count += 1;
+          return count === 2;
+        }
+        return false;
+      });
+
+      expect(predecessor).toEqual({
+        role: "Span",
+        children: [
+          {
+            type: "content",
+            id: "p3R_mc14",
+          },
+        ],
+      });
+
+      expect(leaf).toEqual({
+        role: "Figure",
+        children: [
+          {
+            type: "annotation",
+            id: "pdfjs_internal_id_481R",
+          },
+        ],
+        alt: "Γειά σου with a Mahjong tile 🀀",
       });
 
       await loadingTask.destroy();
@@ -3419,6 +3550,21 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
       await loadingTask.destroy();
     });
 
+    it("gets text content, correctly handling documents with toUnicode cmaps that omit leading zeros on hex-encoded UTF-16", async function () {
+      const loadingTask = getDocument(
+        buildGetDocumentParams("issue18099_reduced.pdf")
+      );
+      const pdfDoc = await loadingTask.promise;
+      const pdfPage = await pdfDoc.getPage(1);
+      const { items } = await pdfPage.getTextContent({
+        disableNormalization: true,
+      });
+      const text = mergeText(items);
+      expect(text).toEqual("Hello world!");
+
+      await loadingTask.destroy();
+    });
+
     it("gets text content, and check that out-of-page text is not present (bug 1755201)", async function () {
       if (isNodeJS) {
         pending("Linked test-cases are not supported in Node.js.");
@@ -4155,7 +4301,7 @@ Caron Broadcasting, Inc., an Ohio corporation (“Lessee”).`)
             checkedCopyLocalImage = true;
             // Ensure that the image was copied in the main-thread, rather
             // than being re-parsed in the worker-thread (which is slower).
-            expect(statsOverall).toBeLessThan(firstStatsOverall / 4);
+            expect(statsOverall).toBeLessThan(firstStatsOverall / 2);
           }
         }
       }

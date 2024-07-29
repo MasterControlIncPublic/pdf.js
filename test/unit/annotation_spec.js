@@ -261,24 +261,11 @@ describe("annotation", function () {
 
     it("should process quadpoints in the standard order", function () {
       rect = [10, 10, 20, 20];
-      dict.set(
-        "QuadPoints",
-        [10, 20, 20, 20, 10, 10, 20, 10, 11, 19, 19, 19, 11, 11, 19, 11]
-      );
-      expect(getQuadPoints(dict, rect)).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-        [
-          { x: 11, y: 19 },
-          { x: 19, y: 19 },
-          { x: 11, y: 11 },
-          { x: 19, y: 11 },
-        ],
-      ]);
+      const quadPoints = [
+        10, 20, 20, 20, 10, 10, 20, 10, 11, 19, 19, 19, 11, 11, 19, 11,
+      ];
+      dict.set("QuadPoints", quadPoints);
+      expect(getQuadPoints(dict, rect)).toEqual(Float32Array.from(quadPoints));
     });
 
     it("should normalize and process quadpoints in non-standard orders", function () {
@@ -296,14 +283,9 @@ describe("annotation", function () {
 
       for (const nonStandardOrder of nonStandardOrders) {
         dict.set("QuadPoints", nonStandardOrder);
-        expect(getQuadPoints(dict, rect)).toEqual([
-          [
-            { x: 10, y: 20 },
-            { x: 20, y: 20 },
-            { x: 10, y: 10 },
-            { x: 20, y: 10 },
-          ],
-        ]);
+        expect(getQuadPoints(dict, rect)).toEqual(
+          Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+        );
       }
     });
   });
@@ -1382,14 +1364,9 @@ describe("annotation", function () {
         idFactoryMock
       );
       expect(data.annotationType).toEqual(AnnotationType.LINK);
-      expect(data.quadPoints).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-      ]);
+      expect(data.quadPoints).toEqual(
+        Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+      );
     });
   });
 
@@ -1791,7 +1768,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList.argsArray.length).toEqual(3);
@@ -2546,7 +2522,6 @@ describe("annotation", function () {
         checkboxEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList.argsArray.length).toEqual(5);
@@ -2607,7 +2582,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList1.argsArray.length).toEqual(3);
@@ -2631,7 +2605,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList2.argsArray.length).toEqual(3);
@@ -2693,7 +2666,6 @@ describe("annotation", function () {
           partialEvaluator,
           task,
           RenderingIntentFlag.PRINT,
-          false,
           annotationStorage
         );
         expect(opList.argsArray.length).toEqual(3);
@@ -2755,7 +2727,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList.argsArray.length).toEqual(3);
@@ -3009,7 +2980,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList1.argsArray.length).toEqual(3);
@@ -3033,7 +3003,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList2.argsArray.length).toEqual(3);
@@ -3093,7 +3062,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         annotationStorage
       );
       expect(opList.argsArray.length).toEqual(3);
@@ -4265,7 +4233,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         null
       );
 
@@ -4288,6 +4255,46 @@ describe("annotation", function () {
         OPS.restore,
         OPS.endAnnotation,
       ]);
+    });
+
+    it("should update an existing FreeText annotation", async function () {
+      const freeTextDict = new Dict();
+      freeTextDict.set("Type", Name.get("Annot"));
+      freeTextDict.set("Subtype", Name.get("FreeText"));
+      freeTextDict.set("CreationDate", "D:20190423");
+      freeTextDict.set("Foo", Name.get("Bar"));
+
+      const freeTextRef = Ref.get(143, 0);
+      partialEvaluator.xref = new XRefMock([
+        { ref: freeTextRef, data: freeTextDict },
+      ]);
+
+      const task = new WorkerTask("test FreeText update");
+      const data = await AnnotationFactory.saveNewAnnotations(
+        partialEvaluator,
+        task,
+        [
+          {
+            annotationType: AnnotationEditorType.FREETEXT,
+            rect: [12, 34, 56, 78],
+            rotation: 0,
+            fontSize: 10,
+            color: [0, 0, 0],
+            value: "Hello PDF.js World !",
+            id: "143R",
+            ref: freeTextRef,
+          },
+        ]
+      );
+
+      const base = data.annotations[0].data.replaceAll(/\(D:\d+\)/g, "(date)");
+      expect(base).toEqual(
+        "143 0 obj\n" +
+          "<< /Type /Annot /Subtype /FreeText /CreationDate (date) /Foo /Bar /M (date) " +
+          "/Rect [12 34 56 78] /DA (/Helv 10 Tf 0 g) /Contents (Hello PDF.js World !) " +
+          "/F 4 /Border [0 0 0] /Rotate 0 /AP << /N 2 0 R>>>>\n" +
+          "endobj\n"
+      );
     });
 
     it("should extract the text from a FreeText annotation", async function () {
@@ -4330,7 +4337,8 @@ describe("annotation", function () {
       const inkDict = new Dict();
       inkDict.set("Type", Name.get("Annot"));
       inkDict.set("Subtype", Name.get("Ink"));
-      inkDict.set("InkList", [[1, 1, 1, 2, 2, 2, 3, 3]]);
+      const inkList = [1, 1, 1, 2, 2, 2, 3, 3];
+      inkDict.set("InkList", [inkList]);
 
       const inkRef = Ref.get(142, 0);
       const xref = new XRefMock([{ ref: inkRef, data: inkDict }]);
@@ -4343,22 +4351,16 @@ describe("annotation", function () {
       );
       expect(data.annotationType).toEqual(AnnotationType.INK);
       expect(data.inkLists.length).toEqual(1);
-      expect(data.inkLists[0]).toEqual([
-        { x: 1, y: 1 },
-        { x: 1, y: 2 },
-        { x: 2, y: 2 },
-        { x: 3, y: 3 },
-      ]);
+      expect(data.inkLists[0]).toEqual(Float32Array.from(inkList));
     });
 
     it("should handle multiple ink lists", async function () {
       const inkDict = new Dict();
       inkDict.set("Type", Name.get("Annot"));
       inkDict.set("Subtype", Name.get("Ink"));
-      inkDict.set("InkList", [
-        [1, 1, 1, 2],
-        [3, 3, 4, 5],
-      ]);
+      const inkList0 = [1, 1, 1, 2];
+      const inkList1 = [3, 3, 4, 5];
+      inkDict.set("InkList", [inkList0, inkList1]);
 
       const inkRef = Ref.get(143, 0);
       const xref = new XRefMock([{ ref: inkRef, data: inkDict }]);
@@ -4371,14 +4373,8 @@ describe("annotation", function () {
       );
       expect(data.annotationType).toEqual(AnnotationType.INK);
       expect(data.inkLists.length).toEqual(2);
-      expect(data.inkLists[0]).toEqual([
-        { x: 1, y: 1 },
-        { x: 1, y: 2 },
-      ]);
-      expect(data.inkLists[1]).toEqual([
-        { x: 3, y: 3 },
-        { x: 4, y: 5 },
-      ]);
+      expect(data.inkLists[0]).toEqual(Float32Array.from(inkList0));
+      expect(data.inkLists[1]).toEqual(Float32Array.from(inkList1));
     });
 
     it("should create a new Ink annotation", async function () {
@@ -4537,7 +4533,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         null
       );
 
@@ -4605,14 +4600,9 @@ describe("annotation", function () {
         idFactoryMock
       );
       expect(data.annotationType).toEqual(AnnotationType.HIGHLIGHT);
-      expect(data.quadPoints).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-      ]);
+      expect(data.quadPoints).toEqual(
+        Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+      );
     });
 
     it("should set quadpoints to null when empty", async function () {
@@ -4711,7 +4701,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         null
       );
 
@@ -4742,7 +4731,7 @@ describe("annotation", function () {
             thickness: 3.14,
             quadPoints: null,
             outlines: {
-              outline: Float64Array.from([
+              outline: Float32Array.from([
                 NaN,
                 NaN,
                 8,
@@ -4756,7 +4745,7 @@ describe("annotation", function () {
                 14,
                 15,
               ]),
-              points: [Float64Array.from([16, 17, 18, 19])],
+              points: [Float32Array.from([16, 17, 18, 19])],
             },
           },
         ]
@@ -4805,7 +4794,7 @@ describe("annotation", function () {
               thickness: 3.14,
               quadPoints: null,
               outlines: {
-                outline: Float64Array.from([
+                outline: Float32Array.from([
                   NaN,
                   NaN,
                   8,
@@ -4819,7 +4808,7 @@ describe("annotation", function () {
                   14,
                   15,
                 ]),
-                points: [Float64Array.from([16, 17, 18, 19])],
+                points: [Float32Array.from([16, 17, 18, 19])],
               },
             },
           ]
@@ -4830,7 +4819,6 @@ describe("annotation", function () {
         partialEvaluator,
         task,
         RenderingIntentFlag.PRINT,
-        false,
         null
       );
 
@@ -4882,14 +4870,9 @@ describe("annotation", function () {
         idFactoryMock
       );
       expect(data.annotationType).toEqual(AnnotationType.UNDERLINE);
-      expect(data.quadPoints).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-      ]);
+      expect(data.quadPoints).toEqual(
+        Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+      );
     });
   });
 
@@ -4929,14 +4912,9 @@ describe("annotation", function () {
         idFactoryMock
       );
       expect(data.annotationType).toEqual(AnnotationType.SQUIGGLY);
-      expect(data.quadPoints).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-      ]);
+      expect(data.quadPoints).toEqual(
+        Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+      );
     });
   });
 
@@ -4976,14 +4954,9 @@ describe("annotation", function () {
         idFactoryMock
       );
       expect(data.annotationType).toEqual(AnnotationType.STRIKEOUT);
-      expect(data.quadPoints).toEqual([
-        [
-          { x: 10, y: 20 },
-          { x: 20, y: 20 },
-          { x: 10, y: 10 },
-          { x: 20, y: 10 },
-        ],
-      ]);
+      expect(data.quadPoints).toEqual(
+        Float32Array.from([10, 20, 20, 20, 10, 10, 20, 10])
+      );
     });
   });
 });
