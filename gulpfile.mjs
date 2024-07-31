@@ -405,8 +405,25 @@ function getVersionJSON() {
   return JSON.parse(fs.readFileSync(BUILD_DIR + "version.json").toString());
 }
 
+function isReleaseBranch() {
+  const branchName = safeSpawnSync(
+    "git",
+    ["rev-parse", "--abbrev-ref", "HEAD"],
+  ).stdout;
+
+  console.log("### found branch: " + branchName );
+  return ['mc-master','master'].includes(branchName);
+}
+
 function getTargetName() {
-  return "mcPDFjs-" + getVersionJSON().version + ".zip";
+  var version = getVersionJSON().version;
+  if(!isReleaseBranch()){
+    console.log("### branch isn't mc-master or master so adding -SNAPSHOT to filename");
+    version += "-SNAPSHOT";
+  }
+  const targetName =  "mcPDFjs-" + version + ".zip";
+  console.log("### targetname we calculated: "+ targetName)
+  return targetName;
 }
 
 function getDeployUrl(isRelease = false) {
