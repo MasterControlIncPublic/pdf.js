@@ -39,7 +39,7 @@ class Preferences extends BasePreferences {
 
 class ExternalServices extends BaseExternalServices {
   async createL10n() {
-    return new GenericL10n(AppOptions.get("locale"));
+    return new GenericL10n(AppOptions.get("localeProperties")?.lang);
   }
 
   createScripting() {
@@ -48,6 +48,14 @@ class ExternalServices extends BaseExternalServices {
 }
 
 class MLManager {
+  async isEnabledFor(_name) {
+    return false;
+  }
+
+  async deleteModel(_service) {
+    return null;
+  }
+
   async guess() {
     return null;
   }
