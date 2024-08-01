@@ -32,7 +32,11 @@ class StampEditor extends AnnotationEditor {
 
   #bitmapFile = null;
 
+  #bitmapFileName = "";
+
   #canvas = null;
+
+  #hasMLBeenQueried = false;
 
   #observer = null;
 
@@ -44,6 +48,8 @@ class StampEditor extends AnnotationEditor {
 
   static _type = "stamp";
 
+  static _editorType = AnnotationEditorType.STAMP;
+
   constructor(params) {
     super({ ...params, name: "stampEditor" });
     this.#bitmapUrl = params.bitmapUrl;
@@ -51,8 +57,8 @@ class StampEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  static initialize(l10n) {
-    AnnotationEditor.initialize(l10n);
+  static initialize(l10n, uiManager) {
+    AnnotationEditor.initialize(l10n, uiManager);
   }
 
   static get supportedTypes() {
@@ -101,6 +107,9 @@ class StampEditor extends AnnotationEditor {
     if (!fromId) {
       this.#bitmapId = data.id;
       this.#isSvg = data.isSvg;
+    }
+    if (data.file) {
+      this.#bitmapFileName = data.file.name;
     }
     this.#createCanvas();
   }
@@ -153,26 +162,35 @@ class StampEditor extends AnnotationEditor {
     }
     input.type = "file";
     input.accept = StampEditor.supportedTypesStr;
+    const signal = this._uiManager._signal;
     this.#bitmapPromise = new Promise(resolve => {
-      input.addEventListener("change", async () => {
-        if (!input.files || input.files.length === 0) {
+      input.addEventListener(
+        "change",
+        async () => {
+          if (!input.files || input.files.length === 0) {
+            this.remove();
+          } else {
+            this._uiManager.enableWaiting(true);
+            const data = await this._uiManager.imageManager.getFromFile(
+              input.files[0]
+            );
+            this.#getBitmapFetched(data);
+          }
+          if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
+            input.remove();
+          }
+          resolve();
+        },
+        { signal }
+      );
+      input.addEventListener(
+        "cancel",
+        () => {
           this.remove();
-        } else {
-          this._uiManager.enableWaiting(true);
-          const data = await this._uiManager.imageManager.getFromFile(
-            input.files[0]
-          );
-          this.#getBitmapFetched(data);
-        }
-        if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
-          input.remove();
-        }
-        resolve();
-      });
-      input.addEventListener("cancel", () => {
-        this.remove();
-        resolve();
-      });
+          resolve();
+        },
+        { signal }
+      );
     }).finally(() => this.#getBitmapDone());
     if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("TESTING")) {
       input.click();
@@ -188,6 +206,10 @@ class StampEditor extends AnnotationEditor {
       this.#canvas = null;
       this.#observer?.disconnect();
       this.#observer = null;
+      if (this.#resizeTimeoutId) {
+        clearTimeout(this.#resizeTimeoutId);
+        this.#resizeTimeoutId = null;
+      }
     }
     super.remove();
   }
@@ -207,7 +229,7 @@ class StampEditor extends AnnotationEditor {
       return;
     }
 
-    if (this.#bitmapId) {
+    if (this.#bitmapId && this.#canvas === null) {
       this.#getBitmap();
     }
 
@@ -230,7 +252,8 @@ class StampEditor extends AnnotationEditor {
       this.#bitmapPromise ||
       this.#bitmap ||
       this.#bitmapUrl ||
-      this.#bitmapFile
+      this.#bitmapFile ||
+      this.#bitmapId
     );
   }
 
@@ -253,6 +276,8 @@ class StampEditor extends AnnotationEditor {
 
     super.render();
     this.div.hidden = true;
+
+    this.addAltTextButton();
 
     if (this.#bitmap) {
       this.#createCanvas();
@@ -315,17 +340,12 @@ class StampEditor extends AnnotationEditor {
     // There are multiple ways to add an image to the page, so here we just
     // count the number of times an image is added to the page whatever the way
     // is.
-    this._uiManager._eventBus.dispatch("reporttelemetry", {
-      source: this,
-      details: {
-        type: "editing",
-        subtype: this.editorType,
-        data: {
-          action: "inserted_image",
-        },
-      },
+    this._reportTelemetry({
+      action: "inserted_image",
     });
-    this.addAltTextButton();
+    if (this.#bitmapFileName) {
+      canvas.setAttribute("aria-label", this.#bitmapFileName);
+    }
   }
 
   /**
@@ -405,6 +425,43 @@ class StampEditor extends AnnotationEditor {
     return bitmap;
   }
 
+  async #mlGuessAltText(bitmap, width, height) {
+    if (this.#hasMLBeenQueried) {
+      return;
+    }
+    this.#hasMLBeenQueried = true;
+    const isMLEnabled = await this._uiManager.isMLEnabledFor("altText");
+    if (!isMLEnabled || this.hasAltText()) {
+      return;
+    }
+    const offscreen = new OffscreenCanvas(width, height);
+    const ctx = offscreen.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(
+      bitmap,
+      0,
+      0,
+      bitmap.width,
+      bitmap.height,
+      0,
+      0,
+      width,
+      height
+    );
+    const response = await this._uiManager.mlGuess({
+      service: "moz-image-to-text",
+      request: {
+        data: ctx.getImageData(0, 0, width, height).data,
+        width,
+        height,
+        channels: 4,
+      },
+    });
+    const altText = response?.output || "";
+    if (this.parent && altText && !this.hasAltText()) {
+      this.altTextData = { altText, decorative: false };
+    }
+  }
+
   #drawBitmap(width, height) {
     width = Math.ceil(width);
     height = Math.ceil(height);
@@ -417,6 +474,9 @@ class StampEditor extends AnnotationEditor {
     const bitmap = this.#isSvg
       ? this.#bitmap
       : this.#scaleBitmap(width, height);
+
+    this.#mlGuessAltText(bitmap, width, height);
+
     const ctx = canvas.getContext("2d");
     ctx.filter = this._uiManager.hcmFilter;
     ctx.drawImage(
@@ -430,6 +490,11 @@ class StampEditor extends AnnotationEditor {
       width,
       height
     );
+  }
+
+  /** @inheritdoc */
+  getImageForAltText() {
+    return this.#canvas;
   }
 
   #serializeBitmap(toUrl) {
@@ -483,6 +548,11 @@ class StampEditor extends AnnotationEditor {
    * Create the resize observer.
    */
   #createObserver() {
+    if (!this._uiManager._signal) {
+      // This method is called after the canvas has been created but the canvas
+      // creation is async, so it's possible that the viewer has been closed.
+      return;
+    }
     this.#observer = new ResizeObserver(entries => {
       const rect = entries[0].contentRect;
       if (rect.width && rect.height) {
@@ -490,6 +560,14 @@ class StampEditor extends AnnotationEditor {
       }
     });
     this.#observer.observe(this.div);
+    this._uiManager._signal.addEventListener(
+      "abort",
+      () => {
+        this.#observer?.disconnect();
+        this.#observer = null;
+      },
+      { once: true }
+    );
   }
 
   /** @inheritdoc */

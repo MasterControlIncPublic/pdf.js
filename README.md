@@ -23,9 +23,9 @@ Perform the sync manually as described below:
     $ git switch master
     $ git merge upstream/master
     ```
-- push `master` up to our fork's repo
+- push `master` up to our fork's repo (include the new tags)
     ```
-    $ git push master
+    $ git push --tags master
     ```
 
 ### Updating `mc-master` with changes from the upstream master
@@ -37,9 +37,12 @@ This should be done after syncing master as described above. The idea here is to
     $ git switch -c merge-v3.1.81-into-mc-master mc-master
     $ git merge v3.1.81
     ```
-- You're likely to have merge conflicts to resolve, good luck.
+- You're likely to have merge conflicts to resolve, good luck. Consider the suggestions below. 
+  - It can be helpful to compare our mc-master with the most recent tag it was based off of in order to see _only_ what MC has changed. Github's compare tool is could be handy but beware of how git histories are treated: https://github.com/MasterControlIncPublic/pdf.js/compare/v4.3.136...MasterControlIncPublic:pdf.js:mc-master
+  - An alternative would be to use a simple git-diff command `git diff v4.3.136 mc-master`
 - Make sure things still work and MC's customizations are still in place, deploy snapshot, test, etc
-- Create a merge commit PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in. **Make sure to use a merge commit PR (NOT a squash)** so that we retain Mozilla's commit history and future merges of this type are possible. In your PR title include which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
+- Create a merge commit PR for `merge-v3.1.81-into-mc-master` that will go in before your story branch PR goes in.
+  - **Make sure to use a merge commit PR (NOT a squash)** so that we retain Mozilla's commit history and future merges of this type are possible. In your PR title include which version from Mozilla has been merged in. **Note: when creating a PR make sure to select our repository and _not_ Mozilla's.**
 
 ### Feature Work
 New feature work can be done as normal on a feature branch based off `mc-master`.
@@ -57,7 +60,6 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * Configurably can allow printing (web/pdf_print_service.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
 * Removed dark theme (web/viewer.css)
-* Added watermark handling code (web/text_layer_builder.js, web_pdf_page_view.js, web/ui_utils.js)
 * Added presentation mode to the toolbar (web/toolbar.js)
 * Include Global-complete styles (web/viewer.html)
 * Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
@@ -105,6 +107,8 @@ Please don't forget to tag the commit you deployed and push the tags to the repo
     
 We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to help differentiate our tags since we're building from a different branch and the commit counting (used in the automatic version number creation) will be different and likely _behind_ the Mozilla PDFjs numbers.
 
+TODO: Consider changing our tagging practice to show both which mozilla tag we're based off of and which version the mc-build process built. Perhaps something like v4.3.136-moz_v4.3.238-mc or v4.3.136-mc238
+
 # ORIGINAL README BELOW
 # PDF.js [![Build Status](https://github.com/mozilla/pdf.js/workflows/CI/badge.svg?branch=master)](https://github.com/mozilla/pdf.js/actions?query=workflow%3ACI+branch%3Amaster)
 
@@ -148,7 +152,7 @@ PDF.js is built into version 19+ of Firefox.
 
 + The official extension for Chrome can be installed from the [Chrome Web Store](https://chrome.google.com/webstore/detail/pdf-viewer/oemmndcbldboiebfnladdacbdfmadadm).
 *This extension is maintained by [@Rob--W](https://github.com/Rob--W).*
-+ Build Your Own - Get the code as explained below and issue `gulp chromium`. Then open
++ Build Your Own - Get the code as explained below and issue `npx gulp chromium`. Then open
 Chrome, go to `Tools > Extension` and load the (unpackaged) extension from the
 directory `build/chromium`.
 
@@ -160,19 +164,18 @@ To get a local copy of the current code, clone it using git:
     $ cd pdf.js
 
 Next, install Node.js via the [official package](https://nodejs.org) or via
-[nvm](https://github.com/creationix/nvm). You need to install the gulp package
-globally (see also [gulp's getting started](https://github.com/gulpjs/gulp/tree/master/docs/getting-started)):
-
-    $ npm install -g gulp-cli
-
-If everything worked out, install all dependencies for PDF.js:
+[nvm](https://github.com/creationix/nvm). If everything worked out, install
+all dependencies for PDF.js:
 
     $ npm install
+
+> [!NOTE]
+> On MacOS M1/M2 you may see some `node-gyp`-related errors when running `npm install`. This is because one of our dependencies, `"canvas"`, does not provide pre-built binaries for this platform and instead `npm` will try to build it from source. Please make sure to first install the necessary native dependencies using `brew`: https://github.com/Automattic/node-canvas#compiling.
 
 Finally, you need to start a local web server as some browsers do not allow opening
 PDF files using a `file://` URL. Run:
 
-    $ gulp server
+    $ npx gulp server
 
 and then you can open:
 
@@ -189,11 +192,11 @@ It is also possible to view all test PDF files on the right side by opening:
 In order to bundle all `src/` files into two production scripts and build the generic
 viewer, run:
 
-    $ gulp generic
+    $ npx gulp generic
 
 If you need to support older browsers, run:
 
-    $ gulp generic-legacy
+    $ npx gulp generic-legacy
 
 This will generate `pdf.js` and `pdf.worker.js` in the `build/generic/build/` directory (respectively `build/generic-legacy/build/`).
 Both scripts are needed but only `pdf.js` needs to be included since `pdf.worker.js` will
@@ -219,7 +222,7 @@ You can play with the PDF.js API directly from your browser using the live demos
 
 + [Interactive examples](https://mozilla.github.io/pdf.js/examples/index.html#interactive-examples)
 
-More examples can be found in the [examples folder](https://github.com/mozilla/pdf.js/tree/master/examples/). Some of them are using the pdfjs-dist package, which can be built and installed in this repo directory via `gulp dist-install` command.
+More examples can be found in the [examples folder](https://github.com/mozilla/pdf.js/tree/master/examples/). Some of them are using the pdfjs-dist package, which can be built and installed in this repo directory via `npx gulp dist-install` command.
 
 For an introduction to the PDF.js code, check out the presentation by our
 contributor Julian Viereck:
