@@ -406,23 +406,26 @@ function getVersionJSON() {
 }
 
 function isReleaseBranch() {
-  const branchName = safeSpawnSync(
-    "git",
-    ["rev-parse", "--abbrev-ref", "HEAD"],
-  ).stdout;
+  const branchName = safeSpawnSync("git", [
+    "rev-parse",
+    "--abbrev-ref",
+    "HEAD",
+  ]).stdout;
 
-  console.log("### found branch: " + branchName );
-  return ['mc-master','master'].includes(branchName);
+  console.log("### found branch: " + branchName);
+  return ["mc-master", "master"].includes(branchName);
 }
 
 function getTargetName() {
-  var version = getVersionJSON().version;
-  if(!isReleaseBranch()){
-    console.log("### branch isn't mc-master or master so adding -SNAPSHOT to filename");
+  let version = getVersionJSON().version;
+  if (!isReleaseBranch()) {
+    console.log(
+      "### branch isn't mc-master or master so adding -SNAPSHOT to filename"
+    );
     version += "-SNAPSHOT";
   }
-  const targetName =  "mcPDFjs-" + version + ".zip";
-  console.log("### targetname we calculated: "+ targetName)
+  const targetName = "mcPDFjs-" + version + ".zip";
+  console.log("### targetname we calculated: " + targetName);
   return targetName;
 }
 
@@ -2108,7 +2111,7 @@ gulp.task("clean", function (done) {
 
 gulp.task(
   "mc-build",
-  gulp.series("clean","generic", function packageMcBuild(done) {
+  gulp.series("clean", "generic", function packageMcBuild(done) {
     const targetName = getTargetName();
     gulp
       .src(BUILD_DIR + "generic/**")
@@ -2160,7 +2163,6 @@ function mcDeploy(deployUrl, done) {
       done();
     });
 }
-
 
 gulp.task("importl10n", async function () {
   const { downloadL10n } = await import("./external/importL10n/locales.mjs");
