@@ -999,7 +999,7 @@ a:is(.toolbarButton, .secondaryToolbarButton)[href="#"] {
 
 #currentOutlineItem::before {
   font: 14px FontAwesome;
-  content: "\f022"
+  content: "\f022";
 }
 
 #viewFind::before {
