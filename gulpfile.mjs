@@ -410,10 +410,10 @@ function isReleaseBranch() {
     "rev-parse",
     "--abbrev-ref",
     "HEAD",
-  ]).stdout;
+  ]).stdout.toString().trim();
 
   console.log("### found branch: " + branchName);
-  return ["mc-master", "master"].includes(branchName);
+  return ["mc-master"].includes(branchName);
 }
 
 function getTargetName() {
