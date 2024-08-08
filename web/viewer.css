@@ -38,7 +38,7 @@
   --scrollbar-color: auto;
   --scrollbar-bg-color: auto;
   --toolbar-icon-bg-color: rgb(255 255 255);
-  --toolbar-icon-hover-bg-color: rgb(0 0 0);
+  --toolbar-icon-hover-bg-color: none;
   --original-toolbar-icon-hover-bg-color: rgb(255 255 255);
 
   --sidebar-narrow-bg-color: rgb(212 212 215 / 0.9);
@@ -62,11 +62,11 @@
   --field-color: var(--main-color);
   --field-bg-color: rgb(255 255 255);
   --field-border-color: rgb(187 187 188);
-  --treeitem-color: rgb(0 0 0 / 0.8);
-  --treeitem-bg-color: rgb(0 0 0 / 0.15);
-  --treeitem-hover-color: rgb(0 0 0 / 0.9);
-  --treeitem-selected-color: rgb(0 0 0 / 0.9);
-  --treeitem-selected-bg-color: rgb(0 0 0 / 0.25);
+  --treeitem-color: rgb(255 255 255 / 0.8);
+  --treeitem-bg-color: rgb(255 255 255 / 0.15);
+  --treeitem-hover-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-bg-color: rgb(255 255 255 / 0.25);
   --thumbnail-hover-color: rgb(0 0 0 / 0.1);
   --thumbnail-selected-color: rgb(0 0 0 / 0.2);
   --doorhanger-bg-color: rgb(255 255 255);
@@ -861,7 +861,7 @@ body {
   height: 16px;
 
   content: "";
-  /*background-color: var(--toolbar-icon-bg-color);*/ /*TODO: do we need this?*/
+  background-color: var(--toolbar-icon-bg-color); /*TODO: do we need this?*/
   mask-size: cover;
 }
 
@@ -980,12 +980,13 @@ a:is(.toolbarButton, .secondaryToolbarButton)[href="#"] {
 }
 
 #viewThumbnail::before {
-  mask-image: var(--toolbarButton-viewThumbnail-icon);
+  font: 14px FontAwesome;
+  content: "\f009";
 }
 
 #viewOutline::before {
-  mask-image: var(--toolbarButton-viewOutline-icon);
-  transform: scaleX(var(--dir-factor));
+  font: 14px FontAwesome;
+  content: "\f0ca";
 }
 
 #viewAttachments::before {
@@ -997,8 +998,8 @@ a:is(.toolbarButton, .secondaryToolbarButton)[href="#"] {
 }
 
 #currentOutlineItem::before {
-  mask-image: var(--toolbarButton-currentOutlineItem-icon);
-  transform: scaleX(var(--dir-factor));
+  font: 14px FontAwesome;
+  content: "\f022";
 }
 
 #viewFind::before {
