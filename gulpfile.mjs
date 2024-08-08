@@ -406,11 +406,9 @@ function getVersionJSON() {
 }
 
 function isReleaseBranch() {
-  const branchName = safeSpawnSync("git", [
-    "rev-parse",
-    "--abbrev-ref",
-    "HEAD",
-  ]).stdout.toString().trim();
+  const branchName = safeSpawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"])
+    .stdout.toString()
+    .trim();
 
   console.log("### found branch: " + branchName);
   return ["mc-master"].includes(branchName);
