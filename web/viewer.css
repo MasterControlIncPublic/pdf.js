@@ -562,7 +562,7 @@ body {
   content: "\f067";
 }
 
-#presentationMode::before,
+#presentationModeButton::before,
 #secondaryPresentationMode::before {
   font: 14px FontAwesome;
   content: "\f0b2";
@@ -1226,8 +1226,9 @@ dialog :link {
       mask-image: var(--toolbarButton-download-icon);
     }
 
-    #presentationMode::before {
-      mask-image: var(--toolbarButton-presentationMode-icon);
+    #secondaryPresentationMode::before {
+      font: 14px FontAwesome;
+      content: "\f0b2";
     }
 
     #viewBookmark::before {

@@ -60,7 +60,8 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * Configurably can allow printing (web/pdf_print_service.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
 * Removed dark theme (web/viewer.css)
-* Added presentation mode to the toolbar (web/toolbar.js)
+* Added presentation mode to the toolbar (web/toolbar.js, web/viewer.html)
+* Remove page scroll mode from the toolbar (web/viewer.html) (didn't feel intuitive that there were other pages to scroll to)
 * Include Global-complete styles (web/viewer.html)
 * Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
 * Changed AnnotationMode to "ENABLE" which disables interactive form fields. This setting may be dependent on the form field rendering change above. (web/app_options.js)
@@ -83,7 +84,7 @@ You can copy the result (or unzip the mc artifact) into `<site>/services/StaticC
 
 ### Testing
 
-The PRs will run automated testing. You can do that locally with commands like `gulp ci-test` (and possibly autofix some linting with the `--fix` argument)
+The PRs will run automated testing. You can do that locally with commands like `gulp unittest` (and possibly autofix some linting with the `--fix` argument)
 
 ### Deploying an artifact to Artifactory
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
