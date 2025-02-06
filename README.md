@@ -90,16 +90,26 @@ The PRs will run automated testing. You can do that locally with commands like `
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
 
 #### Deploying a snapshot
-You should be able to deploy a snapshot to artifactory by running the following command.
+There is an issue with snapshots being deployed to artifactory using  `$ gulp mc-deploy-snapshot`.
+Instead, you will need to manually upload a snapshot to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
 
-    $ gulp mc-deploy-snapshot
+[//]: # (Deploy issue found with QX-18361, alternatiave method added until deploy issue can be resolved.)
+[//]: # (You should be able to deploy a snapshot to artifactory by running the following command.)
+
+[//]: # ()
+[//]: # (    $ gulp mc-deploy-snapshot)
 
 #### Deploying a release
 **Only release builds from mc-master!** This will deploy straight to our libs-release-local repo, **you have been warned**.
 
-First make sure the version is correct in pdfjs.config. Then run:
+There is an issue with releases being deployed to artifactory using  `$ gulp mc-deploy-release`.
+Instead, you will need to manually upload a release to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
 
-    $ gulp mc-deploy-release
+[//]: # (Deploy issue found with QX-18361, alternatiave method added until deploy issue can be resolved.)
+[//]: # (First make sure the version is correct in pdfjs.config. Then run:)
+
+[//]: # ()
+[//]: # (    $ gulp mc-deploy-release)
 
 Please don't forget to tag the commit you deployed and push the tags to the repository with commands similar to the following:
 
