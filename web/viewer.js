@@ -243,7 +243,7 @@ function setMCOptions() {
 
 function enablePrintingIfCanPrint() {
   if (MCOptions.get("canPrint")) {
-    document.getElementById("print").classList.remove("hidden");
+    document.getElementById("printButton").classList.remove("hidden");
   }
 }
 
