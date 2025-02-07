@@ -92,6 +92,8 @@ Please make sure you don't have any uncommitted changes as they'd be zipped and 
 #### Deploying a snapshot
 There is an issue with snapshots being deployed to artifactory using  `$ gulp mc-deploy-snapshot`.
 Instead, you will need to manually upload a snapshot to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
+1. run `$ gulp mc-build`
+2. Copy the `.zip` from the build folder to paste into the generic-artifactory-zip-uploader and follow README instructions for that repo.
 
 [//]: # (Deploy issue found with QX-18361, alternatiave method added until deploy issue can be resolved.)
 [//]: # (You should be able to deploy a snapshot to artifactory by running the following command.)
@@ -104,6 +106,8 @@ Instead, you will need to manually upload a snapshot to artifactory using the [g
 
 There is an issue with releases being deployed to artifactory using  `$ gulp mc-deploy-release`.
 Instead, you will need to manually upload a release to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
+1. run `$ gulp mc-build`
+2. Copy the `.zip` from the build folder to paste into the generic-artifactory-zip-uploader and follow README instructions for that repo.
 
 [//]: # (Deploy issue found with QX-18361, alternatiave method added until deploy issue can be resolved.)
 [//]: # (First make sure the version is correct in pdfjs.config. Then run:)
