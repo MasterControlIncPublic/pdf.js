@@ -1231,10 +1231,6 @@ dialog :link {
       content: "\f0b2";
     }
 
-    #viewBookmark::before {
-      mask-image: var(--toolbarButton-bookmark-icon);
-    }
-
     #firstPage::before {
       font: 14px FontAwesome;
       content: "\f062";
