@@ -1296,6 +1296,10 @@ dialog :link {
       mask-image: var(--secondaryToolbarButton-spreadEven-icon);
     }
 
+    #spreadModeButtons button::before {
+      background-color: var(--main-color);
+    }
+
     #imageAltTextSettings::before {
       mask-image: var(--secondaryToolbarButton-imageAltTextSettings-icon);
     }
