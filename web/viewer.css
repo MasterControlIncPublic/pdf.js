@@ -646,29 +646,6 @@ body {
   width: 100%;
 }
 
-.toggleButton {
-  display: inline;
-
-  &:has(> input:checked) {
-    color: var(--toggled-btn-color);
-    background-color: var(--toggled-btn-bg-color);
-  }
-
-  &:is(:hover, :has(> input:focus-visible)) {
-    color: var(--toggled-btn-color);
-    background-color: var(--button-hover-color);
-  }
-
-  & > input {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-}
-
 .toolbarField {
   padding: 4px 7px;
   margin: 3px 0;
@@ -685,6 +662,11 @@ body {
   &:focus {
     border-color: #0a84ff;
   }
+}
+
+.toolbarHorizontalGroup input[type="checkbox"] {
+  position: relative;
+  top: 1px;
 }
 
 #pageNumber {
@@ -1231,10 +1213,6 @@ dialog :link {
       content: "\f0b2";
     }
 
-    #viewBookmark::before {
-      mask-image: var(--toolbarButton-bookmark-icon);
-    }
-
     #firstPage::before {
       font: 14px FontAwesome;
       content: "\f062";
@@ -1294,6 +1272,10 @@ dialog :link {
 
     #spreadEven::before {
       mask-image: var(--secondaryToolbarButton-spreadEven-icon);
+    }
+
+    #spreadModeButtons button::before {
+      background-color: var(--main-color);
     }
 
     #imageAltTextSettings::before {
@@ -1378,7 +1360,6 @@ dialog :link {
     #findResultsCount {
       background-color: rgb(217 217 217);
       color: rgb(82 82 82);
-      padding-block: 4px;
 
       &:empty {
         display: none;
