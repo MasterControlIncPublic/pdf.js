@@ -86,7 +86,8 @@ async function downloadManifestFiles(manifest) {
     try {
       await downloadFile(file, url);
     } catch (ex) {
-      console.error(`Error during downloading of ${url}:`, ex);
+      const sanitizedError = ex.toString().replace(/\n|\r/g, "");
+      console.error(`Error during downloading of ${url}:`, sanitizedError);
       fs.writeFileSync(file, ""); // making it empty file
       fs.writeFileSync(`${file}.error`, ex);
     }
