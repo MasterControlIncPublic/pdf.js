@@ -16,6 +16,8 @@ limitations under the License.
 
 "use strict";
 
+import DOMPurify from "dompurify";
+
 var VIEWER_URL = chrome.runtime.getURL("content/web/viewer.html");
 
 function getViewerURL(pdf_url) {
@@ -256,6 +258,7 @@ function maybeRenderPdfDoc(isNotPOST) {
   iframe.style.width = "100%";
   iframe.style.height = "100%";
   iframe.style.border = "0 none";
-  iframe.src = getEmbeddedViewerURL(document.URL);
+  const sanitizedURL = DOMPurify.sanitize(document.URL);
+  iframe.src = getEmbeddedViewerURL(sanitizedURL);
   shadowRoot.append(iframe);
 }
