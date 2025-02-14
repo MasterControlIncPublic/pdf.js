@@ -121,7 +121,7 @@ class DownloadManager {
         window.open(viewerUrl);
         return true;
       } catch (ex) {
-        console.error(`openOrDownloadData: ${ex}`);
+        console.error("openOrDownloadData:", ex);
         // Release the `blobUrl`, since opening it failed, and fallback to
         // downloading the PDF file.
         URL.revokeObjectURL(blobUrl);
@@ -133,7 +133,7 @@ class DownloadManager {
     return false;
   }
 
-  download(data, url, filename, options = {}) {
+  download(data, url, filename) {
     const blobUrl = data
       ? URL.createObjectURL(new Blob([data], { type: "application/pdf" }))
       : null;
@@ -142,7 +142,6 @@ class DownloadManager {
       blobUrl,
       originalUrl: url,
       filename,
-      options,
     });
   }
 }
@@ -308,34 +307,146 @@ class FirefoxScripting {
 }
 
 class MLManager {
+  #abortSignal = null;
+
   #enabled = null;
 
-  eventBus = null;
+  #eventBus = null;
 
-  constructor(options) {
-    this.enable({ ...options, listenToProgress: false });
-  }
+  #ready = null;
 
-  async isEnabledFor(name) {
-    return !!(await this.#enabled?.get(name));
-  }
+  #requestResolvers = null;
 
-  deleteModel(service) {
-    return FirefoxCom.requestAsync("mlDelete", service);
-  }
+  hasProgress = false;
 
-  guess(data) {
-    return FirefoxCom.requestAsync("mlGuess", data);
-  }
+  static #AI_ALT_TEXT_MODEL_NAME = "moz-image-to-text";
 
-  enable({ altTextLearnMoreUrl, enableGuessAltText, listenToProgress }) {
-    if (enableGuessAltText) {
-      this.#loadAltTextEngine(listenToProgress);
-    }
+  constructor({
+    altTextLearnMoreUrl,
+    enableGuessAltText,
+    enableAltTextModelDownload,
+  }) {
     // The `altTextLearnMoreUrl` is used to provide a link to the user to learn
     // more about the "alt text" feature.
     // The link is used in the Alt Text dialog or in the Image Settings.
     this.altTextLearnMoreUrl = altTextLearnMoreUrl;
+    this.enableAltTextModelDownload = enableAltTextModelDownload;
+    this.enableGuessAltText = enableGuessAltText;
+  }
+
+  setEventBus(eventBus, abortSignal) {
+    this.#eventBus = eventBus;
+    this.#abortSignal = abortSignal;
+    eventBus._on(
+      "enablealttextmodeldownload",
+      ({ value }) => {
+        if (this.enableAltTextModelDownload === value) {
+          return;
+        }
+        if (value) {
+          this.downloadModel("altText");
+        } else {
+          this.deleteModel("altText");
+        }
+      },
+      { signal: abortSignal }
+    );
+    eventBus._on(
+      "enableguessalttext",
+      ({ value }) => {
+        this.toggleService("altText", value);
+      },
+      { signal: abortSignal }
+    );
+  }
+
+  async isEnabledFor(name) {
+    return this.enableGuessAltText && !!(await this.#enabled?.get(name));
+  }
+
+  isReady(name) {
+    return this.#ready?.has(name) ?? false;
+  }
+
+  async deleteModel(name) {
+    if (name !== "altText" || !this.enableAltTextModelDownload) {
+      return;
+    }
+    this.enableAltTextModelDownload = false;
+    this.#ready?.delete(name);
+    this.#enabled?.delete(name);
+    await this.toggleService("altText", false);
+    await FirefoxCom.requestAsync(
+      "mlDelete",
+      MLManager.#AI_ALT_TEXT_MODEL_NAME
+    );
+  }
+
+  async loadModel(name) {
+    if (name === "altText" && this.enableAltTextModelDownload) {
+      await this.#loadAltTextEngine(false);
+    }
+  }
+
+  async downloadModel(name) {
+    if (name !== "altText" || this.enableAltTextModelDownload) {
+      return null;
+    }
+    this.enableAltTextModelDownload = true;
+    return this.#loadAltTextEngine(true);
+  }
+
+  async guess(data) {
+    if (data?.name !== "altText") {
+      return null;
+    }
+    const resolvers = (this.#requestResolvers ||= new Set());
+    const resolver = Promise.withResolvers();
+    resolvers.add(resolver);
+
+    data.service = MLManager.#AI_ALT_TEXT_MODEL_NAME;
+
+    FirefoxCom.requestAsync("mlGuess", data)
+      .then(response => {
+        if (resolvers.has(resolver)) {
+          resolver.resolve(response);
+          resolvers.delete(resolver);
+        }
+      })
+      .catch(reason => {
+        if (resolvers.has(resolver)) {
+          resolver.reject(reason);
+          resolvers.delete(resolver);
+        }
+      });
+
+    return resolver.promise;
+  }
+
+  async #cancelAllRequests() {
+    if (!this.#requestResolvers) {
+      return;
+    }
+    for (const resolver of this.#requestResolvers) {
+      resolver.resolve({ cancel: true });
+    }
+    this.#requestResolvers.clear();
+    this.#requestResolvers = null;
+  }
+
+  async toggleService(name, enabled) {
+    if (name !== "altText" || this.enableGuessAltText === enabled) {
+      return;
+    }
+
+    this.enableGuessAltText = enabled;
+    if (enabled) {
+      if (this.enableAltTextModelDownload) {
+        await this.#loadAltTextEngine(false);
+      }
+    } else {
+      this.#cancelAllRequests();
+    }
   }
 
   async #loadAltTextEngine(listenToProgress) {
@@ -343,28 +454,44 @@ class MLManager {
       // We already have a promise for the "altText" service.
       return;
     }
+    this.#ready ||= new Set();
     const promise = FirefoxCom.requestAsync("loadAIEngine", {
-      service: "moz-image-to-text",
+      service: MLManager.#AI_ALT_TEXT_MODEL_NAME,
       listenToProgress,
+    }).then(ok => {
+      if (ok) {
+        this.#ready.add("altText");
+      }
+      return ok;
     });
     (this.#enabled ||= new Map()).set("altText", promise);
     if (listenToProgress) {
-      const callback = ({ detail }) => {
-        this.eventBus.dispatch("loadaiengineprogress", {
-          source: this,
-          detail,
-        });
-        if (detail.finished) {
-          window.removeEventListener("loadAIEngineProgress", callback);
-        }
-      };
-      window.addEventListener("loadAIEngineProgress", callback);
+      const ac = new AbortController();
+      const signal = AbortSignal.any([this.#abortSignal, ac.signal]);
+
+      this.hasProgress = true;
+      window.addEventListener(
+        "loadAIEngineProgress",
+        ({ detail }) => {
+          this.#eventBus.dispatch("loadaiengineprogress", {
+            source: this,
+            detail,
+          });
+          if (detail.finished) {
+            ac.abort();
+            this.hasProgress = false;
+          }
+        },
+        { signal }
+      );
       promise.then(ok => {
         if (!ok) {
-          window.removeEventListener("loadAIEngineProgress", callback);
+          ac.abort();
+          this.hasProgress = false;
         }
       });
     }
+    await promise;
   }
 }
 

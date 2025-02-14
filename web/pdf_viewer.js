@@ -35,6 +35,7 @@ import {
   PermissionFlag,
   PixelsPerInch,
   shadow,
+  stopEvent,
   version,
 } from "pdfjs-lib";
 import {
@@ -125,6 +126,8 @@ function isValidAnnotationEditorMode(mode) {
  *   mode.
  * @property {boolean} [enableHWA] - Enables hardware acceleration for
  *   rendering. The default value is `false`.
+ * @property {boolean} [supportsPinchToZoom] - Enable zooming on pinch gesture.
+ *   The default value is `true`.
  */
 
 class PDFPageViewBuffer {
@@ -213,6 +216,8 @@ class PDFViewer {
 
   #containerTopLeft = null;
 
+  #editorUndoBar = null;
+
   #enableHWA = false;
 
   #enableHighlightFloatingButton = false;
@@ -221,11 +226,13 @@ class PDFViewer {
 
   #enableUpdatedAddImage = false;
 
+  #enableNewAltTextWhenAddingImage = false;
+
   #eventAbortController = null;
 
   #mlManager = null;
 
-  #onPageRenderedCallback = null;
+  #switchAnnotationEditorModeAC = null;
 
   #switchAnnotationEditorModeTimeoutId = null;
 
@@ -242,6 +249,8 @@ class PDFViewer {
   #scrollModePageState = null;
 
   #scaleTimeoutId = null;
+
+  #supportsPinchToZoom = true;
 
   #textLayerMode = TextLayerMode.ENABLE;
 
@@ -278,6 +287,7 @@ class PDFViewer {
     this.downloadManager = options.downloadManager || null;
     this.findController = options.findController || null;
     this.#altTextManager = options.altTextManager || null;
+    this.#editorUndoBar = options.editorUndoBar || null;
 
     if (this.findController) {
       this.findController.onIsPageVisible = pageNumber =>
@@ -294,6 +304,8 @@ class PDFViewer {
     this.#enableHighlightFloatingButton =
       options.enableHighlightFloatingButton === true;
     this.#enableUpdatedAddImage = options.enableUpdatedAddImage === true;
+    this.#enableNewAltTextWhenAddingImage =
+      options.enableNewAltTextWhenAddingImage === true;
     this.imageResourcesPath = options.imageResourcesPath || "";
     this.enablePrintAutoRotate = options.enablePrintAutoRotate || false;
     if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
@@ -308,6 +320,7 @@ class PDFViewer {
     this.pageColors = options.pageColors || null;
     this.#mlManager = options.mlManager || null;
     this.#enableHWA = options.enableHWA || false;
+    this.#supportsPinchToZoom = options.supportsPinchToZoom !== false;
 
     this.defaultRenderingQueue = !options.renderingQueue;
     if (
@@ -669,22 +682,29 @@ class PDFViewer {
 
     // Handle the window/tab becoming inactive *after* rendering has started;
     // fixes (another part of) bug 1746213.
-    const hiddenCapability = Promise.withResolvers();
-    function onVisibilityChange() {
-      if (document.visibilityState === "hidden") {
-        hiddenCapability.resolve();
+    const hiddenCapability = Promise.withResolvers(),
+      ac = new AbortController();
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (document.visibilityState === "hidden") {
+          hiddenCapability.resolve();
+        }
+      },
+      {
+        signal:
+          (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+          typeof AbortSignal.any === "function"
+            ? AbortSignal.any([signal, ac.signal])
+            : signal,
       }
-    }
-    document.addEventListener("visibilitychange", onVisibilityChange, {
-      signal,
-    });
+    );
 
     await Promise.race([
       this._onePageRenderedCapability.promise,
       hiddenCapability.promise,
     ]);
-    // Ensure that the "visibilitychange" listener is removed immediately.
-    document.removeEventListener("visibilitychange", onVisibilityChange);
+    ac.abort(); // Remove the "visibilitychange" listener immediately.
   }
 
   async getAllText() {
@@ -737,8 +757,7 @@ class PDFViewer {
         this.#getAllTextInProgress ||
         textLayerMode === TextLayerMode.ENABLE_PERMISSIONS
       ) {
-        event.preventDefault();
-        event.stopPropagation();
+        stopEvent(event);
         return;
       }
       this.#getAllTextInProgress = true;
@@ -775,8 +794,7 @@ class PDFViewer {
           classList.remove("copyAll");
         });
 
-      event.preventDefault();
-      event.stopPropagation();
+      stopEvent(event);
     }
   }
 
@@ -793,10 +811,8 @@ class PDFViewer {
       this.findController?.setDocument(null);
       this._scriptingManager?.setDocument(null);
 
-      if (this.#annotationEditorUIManager) {
-        this.#annotationEditorUIManager.destroy();
-        this.#annotationEditorUIManager = null;
-      }
+      this.#annotationEditorUIManager?.destroy();
+      this.#annotationEditorUIManager = null;
     }
 
     this.pdfDocument = pdfDocument;
@@ -878,7 +894,11 @@ class PDFViewer {
           viewer.before(element);
         }
 
-        if (annotationEditorMode !== AnnotationEditorType.DISABLE) {
+        if (
+          ((typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) ||
+            typeof AbortSignal.any === "function") &&
+          annotationEditorMode !== AnnotationEditorType.DISABLE
+        ) {
           const mode = annotationEditorMode;
 
           if (pdfDocument.isPureXfa) {
@@ -894,13 +914,19 @@ class PDFViewer {
               this.#annotationEditorHighlightColors,
               this.#enableHighlightFloatingButton,
               this.#enableUpdatedAddImage,
-              this.#mlManager
+              this.#enableNewAltTextWhenAddingImage,
+              this.#mlManager,
+              this.#editorUndoBar,
+              this.#supportsPinchToZoom
             );
             eventBus.dispatch("annotationeditoruimanager", {
               source: this,
               uiManager: this.#annotationEditorUIManager,
             });
             if (mode !== AnnotationEditorType.NONE) {
+              if (mode === AnnotationEditorType.STAMP) {
+                this.#mlManager?.loadModel("altText");
+              }
               this.#annotationEditorUIManager.updateMode(mode);
             }
           } else {
@@ -917,6 +943,10 @@ class PDFViewer {
         // Ensure that the various layers always get the correct initial size,
         // see issue 15795.
         viewer.style.setProperty("--scale-factor", viewport.scale);
+
+        if (pageColors?.background) {
+          viewer.style.setProperty("--page-bg-color", pageColors.background);
+        }
         if (
           pageColors?.foreground === "CanvasText" ||
           pageColors?.background === "Canvas"
@@ -2266,10 +2296,9 @@ class PDFViewer {
   }
 
   #cleanupSwitchAnnotationEditorMode() {
-    if (this.#onPageRenderedCallback) {
-      this.eventBus._off("pagerendered", this.#onPageRenderedCallback);
-      this.#onPageRenderedCallback = null;
-    }
+    this.#switchAnnotationEditorModeAC?.abort();
+    this.#switchAnnotationEditorModeAC = null;
+
     if (this.#switchAnnotationEditorModeTimeoutId !== null) {
       clearTimeout(this.#switchAnnotationEditorModeTimeoutId);
       this.#switchAnnotationEditorModeTimeoutId = null;
@@ -2306,6 +2335,9 @@ class PDFViewer {
     if (!this.pdfDocument) {
       return;
     }
+    if (mode === AnnotationEditorType.STAMP) {
+      this.#mlManager?.loadModel("altText");
+    }
 
     const { eventBus } = this;
     const updater = () => {
@@ -2336,26 +2368,29 @@ class PDFViewer {
         // We're editing so we must switch to editing mode when the rendering is
         // done.
         this.#cleanupSwitchAnnotationEditorMode();
-        this.#onPageRenderedCallback = ({ pageNumber }) => {
-          idsToRefresh.delete(pageNumber);
-          if (idsToRefresh.size === 0) {
-            this.#switchAnnotationEditorModeTimeoutId = setTimeout(updater, 0);
-          }
-        };
-        const { signal } = this.#eventAbortController;
-        eventBus._on("pagerendered", this.#onPageRenderedCallback, { signal });
+        this.#switchAnnotationEditorModeAC = new AbortController();
+        const signal = AbortSignal.any([
+          this.#eventAbortController.signal,
+          this.#switchAnnotationEditorModeAC.signal,
+        ]);
+
+        eventBus._on(
+          "pagerendered",
+          ({ pageNumber }) => {
+            idsToRefresh.delete(pageNumber);
+            if (idsToRefresh.size === 0) {
+              this.#switchAnnotationEditorModeTimeoutId = setTimeout(
+                updater,
+                0
+              );
+            }
+          },
+          { signal }
+        );
         return;
       }
     }
     updater();
-  }
-
-  // eslint-disable-next-line accessor-pairs
-  set annotationEditorParams({ type, value }) {
-    if (!this.#annotationEditorUIManager) {
-      throw new Error(`The AnnotationEditor is not enabled.`);
-    }
-    this.#annotationEditorUIManager.updateParams(type, value);
   }
 
   refresh(noUpdate = false, updateArgs = Object.create(null)) {

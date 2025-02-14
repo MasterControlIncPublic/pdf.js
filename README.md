@@ -60,7 +60,8 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * Configurably can allow printing (web/pdf_print_service.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
 * Removed dark theme (web/viewer.css)
-* Added presentation mode to the toolbar (web/toolbar.js)
+* Added presentation mode to the toolbar (web/toolbar.js, web/viewer.html)
+* Remove page scroll mode from the toolbar (web/viewer.html) (didn't feel intuitive that there were other pages to scroll to)
 * Include Global-complete styles (web/viewer.html)
 * Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
 * Changed AnnotationMode to "ENABLE" which disables interactive form fields. This setting may be dependent on the form field rendering change above. (web/app_options.js)
@@ -83,22 +84,36 @@ You can copy the result (or unzip the mc artifact) into `<site>/services/StaticC
 
 ### Testing
 
-The PRs will run automated testing. You can do that locally with commands like `gulp ci-test` (and possibly autofix some linting with the `--fix` argument)
+The PRs will run automated testing. You can do that locally with commands like `gulp unittest` (and possibly autofix some linting with the `--fix` argument)
 
 ### Deploying an artifact to Artifactory
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
 
 #### Deploying a snapshot
-You should be able to deploy a snapshot to artifactory by running the following command.
+There is an issue with snapshots being deployed to artifactory using  `$ gulp mc-deploy-snapshot`.
+Instead, you will need to manually upload a snapshot to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
+1. run `$ gulp mc-build`
+2. Copy the `.zip` from the build folder to paste into the generic-artifactory-zip-uploader and follow README instructions for that repo.
 
-    $ gulp mc-deploy-snapshot
+[//]: # (Deploy issue found with QX-18361, alternative method added until deploy issue can be resolved.)
+[//]: # (You should be able to deploy a snapshot to artifactory by running the following command.)
+
+[//]: # ()
+[//]: # (    $ gulp mc-deploy-snapshot)
 
 #### Deploying a release
 **Only release builds from mc-master!** This will deploy straight to our libs-release-local repo, **you have been warned**.
 
-First make sure the version is correct in pdfjs.config. Then run:
+There is an issue with releases being deployed to artifactory using  `$ gulp mc-deploy-release`.
+Instead, you will need to manually upload a release to artifactory using the [generic-artifactory-zip-uploader](https://github.com/MasterControlInc/generic-artifactory-zip-uploader)
+1. run `$ gulp mc-build`
+2. Copy the `.zip` from the build folder to paste into the generic-artifactory-zip-uploader and follow README instructions for that repo.
 
-    $ gulp mc-deploy-release
+[//]: # (Deploy issue found with QX-18361, alternative method added until deploy issue can be resolved.)
+[//]: # (First make sure the version is correct in pdfjs.config. Then run:)
+
+[//]: # ()
+[//]: # (    $ gulp mc-deploy-release)
 
 Please don't forget to tag the commit you deployed and push the tags to the repository with commands similar to the following:
 
@@ -169,9 +184,6 @@ all dependencies for PDF.js:
 
     $ npm install
 
-> [!NOTE]
-> On MacOS M1/M2 you may see some `node-gyp`-related errors when running `npm install`. This is because one of our dependencies, `"canvas"`, does not provide pre-built binaries for this platform and instead `npm` will try to build it from source. Please make sure to first install the necessary native dependencies using `brew`: https://github.com/Automattic/node-canvas#compiling.
-
 Finally, you need to start a local web server as some browsers do not allow opening
 PDF files using a `file://` URL. Run:
 
@@ -205,7 +217,7 @@ be loaded by `pdf.js`. The PDF.js files are large and should be minified for pro
 ## Using PDF.js in a web application
 
 To use PDF.js in a web application you can choose to use a pre-built version of the library
-or to build it from source. We supply pre-built versions for usage with NPM and Bower under
+or to build it from source. We supply pre-built versions for usage with NPM under
 the `pdfjs-dist` name. For more information and examples please refer to the
 [wiki page](https://github.com/mozilla/pdf.js/wiki/Setup-pdf.js-in-a-website) on this subject.
 
@@ -249,4 +261,4 @@ Talk to us on Matrix:
 
 File an issue:
 
-+ https://github.com/mozilla/pdf.js/issues/new
++ https://github.com/mozilla/pdf.js/issues/new/choose

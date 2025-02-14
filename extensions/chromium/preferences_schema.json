@@ -59,6 +59,14 @@
       "type": "boolean",
       "default": true
     },
+    "enableAltTextModelDownload": {
+      "type": "boolean",
+      "default": true
+    },
+    "enableNewAltTextWhenAddingImage": {
+      "type": "boolean",
+      "default": true
+    },
     "altTextLearnMoreUrl": {
       "type": "string",
       "default": ""
@@ -84,10 +92,6 @@
       "title": "Enable active content (JavaScript) in PDFs",
       "type": "boolean",
       "description": "Whether to allow execution of active content (JavaScript) by PDF files.",
-      "default": false
-    },
-    "enableHighlightEditor": {
-      "type": "boolean",
       "default": false
     },
     "enableHighlightFloatingButton": {
