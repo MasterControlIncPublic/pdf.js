@@ -19,13 +19,16 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
   if (
     typeof PDFJSDev !== "undefined" &&
     PDFJSDev.test("LIB") &&
-    typeof navigator === "undefined"
+    !globalThis.navigator?.language
   ) {
-    globalThis.navigator = Object.create(null);
+    globalThis.navigator = {
+      language: "en-US",
+      maxTouchPoints: 1,
+      platform: "",
+      userAgent: "",
+    };
   }
-  const userAgent = navigator.userAgent || "";
-  const platform = navigator.platform || "";
-  const maxTouchPoints = navigator.maxTouchPoints || 1;
+  const { maxTouchPoints, platform, userAgent } = navigator;
 
   const isAndroid = /Android/.test(userAgent);
   const isIOS =
@@ -96,6 +99,11 @@ const defaultOptions = {
         : null,
     kind: OptionKind.BROWSER,
   },
+  maxCanvasDim: {
+    /** @type {number} */
+    value: 32767,
+    kind: OptionKind.BROWSER + OptionKind.VIEWER,
+  },
   nimbusDataStr: {
     /** @type {string} */
     value: "",
@@ -131,6 +139,11 @@ const defaultOptions = {
     value: true,
     kind: OptionKind.BROWSER,
   },
+  supportsPrinting: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.BROWSER,
+  },
   toolbarDensity: {
     /** @type {number} */
     value: 0, // 0 = "normal", 1 = "compact", 2 = "touch"
@@ -153,6 +166,11 @@ const defaultOptions = {
   annotationMode: {
     /** @type {number} */
     value: 1,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  capCanvasAreaFactor: {
+    /** @type {number} */
+    value: 200,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   cursorToolOnLoad: {
@@ -190,18 +208,30 @@ const defaultOptions = {
     value: false,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
-  enableGuessAltText: {
+  enableAltTextModelDownload: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE + OptionKind.EVENT_DISPATCH,
+  },
+  enableAutoLinking: {
     /** @type {boolean} */
     value: true,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
-  enableHighlightEditor: {
-    // We'll probably want to make some experiments before enabling this
-    // in Firefox release, but it has to be temporary.
-    // TODO: remove it when unnecessary.
+  enableComment: {
     /** @type {boolean} */
     value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  enableDetailCanvas: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER,
+  },
+  enableGuessAltText: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE + OptionKind.EVENT_DISPATCH,
   },
   enableHighlightFloatingButton: {
     // We'll probably want to make some experiments before enabling this
@@ -209,6 +239,16 @@ const defaultOptions = {
     // TODO: remove it when unnecessary.
     /** @type {boolean} */
     value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  enableNewAltTextWhenAddingImage: {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  enableOptimizedPartialRendering: {
+    /** @type {boolean} */
+    value: false,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   enablePermissions: {
@@ -224,6 +264,11 @@ const defaultOptions = {
   enableScripting: {
     /** @type {boolean} */
     value: typeof PDFJSDev === "undefined" || !PDFJSDev.test("CHROME"),
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  enableSignatureEditor: {
+    /** @type {boolean} */
+    value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   enableUpdatedAddImage: {
@@ -246,7 +291,9 @@ const defaultOptions = {
   },
   highlightEditorColors: {
     /** @type {string} */
-    value: "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F",
+    value:
+      "yellow=#FFFF98,green=#53FFBC,blue=#80EBFF,pink=#FFCBE6,red=#FF4F5F," +
+      "yellow_HCM=#FFFFCC,green_HCM=#53FFBC,blue_HCM=#80EBFF,pink_HCM=#F6B8FF,red_HCM=#C50043",
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   historyUpdateUrl: {
@@ -270,6 +317,11 @@ const defaultOptions = {
   maxCanvasPixels: {
     /** @type {number} */
     value: 2 ** 25,
+    kind: OptionKind.VIEWER,
+  },
+  minDurationToUpdateCanvas: {
+    /** @type {number} */
+    value: 500, // ms
     kind: OptionKind.VIEWER,
   },
   forcePageColors: {
@@ -317,6 +369,11 @@ const defaultOptions = {
     value: 1,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
+  viewerCssTheme: {
+    /** @type {number} */
+    value: typeof PDFJSDev !== "undefined" && PDFJSDev.test("CHROME") ? 2 : 0,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
   viewOnLoad: {
     /** @type {boolean} */
     value: 0,
@@ -361,7 +418,13 @@ const defaultOptions = {
   },
   docBaseUrl: {
     /** @type {string} */
-    value: typeof PDFJSDev === "undefined" ? document.URL.split("#", 1)[0] : "",
+    value:
+      typeof PDFJSDev === "undefined"
+        ? // NOTE: We cannot use the `updateUrlHash` function here, because of
+          // the default preferences generation (see `gulpfile.mjs`).
+          // However, the following line is *only* used in development mode.
+          document.URL.split("#", 1)[0]
+        : "",
     kind: OptionKind.API,
   },
   enableHWA: {
@@ -377,6 +440,17 @@ const defaultOptions = {
   fontExtraProperties: {
     /** @type {boolean} */
     value: false,
+    kind: OptionKind.API,
+  },
+  iccUrl: {
+    /** @type {string} */
+    value:
+      // eslint-disable-next-line no-nested-ternary
+      typeof PDFJSDev === "undefined"
+        ? "../external/iccs/"
+        : PDFJSDev.test("MOZCENTRAL")
+          ? "resource://pdf.js/web/iccs/"
+          : "../web/iccs/",
     kind: OptionKind.API,
   },
   isEvalSupported: {
@@ -429,10 +503,21 @@ const defaultOptions = {
     value: 1,
     kind: OptionKind.API,
   },
+  wasmUrl: {
+    /** @type {string} */
+    value:
+      typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")
+        ? "resource://pdf.js/web/wasm/"
+        : "../web/wasm/",
+    kind: OptionKind.API,
+  },
 
   workerPort: {
     /** @type {Object} */
-    value: null,
+    value:
+      typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")
+        ? globalThis.pdfjsPreloadedWorker || null
+        : null,
     kind: OptionKind.WORKER,
   },
   workerSrc: {
@@ -464,10 +549,10 @@ if (typeof PDFJSDev === "undefined" || !PDFJSDev.test("MOZCENTRAL")) {
         : "../build/pdf.sandbox.mjs",
     kind: OptionKind.VIEWER,
   };
-  defaultOptions.viewerCssTheme = {
-    /** @type {number} */
-    value: typeof PDFJSDev !== "undefined" && PDFJSDev.test("CHROME") ? 2 : 0,
-    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  defaultOptions.enableFakeMLManager = {
+    /** @type {boolean} */
+    value: true,
+    kind: OptionKind.VIEWER,
   };
 }
 if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
@@ -482,15 +567,6 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
     value: false,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   };
-}
-
-const userOptions = new Map();
-
-if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
-  // Apply any compatibility-values to the user-options.
-  for (const [name, value] of compatParams) {
-    userOptions.set(name, value);
-  }
 }
 
 if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING || LIB")) {
@@ -544,14 +620,46 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING || LIB")) {
 class AppOptions {
   static eventBus;
 
+  static #opts = new Map();
+
+  static {
+    // Initialize all the user-options.
+    for (const name in defaultOptions) {
+      this.#opts.set(name, defaultOptions[name].value);
+    }
+
+    if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
+      // Apply any compatibility-values to the user-options.
+      for (const [name, value] of compatParams) {
+        this.#opts.set(name, value);
+      }
+      this._hasInvokedSet = false;
+
+      this._checkDisablePreferences = () => {
+        if (this.get("disablePreferences")) {
+          // Give custom implementations of the default viewer a simpler way to
+          // opt-out of having the `Preferences` override existing `AppOptions`.
+          return true;
+        }
+        if (this._hasInvokedSet) {
+          console.warn(
+            "The Preferences may override manually set AppOptions; " +
+              'please use the "disablePreferences"-option to prevent that.'
+          );
+        }
+        return false;
+      };
+    }
+  }
+
   constructor() {
-    throw new Error("Cannot initialize AppOptions.");
+    if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
+      throw new Error("Cannot initialize AppOptions.");
+    }
   }
 
   static get(name) {
-    return userOptions.has(name)
-      ? userOptions.get(name)
-      : defaultOptions[name]?.value;
+    return this.#opts.get(name);
   }
 
   static getAll(kind = null, defaultOnly = false) {
@@ -562,10 +670,7 @@ class AppOptions {
       if (kind && !(kind & defaultOpt.kind)) {
         continue;
       }
-      options[name] =
-        !defaultOnly && userOptions.has(name)
-          ? userOptions.get(name)
-          : defaultOpt.value;
+      options[name] = !defaultOnly ? this.#opts.get(name) : defaultOpt.value;
     }
     return options;
   }
@@ -575,6 +680,9 @@ class AppOptions {
   }
 
   static setAll(options, prefs = false) {
+    if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
+      this._hasInvokedSet ||= true;
+    }
     let events;
 
     for (const name in options) {
@@ -601,7 +709,7 @@ class AppOptions {
       if (this.eventBus && kind & OptionKind.EVENT_DISPATCH) {
         (events ||= new Map()).set(name, userOpt);
       }
-      userOptions.set(name, userOpt);
+      this.#opts.set(name, userOpt);
     }
 
     if (events) {
@@ -610,28 +718,6 @@ class AppOptions {
       }
     }
   }
-}
-
-if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
-  AppOptions._checkDisablePreferences = () => {
-    if (AppOptions.get("disablePreferences")) {
-      // Give custom implementations of the default viewer a simpler way to
-      // opt-out of having the `Preferences` override existing `AppOptions`.
-      return true;
-    }
-    for (const [name] of userOptions) {
-      // Ignore any compatibility-values in the user-options.
-      if (compatParams.has(name)) {
-        continue;
-      }
-      console.warn(
-        "The Preferences may override manually set AppOptions; " +
-          'please use the "disablePreferences"-option to prevent that.'
-      );
-      break;
-    }
-    return false;
-  };
 }
 
 export { AppOptions, OptionKind };

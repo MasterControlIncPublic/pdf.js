@@ -26,7 +26,6 @@ import path from "path";
 import puppeteer from "puppeteer";
 import readline from "readline";
 import { translateFont } from "./font/ttxdriver.mjs";
-import url from "url";
 import { WebServer } from "./webserver.mjs";
 import yargs from "yargs";
 
@@ -68,6 +67,11 @@ function parseOptions() {
     .option("noChrome", {
       default: false,
       describe: "Skip Chrome when running tests.",
+      type: "boolean",
+    })
+    .option("noFirefox", {
+      default: false,
+      describe: "Skip Firefox when running tests.",
       type: "boolean",
     })
     .option("noDownload", {
@@ -157,7 +161,7 @@ function parseOptions() {
       );
     })
     .check(argv => {
-      if (argv.testfilter && argv.testfilter.length > 0 && argv.xfaOnly) {
+      if (argv.testfilter?.length > 0 && argv.xfaOnly) {
         throw new Error("--testfilter and --xfaOnly cannot be used together.");
       }
       return true;
@@ -456,6 +460,13 @@ function checkEq(task, results, browser, masterMode) {
     } else {
       console.error("Valid snapshot was not found.");
     }
+    let unoptimizedSnapshot = pageResult.baselineSnapshot;
+    if (unoptimizedSnapshot?.startsWith("data:image/png;base64,")) {
+      unoptimizedSnapshot = Buffer.from(
+        unoptimizedSnapshot.substring(22),
+        "base64"
+      );
+    }
 
     var refSnapshot = null;
     var eq = false;
@@ -522,7 +533,7 @@ function checkEq(task, results, browser, masterMode) {
       ensureDirSync(tmpSnapshotDir);
       fs.writeFileSync(
         path.join(tmpSnapshotDir, page + 1 + ".png"),
-        testSnapshot
+        unoptimizedSnapshot ?? testSnapshot
       );
     }
   }
@@ -612,7 +623,14 @@ function checkRefTestResults(browser, id, results) {
         return; // no results
       }
       if (pageResult.failure) {
-        failed = true;
+        // If the test failes due to a difference between the optimized and
+        // unoptimized rendering, we don't set `failed` to true so that we will
+        // still compute the differences between them. In master mode, this
+        // means that we will save the reference image from the unoptimized
+        // rendering even if the optimized rendering is wrong.
+        if (!pageResult.failure.includes("Optimized rendering differs")) {
+          failed = true;
+        }
         if (fs.existsSync(task.file + ".error")) {
           console.log(
             "TEST-SKIPPED | PDF was not downloaded " +
@@ -627,7 +645,9 @@ function checkRefTestResults(browser, id, results) {
               pageResult.failure
           );
         } else {
-          session.numErrors++;
+          if (failed) {
+            session.numErrors++;
+          }
           console.log(
             "TEST-UNEXPECTED-FAIL | test failed " +
               id +
@@ -649,6 +669,7 @@ function checkRefTestResults(browser, id, results) {
   }
   switch (task.type) {
     case "eq":
+    case "partial":
     case "text":
     case "highlight":
       checkEq(task, results, browser, session.masterMode);
@@ -670,8 +691,7 @@ function checkRefTestResults(browser, id, results) {
   });
 }
 
-function refTestPostHandler(req, res) {
-  var parsedUrl = url.parse(req.url, true);
+function refTestPostHandler(parsedUrl, req, res) {
   var pathname = parsedUrl.pathname;
   if (
     pathname !== "/tellMeToQuit" &&
@@ -691,7 +711,7 @@ function refTestPostHandler(req, res) {
 
     var session;
     if (pathname === "/tellMeToQuit") {
-      session = getSession(parsedUrl.query.browser);
+      session = getSession(parsedUrl.searchParams.get("browser"));
       monitorBrowserTimeout(session, null);
       closeSession(session.name);
       return;
@@ -709,6 +729,7 @@ function refTestPostHandler(req, res) {
     var page = data.page - 1;
     var failure = data.failure;
     var snapshot = data.snapshot;
+    var baselineSnapshot = data.baselineSnapshot;
     var lastPageNum = data.lastPageNum;
 
     session = getSession(browser);
@@ -737,6 +758,7 @@ function refTestPostHandler(req, res) {
     taskResults[round][page] = {
       failure,
       snapshot,
+      baselineSnapshot,
       viewportWidth: data.viewportWidth,
       viewportHeight: data.viewportHeight,
       outputScale: data.outputScale,
@@ -803,7 +825,7 @@ async function startIntegrationTest() {
   onAllSessionsClosed = onAllSessionsClosedAfterTests("integration");
   startServer();
 
-  const { runTests } = await import("./integration-boot.mjs");
+  const { runTests } = await import("./integration/jasmine-boot.js");
   await startBrowsers({
     baseUrl: null,
     initializeSession: session => {
@@ -821,8 +843,7 @@ async function startIntegrationTest() {
   await Promise.all(sessions.map(session => closeSession(session.name)));
 }
 
-function unitTestPostHandler(req, res) {
-  var parsedUrl = url.parse(req.url);
+function unitTestPostHandler(parsedUrl, req, res) {
   var pathname = parsedUrl.pathname;
   if (
     pathname !== "/tellMeToQuit" &&
@@ -882,7 +903,7 @@ async function startBrowser({
   extraPrefsFirefox = {},
 }) {
   const options = {
-    product: browserName,
+    browser: browserName,
     protocol: "webDriverBiDi",
     headless,
     dumpio: true,
@@ -904,6 +925,14 @@ async function startBrowser({
   const printFile = path.join(tempDir, "print.pdf");
 
   if (browserName === "chrome") {
+    // Slow down protocol calls by the given number of milliseconds. In Chrome
+    // protocol calls are faster than in Firefox and thus trigger in quicker
+    // succession. This can cause intermittent failures because new protocol
+    // calls can run before events triggered by the previous protocol calls had
+    // a chance to be processed (essentially causing events to get lost). This
+    // value gives Chrome a more similar execution speed as Firefox.
+    options.slowMo = 5;
+
     // avoid crash
     options.args = ["--no-sandbox", "--disable-setuid-sandbox"];
     // silent printing in a pdf
@@ -928,24 +957,25 @@ async function startBrowser({
       "browser.download.dir": tempDir,
       // Print silently in a pdf
       "print.always_print_silent": true,
-      "print.show_print_progress": false,
       print_printer: "PDF",
       "print.printer_PDF.print_to_file": true,
       "print.printer_PDF.print_to_filename": printFile,
-      // Enable OffscreenCanvas
-      "gfx.offscreencanvas.enabled": true,
       // Disable gpu acceleration
       "gfx.canvas.accelerated": false,
-      // Enable the `round` CSS function.
-      "layout.css.round.enabled": true,
-      // This allow to copy some data in the clipboard.
-      "dom.events.asyncClipboard.clipboardItem": true,
       // It's helpful to see where the caret is.
       "accessibility.browsewithcaret": true,
       // Disable the newtabpage stuff.
       "browser.newtabpage.enabled": false,
       // Disable network connections to Contile.
       "browser.topsites.contile.enabled": false,
+      // Disable logging for remote settings.
+      "services.settings.loglevel": "off",
+      // Disable AI/ML functionality.
+      "browser.ml.enable": false,
+      "browser.ml.chat.enabled": false,
+      "browser.ml.linkPreview.enabled": false,
+      "browser.tabs.groups.smart.enabled": false,
+      "browser.tabs.groups.smart.userEnabled": false,
       ...extraPrefsFirefox,
     };
   }
@@ -967,7 +997,13 @@ async function startBrowsers({ baseUrl, initializeSession }) {
   // prevent the disk from filling up over time.
   await puppeteer.trimCache();
 
-  const browserNames = options.noChrome ? ["firefox"] : ["firefox", "chrome"];
+  const browserNames = ["firefox", "chrome"];
+  if (options.noChrome) {
+    browserNames.splice(1, 1);
+  }
+  if (options.noFirefox) {
+    browserNames.splice(0, 1);
+  }
   for (const browserName of browserNames) {
     // The session must be pushed first and augmented with the browser once
     // it's initialized. The reason for this is that browser initialization
@@ -1037,9 +1073,7 @@ async function closeSession(browser) {
       await session.browser.close();
     }
     session.closed = true;
-    const allClosed = sessions.every(function (s) {
-      return s.closed;
-    });
+    const allClosed = sessions.every(s => s.closed);
     if (allClosed) {
       if (tempDir) {
         fs.rmSync(tempDir, { recursive: true, force: true });
