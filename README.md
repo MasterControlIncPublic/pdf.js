@@ -7,10 +7,6 @@ The `master` branch in our fork should be identical to `master` on the upstream 
 ### Synchronizing with upstream mozilla:pdf.js
 Since master is an untouched copy of Mozilla's master we can synchronize our fork as often as we'd like with no impacts to our MC functionality.
 
-You can either use the "Sync Fork" button in the github UI 
-
-OR 
-
 Perform the sync manually as described below:
 
 - add upstream remote to your working copy
@@ -27,6 +23,11 @@ Perform the sync manually as described below:
     ```
     $ git push --tags origin master
     ```
+
+OR
+
+You can use the "Sync Fork" button in the github UI (NOTE: I don't believe this syncs tags, so please do the manual method above!)
+
 
 ### Updating `mc-master` with changes from the upstream master
 This should be done after syncing master as described above. The idea here is to separate this type of sync from your story/defect work for better history tracking. 
