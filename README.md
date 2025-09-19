@@ -25,7 +25,7 @@ Perform the sync manually as described below:
     ```
 - push `master` up to our fork's repo (include the new tags)
     ```
-    $ git push --tags master
+    $ git push --tags origin master
     ```
 
 ### Updating `mc-master` with changes from the upstream master
