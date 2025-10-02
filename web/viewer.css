@@ -44,7 +44,10 @@
   --scrollbar-bg-color: light-dark(auto, rgb(35 35 39));
   --toolbar-icon-bg-color: light-dark(rgb(255 255 255), rgb(255 255 255));
   --toolbar-icon-hover-bg-color: none;
-  --original-toolbar-icon-hover-bg-color: light-dark(rgb(255 255 255), rgb(255 255 255));
+  --original-toolbar-icon-hover-bg-color: light-dark(
+    rgb(255 255 255),
+    rgb(255 255 255)
+  );
 
   --sidebar-narrow-bg-color: light-dark(
     rgb(212 212 215 / 0.9),
@@ -71,8 +74,14 @@
   --field-bg-color: light-dark(rgb(255 255 255), rgb(64 64 68));
   --field-border-color: light-dark(rgb(187 187 188), rgb(115 115 115));
   --treeitem-color: light-dark(rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.8));
-  --treeitem-bg-color: light-dark(rgb(255 255 255 / 0.15), rgb(255 255 255 / 0.15));
-  --treeitem-hover-color: light-dark(rgb(255 255 255 / 0.9), rgb(255 255 255 / 0.9));
+  --treeitem-bg-color: light-dark(
+    rgb(255 255 255 / 0.15),
+    rgb(255 255 255 / 0.15)
+  );
+  --treeitem-hover-color: light-dark(
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.9)
+  );
   --treeitem-selected-color: light-dark(
     rgb(255 255 255 / 0.9),
     rgb(255 255 255 / 0.9)

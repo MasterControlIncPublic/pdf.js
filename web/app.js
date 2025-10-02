@@ -61,7 +61,6 @@ import {
   version,
 } from "pdfjs-lib";
 import { AppOptions, OptionKind } from "./app_options.js";
-import { MCOptions } from "./mc_options.js";
 import { EventBus, FirefoxEventBus } from "./event_utils.js";
 import { ExternalServices, initCom, MLManager } from "web-external_services";
 import {
@@ -75,6 +74,7 @@ import { CaretBrowsingMode } from "./caret_browsing.js";
 import { CommentManager } from "./comment_manager.js";
 import { DownloadManager } from "web-download_manager";
 import { EditorUndoBar } from "./editor_undo_bar.js";
+import { MCOptions } from "./mc_options.js";
 import { OverlayManager } from "./overlay_manager.js";
 import { PasswordPrompt } from "./password_prompt.js";
 import { PDFAttachmentViewer } from "web-pdf_attachment_viewer";
@@ -772,7 +772,7 @@ const PDFViewerApplication = {
       const params = parseQueryString(queryString);
       file = params.get("file") ?? AppOptions.get("defaultUrl");
       try {
-        file = new URL(file, location).href; //mc fix applied until https://github.com/mozilla/pdf.js/issues/20137 is resolved
+        file = new URL(file, location).href; // mc fix applied until https://github.com/mozilla/pdf.js/issues/20137 is resolved
       } catch {
         file = encodeURIComponent(file).replaceAll("%2F", "/");
       }

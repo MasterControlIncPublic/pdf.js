@@ -53,6 +53,7 @@ Use a **squash merge PR for new feature work** so that all your development comm
 ### Changes We Have Made From Mainline
 
 * These README updates
+* Temporary fix for file loading until https://github.com/mozilla/pdf.js/issues/20137 is resolved (web/app.js)
 * The additional gulp tasks that detailed below
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
