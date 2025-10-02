@@ -304,12 +304,6 @@ function setMCOptions() {
   MCOptions.set("canPrint", canPrint === "true");
 }
 
-function enablePrintingIfCanPrint() {
-  if (MCOptions.get("canPrint")) {
-    document.getElementById("print").classList.remove("hidden");
-  }
-}
-
 function webViewerLoad() {
   const config = getViewerConfiguration();
 
@@ -337,7 +331,6 @@ function webViewerLoad() {
     }
   }
   setMCOptions();
-  enablePrintingIfCanPrint();
 
   PDFViewerApplication.run(config);
 }

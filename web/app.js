@@ -61,6 +61,7 @@ import {
   version,
 } from "pdfjs-lib";
 import { AppOptions, OptionKind } from "./app_options.js";
+import { MCOptions } from "./mc_options.js";
 import { EventBus, FirefoxEventBus } from "./event_utils.js";
 import { ExternalServices, initCom, MLManager } from "web-external_services";
 import {
@@ -949,8 +950,7 @@ const PDFViewerApplication = {
     return shadow(
       this,
       "supportsPrinting",
-      AppOptions.get("supportsPrinting") &&
-        PDFPrintServiceFactory.supportsPrinting
+      MCOptions.get("canPrint") && PDFPrintServiceFactory.supportsPrinting
     );
   },
 

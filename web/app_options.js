@@ -141,7 +141,7 @@ const defaultOptions = {
   },
   supportsPrinting: {
     /** @type {boolean} */
-    value: true,
+    value: false,
     kind: OptionKind.BROWSER,
   },
   toolbarDensity: {

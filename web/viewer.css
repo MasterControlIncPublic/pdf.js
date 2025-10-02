@@ -584,6 +584,11 @@ body {
   mask-image: var(--toolbarButton-download-icon);
 }
 
+#presentationMode::before {
+  font: 14px FontAwesome;
+  content: "\f0b2";
+}
+
 #currentOutlineItem::before {
   font: 14px FontAwesome;
   content: "\f022";
@@ -1216,7 +1221,6 @@ dialog :link {
       mask-image: var(--toolbarButton-download-icon);
     }
 
-    #presentationMode::before,
     #secondaryPresentationMode::before {
       font: 14px FontAwesome;
       content: "\f0b2";
