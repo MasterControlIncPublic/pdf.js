@@ -1214,7 +1214,8 @@ dialog :link {
     /*#endif*/
 
     #secondaryPrint::before {
-      mask-image: var(--toolbarButton-print-icon);
+      font: 14px FontAwesome;
+      content: "\f02f";
     }
 
     #secondaryDownload::before {
@@ -1378,7 +1379,6 @@ dialog :link {
     #findResultsCount {
       background-color: rgb(217 217 217);
       color: rgb(82 82 82);
-      padding-block: 4px;
 
       &:empty {
         display: none;
@@ -1686,6 +1686,73 @@ dialog :link {
         animation: progressIndeterminate 1s linear infinite;
       }
     }
+  }
+}
+
+#secondaryToolbar {
+  #firstPage::before {
+    font: 14px FontAwesome;
+    content: "\f062";
+  }
+
+  #lastPage::before {
+    font: 14px FontAwesome;
+    content: "\f063";
+  }
+
+  #pageRotateCcw::before {
+    font: 14px FontAwesome;
+    content: "\f0e2";
+  }
+
+  #pageRotateCw::before {
+    font: 14px FontAwesome;
+    content: "\f01e";
+  }
+
+  #cursorSelectTool::before {
+    font: 14px FontAwesome;
+    content: "\f245";
+  }
+
+  #cursorHandTool::before {
+    font: 14px FontAwesome;
+    content: "\f256";
+  }
+
+  #scrollPage::before {
+    mask-image: var(--secondaryToolbarButton-scrollPage-icon);
+  }
+
+  #scrollVertical::before {
+    font: 14px FontAwesome;
+    content: "\f07d";
+  }
+
+  #scrollHorizontal::before {
+    font: 14px FontAwesome;
+    content: "\f07e";
+  }
+
+  #scrollWrapped::before {
+    font: 14px FontAwesome;
+    content: "\f00a";
+  }
+
+  #spreadNone::before {
+    mask-image: var(--secondaryToolbarButton-spreadNone-icon);
+  }
+
+  #spreadOdd::before {
+    mask-image: var(--secondaryToolbarButton-spreadOdd-icon);
+  }
+
+  #spreadEven::before {
+    mask-image: var(--secondaryToolbarButton-spreadEven-icon);
+  }
+
+  #documentProperties::before {
+    mask-image: var(--secondaryToolbarButton-documentProperties-icon);
   }
 }
 

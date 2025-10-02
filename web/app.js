@@ -2522,7 +2522,9 @@ function onNamedAction(evt) {
       break;
 
     case "SaveAs":
+      /* Don't allow download of mc files
       this.downloadOrSave();
+       */
       break;
   }
 }

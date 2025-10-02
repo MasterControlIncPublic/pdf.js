@@ -447,7 +447,7 @@ export default [
 
     languageOptions: {
       globals: globals.webextensions,
-      sourceType: "script",
+      sourceType: "module",
     },
 
     rules: {
