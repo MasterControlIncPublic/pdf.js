@@ -25,15 +25,30 @@ describe("Annotation highlight", () => {
   describe("annotation-highlight.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait(
         "annotation-highlight.pdf",
         "[data-annotation-id='19R']"
       );
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
+    });
+
+    it("must check the popup position in the DOM", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          const areSiblings = await page.evaluate(() => {
+            const highlight = document.querySelector(
+              "[data-annotation-id='19R']"
+            );
+            const popup = document.querySelector("[data-annotation-id='21R']");
+            return highlight.nextElementSibling === popup;
+          });
+          expect(areSiblings).withContext(`In ${browserName}`).toEqual(true);
+        })
+      );
     });
 
     it("must show a popup on mouseover", async () => {
@@ -62,11 +77,11 @@ describe("Annotation highlight", () => {
   describe("Check that widget annotations are in front of highlight ones", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("bug1883609.pdf", "[data-annotation-id='23R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -87,11 +102,11 @@ describe("Checkbox annotation", () => {
   describe("issue12706.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("issue12706.pdf", "[data-annotation-id='63R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -123,11 +138,11 @@ describe("Checkbox annotation", () => {
   describe("issue15597.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("issue15597.pdf", "[data-annotation-id='7R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -148,11 +163,11 @@ describe("Checkbox annotation", () => {
   describe("bug1847733.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("bug1847733.pdf", "[data-annotation-id='18R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -178,11 +193,11 @@ describe("Text widget", () => {
   describe("issue13271.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("issue13271.pdf", "[data-annotation-id='24R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -207,11 +222,11 @@ describe("Text widget", () => {
   describe("issue16473.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("issue16473.pdf", "[data-annotation-id='22R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -232,15 +247,60 @@ describe("Text widget", () => {
   });
 });
 
+describe("Link annotations with internal destinations", () => {
+  describe("bug1708041.pdf", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "bug1708041.pdf",
+        ".page[data-page-number='1'] .annotationLayer"
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must click on a link and check if it navigates to the correct page", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          const pageOneSelector = ".page[data-page-number='1']";
+          const linkSelector = `${pageOneSelector} #pdfjs_internal_id_42R`;
+          await page.waitForSelector(linkSelector);
+          const linkTitle = await page.$eval(linkSelector, el => el.title);
+          expect(linkTitle)
+            .withContext(`In ${browserName}`)
+            .toEqual("Go to the last page");
+          await page.click(linkSelector);
+          const pageSixTextLayerSelector =
+            ".page[data-page-number='6'] .textLayer";
+          await page.waitForSelector(pageSixTextLayerSelector, {
+            visible: true,
+          });
+          await page.waitForFunction(
+            sel => {
+              const textLayer = document.querySelector(sel);
+              return document.activeElement === textLayer;
+            },
+            {},
+            pageSixTextLayerSelector
+          );
+        })
+      );
+    });
+  });
+});
+
 describe("Annotation and storage", () => {
   describe("issue14023.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("issue14023.pdf", "[data-annotation-id='64R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -337,11 +397,11 @@ describe("ResetForm action", () => {
   describe("resetform.pdf", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("resetform.pdf", "[data-annotation-id='63R']");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -462,14 +522,14 @@ describe("ResetForm action", () => {
     describe("issue14438.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "issue14438.pdf",
           "[data-annotation-id='10R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -490,14 +550,14 @@ describe("ResetForm action", () => {
     describe("annotation-caret-ink.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "annotation-caret-ink.pdf",
           "[data-annotation-id='25R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -525,14 +585,14 @@ describe("ResetForm action", () => {
     describe("bug1844583.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "bug1844583.pdf",
           "[data-annotation-id='8R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -553,14 +613,14 @@ describe("ResetForm action", () => {
     describe("tagged_stamp.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "tagged_stamp.pdf",
           "[data-annotation-id='20R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -622,14 +682,14 @@ describe("ResetForm action", () => {
     describe("issue14438.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "highlights.pdf",
           "[data-annotation-id='693R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -649,17 +709,17 @@ describe("ResetForm action", () => {
   });
 
   describe("Rotated annotation and its clickable area", () => {
-    describe("issue14438.pdf", () => {
+    describe("rotated_ink.pdf", () => {
       let pages;
 
-      beforeAll(async () => {
+      beforeEach(async () => {
         pages = await loadAndWait(
           "rotated_ink.pdf",
           "[data-annotation-id='18R']"
         );
       });
 
-      afterAll(async () => {
+      afterEach(async () => {
         await closePages(pages);
       });
 
@@ -676,6 +736,79 @@ describe("ResetForm action", () => {
               rect.y + rect.height * 0.9
             );
             await promisePopup;
+          })
+        );
+      });
+    });
+  });
+
+  describe("Text under some annotations", () => {
+    describe("bug1885505.pdf", () => {
+      let pages;
+
+      beforeEach(async () => {
+        pages = await loadAndWait(
+          "bug1885505.pdf",
+          ":is(" +
+            [56, 58, 60, 65]
+              .map(id => `[data-annotation-id='${id}R']`)
+              .join(", ") +
+            ")"
+        );
+      });
+
+      afterEach(async () => {
+        await closePages(pages);
+      });
+
+      it("must check that the text under a highlight annotation exist in the DOM", async () => {
+        await Promise.all(
+          pages.map(async ([browserName, page]) => {
+            const text = await page.$eval(
+              "[data-annotation-id='56R'] mark",
+              el => el.textContent
+            );
+            expect(text).withContext(`In ${browserName}`).toEqual("Languages");
+          })
+        );
+      });
+
+      it("must check that the text under an underline annotation exist in the DOM", async () => {
+        await Promise.all(
+          pages.map(async ([browserName, page]) => {
+            const text = await page.$eval(
+              "[data-annotation-id='58R'] u",
+              el => el.textContent
+            );
+            expect(text).withContext(`In ${browserName}`).toEqual("machine");
+          })
+        );
+      });
+
+      it("must check that the text under a squiggly annotation exist in the DOM", async () => {
+        await Promise.all(
+          pages.map(async ([browserName, page]) => {
+            const text = await page.$eval(
+              "[data-annotation-id='60R'] u",
+              el => el.textContent
+            );
+            expect(text).withContext(`In ${browserName}`)
+              .toEqual(`paths through nested loops. We have implemented
+a dynamic compiler for JavaScript based on our`);
+          })
+        );
+      });
+
+      it("must check that the text under a strikeout annotation exist in the DOM", async () => {
+        await Promise.all(
+          pages.map(async ([browserName, page]) => {
+            const text = await page.$eval(
+              "[data-annotation-id='65R'] s",
+              el => el.textContent
+            );
+            expect(text)
+              .withContext(`In ${browserName}`)
+              .toEqual("Experimentation,");
           })
         );
       });

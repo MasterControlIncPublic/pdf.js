@@ -43,6 +43,10 @@ class BaseShadingPattern {
     }
   }
 
+  isModifyingCurrentTransform() {
+    return false;
+  }
+
   getPattern() {
     unreachable("Abstract method `getPattern` called.");
   }
@@ -313,8 +317,8 @@ class MeshShadingPattern extends BaseShadingPattern {
     this._colors = IR[3];
     this._figures = IR[4];
     this._bounds = IR[5];
-    this._bbox = IR[7];
-    this._background = IR[8];
+    this._bbox = IR[6];
+    this._background = IR[7];
     this.matrix = null;
   }
 
@@ -388,18 +392,24 @@ class MeshShadingPattern extends BaseShadingPattern {
     };
   }
 
+  isModifyingCurrentTransform() {
+    return true;
+  }
+
   getPattern(ctx, owner, inverse, pathType) {
     applyBoundingBox(ctx, this._bbox);
-    let scale;
+    const scale = new Float32Array(2);
     if (pathType === PathType.SHADING) {
-      scale = Util.singularValueDecompose2dScale(getCurrentTransform(ctx));
-    } else {
+      Util.singularValueDecompose2dScale(getCurrentTransform(ctx), scale);
+    } else if (this.matrix) {
       // Obtain scale from matrix and current transformation matrix.
-      scale = Util.singularValueDecompose2dScale(owner.baseTransform);
-      if (this.matrix) {
-        const matrixScale = Util.singularValueDecompose2dScale(this.matrix);
-        scale = [scale[0] * matrixScale[0], scale[1] * matrixScale[1]];
-      }
+      Util.singularValueDecompose2dScale(this.matrix, scale);
+      const [matrixScaleX, matrixScaleY] = scale;
+      Util.singularValueDecompose2dScale(owner.baseTransform, scale);
+      scale[0] *= matrixScaleX;
+      scale[1] *= matrixScaleY;
+    } else {
+      Util.singularValueDecompose2dScale(owner.baseTransform, scale);
     }
 
     // Rasterizing on the main thread since sending/queue large canvases
@@ -454,7 +464,8 @@ class TilingPattern {
   // 10in @ 300dpi shall be enough.
   static MAX_PATTERN_SIZE = 3000;
 
-  constructor(IR, color, ctx, canvasGraphicsFactory, baseTransform) {
+  constructor(IR, ctx, canvasGraphicsFactory, baseTransform) {
+    this.color = IR[1];
     this.operatorList = IR[2];
     this.matrix = IR[3];
     this.bbox = IR[4];
@@ -462,7 +473,6 @@ class TilingPattern {
     this.ystep = IR[6];
     this.paintType = IR[7];
     this.tilingType = IR[8];
-    this.color = color;
     this.ctx = ctx;
     this.canvasGraphicsFactory = canvasGraphicsFactory;
     this.baseTransform = baseTransform;
@@ -509,12 +519,12 @@ class TilingPattern {
     const height = y1 - y0;
 
     // Obtain scale from matrix and current transformation matrix.
-    const matrixScale = Util.singularValueDecompose2dScale(this.matrix);
-    const curMatrixScale = Util.singularValueDecompose2dScale(
-      this.baseTransform
-    );
-    const combinedScaleX = matrixScale[0] * curMatrixScale[0];
-    const combinedScaleY = matrixScale[1] * curMatrixScale[1];
+    const scale = new Float32Array(2);
+    Util.singularValueDecompose2dScale(this.matrix, scale);
+    const [matrixScaleX, matrixScaleY] = scale;
+    Util.singularValueDecompose2dScale(this.baseTransform, scale);
+    const combinedScaleX = matrixScaleX * scale[0];
+    const combinedScaleY = matrixScaleY * scale[1];
 
     let canvasWidth = width,
       canvasHeight = height,
@@ -563,11 +573,24 @@ class TilingPattern {
     this.setFillAndStrokeStyleToContext(graphics, paintType, color);
 
     tmpCtx.translate(-dimx.scale * x0, -dimy.scale * y0);
-    graphics.transform(dimx.scale, 0, 0, dimy.scale, 0, 0);
+    graphics.transform(
+      // We pass 0 as the 'opIdx' argument, but the value is irrelevant.
+      // We know that we are in a 'CanvasNestedDependencyTracker' that captures
+      // all the sub-operations needed to create this pattern canvas and uses
+      // the top-level operation index as their index.
+      0,
+      dimx.scale,
+      0,
+      0,
+      dimy.scale,
+      0,
+      0
+    );
 
     // To match CanvasGraphics beginDrawing we must save the context here or
     // else we end up with unbalanced save/restores.
     tmpCtx.save();
+    graphics.dependencyTracker?.save();
 
     this.clipBbox(graphics, x0, y0, x1, y1);
 
@@ -577,6 +600,7 @@ class TilingPattern {
 
     graphics.endDrawing();
 
+    graphics.dependencyTracker?.restore().recordNestedDependencies?.();
     tmpCtx.restore();
 
     if (redrawHorizontally || redrawVertically) {
@@ -670,12 +694,11 @@ class TilingPattern {
     const bboxWidth = x1 - x0;
     const bboxHeight = y1 - y0;
     graphics.ctx.rect(x0, y0, bboxWidth, bboxHeight);
-    graphics.current.updateRectMinMax(getCurrentTransform(graphics.ctx), [
-      x0,
-      y0,
-      x1,
-      y1,
-    ]);
+    Util.axialAlignedBoundingBox(
+      [x0, y0, x1, y1],
+      getCurrentTransform(graphics.ctx),
+      graphics.current.minMax
+    );
     graphics.clip();
     graphics.endPath();
   }
@@ -685,23 +708,22 @@ class TilingPattern {
       current = graphics.current;
     switch (paintType) {
       case PaintType.COLORED:
-        const ctx = this.ctx;
-        context.fillStyle = ctx.fillStyle;
-        context.strokeStyle = ctx.strokeStyle;
-        current.fillColor = ctx.fillStyle;
-        current.strokeColor = ctx.strokeStyle;
+        const { fillStyle, strokeStyle } = this.ctx;
+        context.fillStyle = current.fillColor = fillStyle;
+        context.strokeStyle = current.strokeColor = strokeStyle;
         break;
       case PaintType.UNCOLORED:
-        const cssColor = Util.makeHexColor(color[0], color[1], color[2]);
-        context.fillStyle = cssColor;
-        context.strokeStyle = cssColor;
+        context.fillStyle = context.strokeStyle = color;
         // Set color needed by image masks (fixes issues 3226 and 8741).
-        current.fillColor = cssColor;
-        current.strokeColor = cssColor;
+        current.fillColor = current.strokeColor = color;
         break;
       default:
         throw new FormatError(`Unsupported paint type: ${paintType}`);
     }
+  }
+
+  isModifyingCurrentTransform() {
+    return false;
   }
 
   getPattern(ctx, owner, inverse, pathType) {

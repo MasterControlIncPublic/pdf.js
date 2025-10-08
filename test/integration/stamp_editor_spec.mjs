@@ -16,7 +16,7 @@
 import {
   applyFunctionToEditor,
   awaitPromise,
-  cleanupEditing,
+  clearEditors,
   clearInput,
   closePages,
   copy,
@@ -29,45 +29,33 @@ import {
   getFirstSerialized,
   getRect,
   getSerialized,
-  isVisible,
+  isCanvasMonochrome,
   kbBigMoveDown,
   kbBigMoveRight,
-  kbSelectAll,
   kbUndo,
   loadAndWait,
   paste,
   pasteFromClipboard,
   scrollIntoView,
+  selectEditor,
   serializeBitmapDimensions,
   switchToEditor,
+  unselectEditor,
   waitForAnnotationEditorLayer,
   waitForAnnotationModeChanged,
   waitForEntryInStorage,
+  waitForPageRendered,
   waitForSelectedEditor,
   waitForSerialized,
-  waitForStorageEntries,
   waitForTimeout,
-  waitForUnselectedEditor,
 } from "./test_utils.mjs";
-import { fileURLToPath } from "url";
 import fs from "fs";
 import path from "path";
 import { PNG } from "pngjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 
-const selectAll = async page => {
-  await kbSelectAll(page);
-  await page.waitForFunction(
-    () => !document.querySelector(".stampEditor:not(.selectedEditor)")
-  );
-};
-
-const clearAll = async page => {
-  await selectAll(page);
-  await page.keyboard.press("Backspace");
-  await waitForStorageEntries(page, 0);
-};
+const clearAll = clearEditors.bind(null, "stamp");
 
 const waitForImage = async (page, selector) => {
   await page.waitForSelector(`${selector} canvas`);
@@ -85,7 +73,7 @@ const waitForImage = async (page, selector) => {
   await page.waitForSelector(`${selector} .altText`);
 };
 
-const copyImage = async (page, imagePath, number) => {
+const copyImage = async (page, imagePath, selector) => {
   const data = fs
     .readFileSync(path.join(__dirname, imagePath))
     .toString("base64");
@@ -93,7 +81,7 @@ const copyImage = async (page, imagePath, number) => {
   await copyToClipboard(page, { "image/png": `data:image/png;base64,${data}` });
   await pasteFromClipboard(page);
 
-  await waitForImage(page, getEditorSelector(number));
+  await waitForImage(page, selector);
 };
 
 async function waitForTranslation(page) {
@@ -110,7 +98,7 @@ describe("Stamp Editor", () => {
   describe("Basic operations", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", null, {
         eventBusSetup: eventBus => {
           eventBus.on("annotationeditoruimanager", ({ uiManager }) => {
@@ -121,10 +109,6 @@ describe("Stamp Editor", () => {
     });
 
     afterEach(async () => {
-      await cleanupEditing(pages, switchToStamp);
-    });
-
-    afterAll(async () => {
       await closePages(pages);
     });
 
@@ -138,9 +122,14 @@ describe("Stamp Editor", () => {
           await input.uploadFile(
             `${path.join(__dirname, "../images/firefox_logo.png")}`
           );
-          await waitForImage(page, getEditorSelector(0));
+          const editorSelector = getEditorSelector(0);
+          await waitForImage(page, editorSelector);
 
-          const { width } = await getEditorDimensions(page, 0);
+          await page.waitForFunction(
+            `document.getElementById("viewer-alert").textContent === "Image added"`
+          );
+
+          const { width } = await getEditorDimensions(page, editorSelector);
 
           // The image is bigger than the page, so it has been scaled down to
           // 75% of the page width.
@@ -162,9 +151,10 @@ describe("Stamp Editor", () => {
           await input.uploadFile(
             `${path.join(__dirname, "../images/firefox_logo.svg")}`
           );
-          await waitForImage(page, getEditorSelector(0));
+          const editorSelector = getEditorSelector(0);
+          await waitForImage(page, editorSelector);
 
-          const { width } = await getEditorDimensions(page, 0);
+          const { width } = await getEditorDimensions(page, editorSelector);
 
           expect(Math.round(parseFloat(width))).toEqual(40);
 
@@ -193,8 +183,8 @@ describe("Stamp Editor", () => {
           await waitForImage(page, editorSelector);
           await waitForSerialized(page, 1);
 
-          await page.waitForSelector(`${editorSelector} button.delete`);
-          await page.click(`${editorSelector} button.delete`);
+          await page.waitForSelector(`${editorSelector} button.deleteButton`);
+          await page.click(`${editorSelector} button.deleteButton`);
           await waitForSerialized(page, 0);
 
           await kbUndo(page);
@@ -210,7 +200,7 @@ describe("Stamp Editor", () => {
   describe("Resize", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", 50, {
         eventBusSetup: eventBus => {
           eventBus.on("annotationeditoruimanager", ({ uiManager }) => {
@@ -220,12 +210,8 @@ describe("Stamp Editor", () => {
       });
     });
 
-    afterAll(async () => {
-      await closePages(pages);
-    });
-
     afterEach(async () => {
-      await cleanupEditing(pages, switchToStamp);
+      await closePages(pages);
     });
 
     it("must check that an added image stay within the page", async () => {
@@ -332,11 +318,11 @@ describe("Stamp Editor", () => {
   describe("Alt text dialog", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", 50);
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -345,10 +331,11 @@ describe("Stamp Editor", () => {
       for (const [browserName, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
 
         // Wait for the alt-text button to be visible.
-        const buttonSelector = `${getEditorSelector(0)} button.altText`;
+        const buttonSelector = `${editorSelector} button.altText`;
         await page.waitForSelector(buttonSelector);
 
         // Click on the alt-text button.
@@ -367,9 +354,7 @@ describe("Stamp Editor", () => {
         await page.click(saveButtonSelector);
 
         // Check that the canvas has an aria-describedby attribute.
-        await page.waitForSelector(
-          `${getEditorSelector(0)} canvas[aria-describedby]`
-        );
+        await page.waitForSelector(`${editorSelector}[aria-describedby]`);
 
         // Wait for the alt-text button to have the correct icon.
         await page.waitForSelector(`${buttonSelector}.done`);
@@ -508,11 +493,11 @@ describe("Stamp Editor", () => {
   describe("Resize an image with the keyboard", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", 50);
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -521,12 +506,10 @@ describe("Stamp Editor", () => {
       for (const [browserName, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
 
-        await page.click(editorSelector);
-        await waitForSelectedEditor(page, editorSelector);
+        await selectEditor(page, editorSelector);
 
         await page.waitForSelector(
           `${editorSelector} .resizer.topLeft[tabindex="-1"]`
@@ -641,23 +624,25 @@ describe("Stamp Editor", () => {
   describe("Copy/paste from a tab to an other", () => {
     let pages1, pages2;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages1 = await loadAndWait("empty.pdf", ".annotationEditorLayer");
       pages2 = await loadAndWait("empty.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages1);
       await closePages(pages2);
     });
 
     it("must check that the alt-text button is here when pasting in the second tab", async () => {
+      // Run sequentially to avoid clipboard issues.
       for (let i = 0; i < pages1.length; i++) {
         const [, page1] = pages1[i];
         await page1.bringToFront();
         await switchToStamp(page1);
 
-        await copyImage(page1, "../images/firefox_logo.png", 0);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page1, "../images/firefox_logo.png", editorSelector);
         await copy(page1);
 
         const [, page2] = pages2[i];
@@ -666,7 +651,7 @@ describe("Stamp Editor", () => {
 
         await paste(page2);
 
-        await waitForImage(page2, getEditorSelector(0));
+        await waitForImage(page2, editorSelector);
       }
     });
   });
@@ -674,11 +659,11 @@ describe("Stamp Editor", () => {
   describe("Undo a stamp", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -686,18 +671,18 @@ describe("Stamp Editor", () => {
       // Run sequentially to avoid clipboard issues.
       for (const [, page] of pages) {
         await switchToStamp(page);
-        const selector = getEditorSelector(0);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(selector);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
-        await page.waitForSelector(`${selector} button.delete`);
-        await page.click(`${selector} button.delete`);
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
         await waitForSerialized(page, 0);
 
         await kbUndo(page);
-        await waitForImage(page, selector);
+        await waitForImage(page, editorSelector);
         await waitForSerialized(page, 1);
       }
     });
@@ -706,11 +691,11 @@ describe("Stamp Editor", () => {
   describe("Delete a stamp and undo it on another page", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -718,14 +703,14 @@ describe("Stamp Editor", () => {
       // Run sequentially to avoid clipboard issues.
       for (const [, page] of pages) {
         await switchToStamp(page);
-        const selector = getEditorSelector(0);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(selector);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
-        await page.waitForSelector(`${selector} button.delete`);
-        await page.click(`${selector} button.delete`);
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
         await waitForSerialized(page, 0);
 
         const twoToFourteen = Array.from(new Array(13).keys(), n => n + 2);
@@ -743,7 +728,7 @@ describe("Stamp Editor", () => {
           await scrollIntoView(page, pageSelector);
         }
 
-        await page.waitForSelector(`${selector} canvas`);
+        await page.waitForSelector(`${editorSelector} canvas`);
       }
     });
   });
@@ -751,11 +736,11 @@ describe("Stamp Editor", () => {
   describe("Delete a stamp, scroll and undo it", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -763,14 +748,14 @@ describe("Stamp Editor", () => {
       // Run sequentially to avoid clipboard issues.
       for (const [, page] of pages) {
         await switchToStamp(page);
-        const selector = getEditorSelector(0);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(selector);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
-        await page.waitForSelector(`${selector} button.delete`);
-        await page.click(`${selector} button.delete`);
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
         await waitForSerialized(page, 0);
 
         const twoToOne = Array.from(new Array(13).keys(), n => n + 2).concat(
@@ -782,7 +767,7 @@ describe("Stamp Editor", () => {
         }
 
         await kbUndo(page);
-        await waitForImage(page, selector);
+        await waitForImage(page, editorSelector);
         await waitForSerialized(page, 1);
       }
     });
@@ -791,11 +776,11 @@ describe("Stamp Editor", () => {
   describe("Resize a stamp", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -804,8 +789,9 @@ describe("Stamp Editor", () => {
       for (const [, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(getEditorSelector(0));
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
         const serializedRect = await getFirstSerialized(page, x => x.rect);
@@ -825,11 +811,8 @@ describe("Stamp Editor", () => {
           (x, y) => x !== y
         );
 
-        const canvasRect = await getRect(
-          page,
-          `${getEditorSelector(0)} canvas`
-        );
-        const stampRect = await getRect(page, getEditorSelector(0));
+        const canvasRect = await getRect(page, `${editorSelector} canvas`);
+        const stampRect = await getRect(page, editorSelector);
 
         expect(
           ["x", "y", "width", "height"].every(
@@ -843,7 +826,7 @@ describe("Stamp Editor", () => {
   describe("Add a stamp in odd spread mode", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait(
         "empty.pdf",
         ".annotationEditorLayer",
@@ -855,7 +838,7 @@ describe("Stamp Editor", () => {
       );
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -864,15 +847,13 @@ describe("Stamp Editor", () => {
       for (const [, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(getEditorSelector(0));
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
-        const canvasRect = await getRect(
-          page,
-          `${getEditorSelector(0)} canvas`
-        );
-        const stampRect = await getRect(page, getEditorSelector(0));
+        const canvasRect = await getRect(page, `${editorSelector} canvas`);
+        const stampRect = await getRect(page, editorSelector);
 
         expect(
           ["x", "y", "width", "height"].every(
@@ -886,11 +867,11 @@ describe("Stamp Editor", () => {
   describe("Copy and paste a stamp with an alt text", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -899,8 +880,9 @@ describe("Stamp Editor", () => {
       for (const [browserName, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
-        await page.waitForSelector(getEditorSelector(0));
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
         await applyFunctionToEditor(page, "pdfjs_internal_editor_0", editor => {
           editor.altTextData = {
@@ -908,7 +890,7 @@ describe("Stamp Editor", () => {
             decorative: false,
           };
         });
-        await page.waitForSelector(`${getEditorSelector(0)} .altText.done`);
+        await page.waitForSelector(`${editorSelector} .altText.done`);
 
         await copy(page);
         await paste(page);
@@ -930,7 +912,7 @@ describe("Stamp Editor", () => {
   describe("New alt-text flow", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait(
         "empty.pdf",
         ".annotationEditorLayer",
@@ -954,23 +936,6 @@ describe("Stamp Editor", () => {
     });
 
     afterEach(async () => {
-      for (const [, page] of pages) {
-        if (await isVisible(page, "#newAltTextDialog")) {
-          await page.keyboard.press("Escape");
-          await page.waitForSelector("#newAltTextDisclaimer", {
-            visible: false,
-          });
-        }
-        await page.evaluate(() => {
-          window.uiManager.reset();
-          window.telemetry = [];
-        });
-        // Disable editing mode.
-        await switchToStamp(page, /* disable */ true);
-      }
-    });
-
-    afterAll(async () => {
       await closePages(pages);
     });
 
@@ -980,8 +945,8 @@ describe("Stamp Editor", () => {
         await switchToStamp(page);
 
         // Add an image.
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
@@ -1057,8 +1022,7 @@ describe("Stamp Editor", () => {
           .toEqual("Review alt text");
 
         // Unselect and select the editor and check that the badge is visible.
-        await page.keyboard.press("Escape");
-        await waitForUnselectedEditor(page, editorSelector);
+        await unselectEditor(page, editorSelector);
         await page.waitForSelector(".editToolbar", { visible: false });
         await page.waitForSelector(".noAltTextBadge", { visible: true });
 
@@ -1107,8 +1071,7 @@ describe("Stamp Editor", () => {
           .toEqual("Missing alt text");
 
         // Unselect and select the editor and check that the badge is visible.
-        await page.keyboard.press("Escape");
-        await waitForUnselectedEditor(page, editorSelector);
+        await unselectEditor(page, editorSelector);
         await page.waitForSelector(".editToolbar", { visible: false });
         await page.waitForSelector(".noAltTextBadge", { visible: true });
         await page.evaluate(() => {
@@ -1176,8 +1139,8 @@ describe("Stamp Editor", () => {
         await switchToStamp(page);
 
         // Add an image.
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
@@ -1217,8 +1180,8 @@ describe("Stamp Editor", () => {
         await switchToStamp(page);
 
         // Add an image.
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
@@ -1239,8 +1202,8 @@ describe("Stamp Editor", () => {
         await switchToStamp(page);
 
         // Add an image.
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
@@ -1310,7 +1273,7 @@ describe("Stamp Editor", () => {
   describe("New alt-text flow (bug 1920515)", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait(
         "empty.pdf",
         ".annotationEditorLayer",
@@ -1332,22 +1295,6 @@ describe("Stamp Editor", () => {
     });
 
     afterEach(async () => {
-      for (const [, page] of pages) {
-        if (await isVisible(page, "#newAltTextDialog")) {
-          await page.keyboard.press("Escape");
-          await page.waitForSelector("#newAltTextDisclaimer", {
-            visible: false,
-          });
-        }
-        await page.evaluate(() => {
-          window.uiManager.reset();
-        });
-        // Disable editing mode.
-        await switchToStamp(page, /* disable */ true);
-      }
-    });
-
-    afterAll(async () => {
       await closePages(pages);
     });
 
@@ -1357,8 +1304,8 @@ describe("Stamp Editor", () => {
         await switchToStamp(page);
 
         // Add an image.
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
 
@@ -1378,11 +1325,11 @@ describe("Stamp Editor", () => {
   describe("No auto-resize", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", 67);
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -1393,7 +1340,7 @@ describe("Stamp Editor", () => {
       for (const [, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
       }
@@ -1421,41 +1368,34 @@ describe("Stamp Editor", () => {
     });
   });
 
-  describe("A stamp musn't be on top of the secondary toolbar", () => {
+  describe("A stamp mustn't be on top of the secondary toolbar", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer", 600);
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
     it("must check that a stamp editor isn't on top of the secondary toolbar", async () => {
       // Run sequentially to avoid clipboard issues.
-      const editorSelector = getEditorSelector(0);
-
       for (const [, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/red.png", 0);
-
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/red.png", editorSelector);
         await page.waitForSelector(editorSelector);
         await waitForSerialized(page, 1);
       }
 
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          const debug = false;
-
           await page.click("#secondaryToolbarToggleButton");
           await page.waitForSelector("#secondaryToolbar", { visible: true });
           const secondary = await page.$("#secondaryToolbar");
-          const png = await secondary.screenshot({
-            type: "png",
-            path: debug ? `foo.png` : "",
-          });
+          const png = await secondary.screenshot({ type: "png" });
           const secondaryImage = PNG.sync.read(Buffer.from(png));
           const buffer = new Uint32Array(secondaryImage.data.buffer);
           expect(buffer.every(x => x === 0xff0000ff))
@@ -1469,11 +1409,11 @@ describe("Stamp Editor", () => {
   describe("Stamp (move existing)", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("stamps.pdf", getAnnotationSelector("25R"));
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -1494,11 +1434,8 @@ describe("Stamp Editor", () => {
           const serialized = await getSerialized(page);
           expect(serialized).withContext(`In ${browserName}`).toEqual([]);
 
-          const editorRect = await getRect(page, editorSelector);
-
           // Select the annotation we want to move.
-          await page.mouse.click(editorRect.x + 2, editorRect.y + 2);
-          await waitForSelectedEditor(page, editorSelector);
+          await selectEditor(page, editorSelector);
 
           await dragAndDrop(page, editorSelector, [[100, 100]]);
           await waitForSerialized(page, 1);
@@ -1510,11 +1447,11 @@ describe("Stamp Editor", () => {
   describe("Stamp (change alt-text)", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("stamps.pdf", getAnnotationSelector("58R"));
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -1524,12 +1461,13 @@ describe("Stamp Editor", () => {
           const modeChangedHandle = await waitForAnnotationModeChanged(page);
           await page.click(getAnnotationSelector("58R"), { count: 2 });
           await awaitPromise(modeChangedHandle);
-          await waitForSelectedEditor(page, getEditorSelector(4));
+          const editorSelector = getEditorSelector(4);
+          await waitForSelectedEditor(page, editorSelector);
 
           const editorIds = await getEditors(page, "stamp");
           expect(editorIds.length).withContext(`In ${browserName}`).toEqual(5);
 
-          await page.click(`${getEditorSelector(4)} button.altText`);
+          await page.click(`${editorSelector} button.altText`);
           await page.waitForSelector("#altTextDialog", { visible: true });
 
           const textareaSelector = "#altTextDialog textarea";
@@ -1569,11 +1507,11 @@ describe("Stamp Editor", () => {
   describe("Stamp (delete existing and undo)", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("stamps.pdf", getAnnotationSelector("37R"));
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
@@ -1594,8 +1532,8 @@ describe("Stamp Editor", () => {
           let serialized = await getSerialized(page);
           expect(serialized).withContext(`In ${browserName}`).toEqual([]);
 
-          await page.waitForSelector(`${editorSelector} button.delete`);
-          await page.click(`${editorSelector} button.delete`);
+          await page.waitForSelector(`${editorSelector} button.deleteButton`);
+          await page.click(`${editorSelector} button.deleteButton`);
 
           await waitForSerialized(page, 1);
           serialized = await getSerialized(page);
@@ -1617,26 +1555,21 @@ describe("Stamp Editor", () => {
   describe("Drag a stamp annotation and click on a touchscreen", () => {
     let pages;
 
-    beforeAll(async () => {
+    beforeEach(async () => {
       pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
     });
 
-    afterAll(async () => {
+    afterEach(async () => {
       await closePages(pages);
     });
 
     it("must check that the annotation isn't unselected when an other finger taps on the screen", async () => {
       // Run sequentially to avoid clipboard issues.
-      for (const [browserName, page] of pages) {
-        if (browserName === "chrome") {
-          // TODO: remove this check when puppeteer supports multiple touch
-          // events (it works in v23.9.1).
-          return;
-        }
+      for (const [, page] of pages) {
         await switchToStamp(page);
 
-        await copyImage(page, "../images/firefox_logo.png", 0);
         const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
         const stampRect = await getRect(page, editorSelector);
 
         await page.touchscreen.tap(stampRect.x + 10, stampRect.y + 10);
@@ -1654,7 +1587,6 @@ describe("Stamp Editor", () => {
 
   describe("Undo deletion popup has the expected behaviour", () => {
     let pages;
-    const editorSelector = getEditorSelector(0);
 
     beforeEach(async () => {
       pages = await loadAndWait("tracemonkey.pdf", ".annotationEditorLayer");
@@ -1665,82 +1597,229 @@ describe("Stamp Editor", () => {
     });
 
     it("must check that deleting an image can be undone using the undo button", async () => {
-      await Promise.all(
-        pages.map(async ([browserName, page]) => {
-          await switchToStamp(page);
-          const selector = editorSelector;
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
 
-          await copyImage(page, "../images/firefox_logo.png", 0);
-          await page.waitForSelector(selector);
-          await waitForSerialized(page, 1);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
+        await waitForSerialized(page, 1);
 
-          await page.waitForSelector(`${selector} button.delete`);
-          await page.click(`${selector} button.delete`);
-          await waitForSerialized(page, 0);
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
+        await waitForSerialized(page, 0);
+        await page.waitForSelector("#editorUndoBar", { visible: true });
 
-          await page.waitForSelector("#editorUndoBar:not([hidden])");
-
-          await page.click("#editorUndoBarUndoButton");
-          await waitForSerialized(page, 1);
-          await page.waitForSelector(editorSelector);
-          await page.waitForSelector(`${selector} canvas`);
-        })
-      );
+        await page.waitForSelector("#editorUndoBarUndoButton", {
+          visible: true,
+        });
+        await page.click("#editorUndoBarUndoButton");
+        await waitForSerialized(page, 1);
+        await page.waitForSelector(editorSelector);
+        await page.waitForSelector(`${editorSelector} canvas`);
+      }
     });
 
     it("must check that the undo deletion popup displays the correct message", async () => {
-      await Promise.all(
-        pages.map(async ([browserName, page]) => {
-          await switchToStamp(page);
-          const selector = editorSelector;
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
 
-          await copyImage(page, "../images/firefox_logo.png", 0);
-          await page.waitForSelector(selector);
-          await waitForSerialized(page, 1);
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
+        await waitForSerialized(page, 1);
 
-          await page.waitForSelector(`${selector} button.delete`);
-          await page.click(`${selector} button.delete`);
-          await waitForSerialized(page, 0);
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
+        await waitForSerialized(page, 0);
 
-          await page.waitForFunction(() => {
-            const messageElement = document.querySelector(
-              "#editorUndoBarMessage"
-            );
-            return messageElement && messageElement.textContent.trim() !== "";
-          });
-          const message = await page.waitForSelector("#editorUndoBarMessage");
-          const messageText = await page.evaluate(
-            el => el.textContent,
-            message
+        await page.waitForFunction(() => {
+          const messageElement = document.querySelector(
+            "#editorUndoBarMessage"
           );
-          expect(messageText).toContain("Image removed");
-        })
-      );
+          return messageElement && messageElement.textContent.trim() !== "";
+        });
+        const message = await page.waitForSelector("#editorUndoBarMessage");
+        const messageText = await page.evaluate(el => el.textContent, message);
+        expect(messageText).toContain("Image removed");
+      }
     });
 
     it("must check that the popup disappears when a new image is inserted", async () => {
+      // Run sequentially to avoid clipboard issues.
+      for (const [, page] of pages) {
+        await switchToStamp(page);
+
+        const editorSelector = getEditorSelector(0);
+        await copyImage(page, "../images/firefox_logo.png", editorSelector);
+        await page.waitForSelector(editorSelector);
+        await waitForSerialized(page, 1);
+
+        await page.waitForSelector(`${editorSelector} button.deleteButton`);
+        await page.click(`${editorSelector} button.deleteButton`);
+        await waitForSerialized(page, 0);
+
+        await page.waitForSelector("#editorUndoBar", { visible: true });
+        await page.click("#editorStampAddImage");
+        const newInput = await page.$("#stampEditorFileInput");
+        await newInput.uploadFile(
+          `${path.join(__dirname, "../images/firefox_logo.png")}`
+        );
+        await waitForImage(page, getEditorSelector(1));
+        await waitForSerialized(page, 1);
+        await page.waitForSelector("#editorUndoBar", { hidden: true });
+      }
+    });
+  });
+
+  describe("Switch to edit mode a pdf with an existing stamp annotation on an invisible and rendered page", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait("issue19239.pdf", ".annotationEditorLayer");
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must move on the second page", async () => {
       await Promise.all(
-        pages.map(async ([browserName, page]) => {
+        pages.map(async ([, page]) => {
+          const pageOneSelector = `.page[data-page-number = "1"]`;
+          const pageTwoSelector = `.page[data-page-number = "2"]`;
+          await scrollIntoView(page, pageTwoSelector);
+          await page.waitForSelector(pageOneSelector, { visible: false });
+
           await switchToStamp(page);
-          const selector = editorSelector;
-
-          await copyImage(page, "../images/firefox_logo.png", 0);
-          await page.waitForSelector(selector);
-          await waitForSerialized(page, 1);
-
-          await page.waitForSelector(`${editorSelector} button.delete`);
-          await page.click(`${editorSelector} button.delete`);
-          await waitForSerialized(page, 0);
-
-          await page.waitForSelector("#editorUndoBar:not([hidden])");
-          await page.click("#editorStampAddImage");
-          const newInput = await page.$("#stampEditorFileInput");
-          await newInput.uploadFile(
-            `${path.join(__dirname, "../images/firefox_logo.png")}`
+          await scrollIntoView(page, pageOneSelector);
+          await page.waitForSelector(
+            `${pageOneSelector} .annotationEditorLayer canvas`,
+            { visible: true }
           );
-          await waitForImage(page, getEditorSelector(1));
-          await waitForSerialized(page, 1);
-          await page.waitForSelector("#editorUndoBar", { hidden: true });
+        })
+      );
+    });
+  });
+
+  describe("Switch to edit mode a pdf with an existing stamp annotation on an invisible and unrendered page", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait("issue19239.pdf", ".annotationEditorLayer");
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must move on the last page", async () => {
+      await Promise.all(
+        pages.map(async ([, page]) => {
+          const twoToFourteen = Array.from(new Array(13).keys(), n => n + 2);
+          for (const pageNumber of twoToFourteen) {
+            const pageSelector = `.page[data-page-number = "${pageNumber}"]`;
+            await scrollIntoView(page, pageSelector);
+          }
+
+          await switchToStamp(page);
+
+          const thirteenToOne = Array.from(new Array(13).keys(), n => 13 - n);
+          for (const pageNumber of thirteenToOne) {
+            const pageSelector = `.page[data-page-number = "${pageNumber}"]`;
+            await scrollIntoView(page, pageSelector);
+          }
+
+          await page.waitForSelector(
+            `.page[data-page-number = "1"] .annotationEditorLayer canvas`,
+            { visible: true }
+          );
+        })
+      );
+    });
+  });
+
+  describe("Switch to edit mode by double clicking on an existing stamp annotation", () => {
+    const annotationSelector = getAnnotationSelector("999R");
+
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait("issue19239.pdf", annotationSelector);
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must switch to edit mode", async () => {
+      await Promise.all(
+        pages.map(async ([, page]) => {
+          await page.waitForSelector(annotationSelector);
+          await scrollIntoView(page, annotationSelector);
+
+          await page.click(annotationSelector, { count: 2 });
+
+          await page.waitForFunction(() =>
+            document
+              .querySelector(".annotationEditorLayer")
+              .classList.contains("stampEditing")
+          );
+        })
+      );
+    });
+  });
+
+  describe("Switch to edit mode, zoom and check that the non-editable stamp is still there", () => {
+    const annotationSelector = getAnnotationSelector("14R");
+
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait("red_stamp.pdf", annotationSelector, 20);
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must check if the canvas is still red", async () => {
+      await Promise.all(
+        pages.map(async ([, page]) => {
+          expect(
+            await isCanvasMonochrome(page, 1, null, 0xff0000ff)
+          ).toBeTrue();
+
+          await switchToStamp(page);
+
+          expect(
+            await isCanvasMonochrome(page, 1, null, 0xff0000ff)
+          ).toBeTrue();
+
+          const rectPage = await getRect(
+            page,
+            `.page[data-page-number = "1"] .annotationEditorLayer`
+          );
+
+          const handle = await waitForPageRendered(page, 1);
+          const originX = rectPage.x + rectPage.width / 2;
+          const originY = rectPage.y + rectPage.height / 2;
+          await page.evaluate(
+            origin => {
+              window.PDFViewerApplication.pdfViewer.increaseScale({
+                scaleFactor: 2,
+                origin,
+              });
+            },
+            [originX, originY]
+          );
+          await awaitPromise(handle);
+
+          expect(
+            await isCanvasMonochrome(page, 1, null, 0xff0000ff)
+          ).toBeTrue();
         })
       );
     });

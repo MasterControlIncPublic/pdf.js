@@ -22,9 +22,15 @@ import {
   ColorManager,
   KeyboardManager,
 } from "./tools.js";
-import { FeatureTest, shadow, unreachable } from "../../shared/util.js";
+import {
+  FeatureTest,
+  MathClamp,
+  shadow,
+  unreachable,
+} from "../../shared/util.js";
 import { noContextMenu, stopEvent } from "../display_utils.js";
 import { AltText } from "./alt_text.js";
+import { Comment } from "./comment.js";
 import { EditorToolbar } from "./toolbar.js";
 import { TouchManager } from "../touch_manager.js";
 
@@ -46,6 +52,8 @@ class AnnotationEditor {
   #allResizerDivs = null;
 
   #altText = null;
+
+  #comment = null;
 
   #disabled = false;
 
@@ -84,6 +92,10 @@ class AnnotationEditor {
   #telemetryTimeouts = null;
 
   #touchManager = null;
+
+  isSelected = false;
+
+  _isCopy = false;
 
   _editToolbar = null;
 
@@ -171,6 +183,7 @@ class AnnotationEditor {
     this._willKeepAspectRatio = false;
     this._initialOptions.isCentered = parameters.isCentered;
     this._structTreeParentId = null;
+    this.annotationElementId = parameters.annotationElementId || null;
 
     const {
       rotation,
@@ -193,6 +206,10 @@ class AnnotationEditor {
 
   get editorType() {
     return Object.getPrototypeOf(this).constructor._type;
+  }
+
+  get mode() {
+    return Object.getPrototypeOf(this).constructor._editorType;
   }
 
   static get isDrawer() {
@@ -418,6 +435,9 @@ class AnnotationEditor {
    * Commit the data contained in this editor.
    */
   commit() {
+    if (!this.isInEditMode()) {
+      return;
+    }
     this.addToAnnotationStorage();
   }
 
@@ -440,6 +460,17 @@ class AnnotationEditor {
     this.y = (y + ty) / height;
 
     this.fixAndSetPosition();
+  }
+
+  _moveAfterPaste(baseX, baseY) {
+    const [parentWidth, parentHeight] = this.parentDimensions;
+    this.setAt(
+      baseX * parentWidth,
+      baseY * parentHeight,
+      this.width * parentWidth,
+      this.height * parentHeight
+    );
+    this._onTranslated();
   }
 
   #translate([width, height], x, y) {
@@ -474,6 +505,10 @@ class AnnotationEditor {
     this.#initialRect ||= [this.x, this.y, this.width, this.height];
     this.#translate(this.pageDimensions, x, y);
     this.div.scrollIntoView({ block: "nearest" });
+  }
+
+  translationDone() {
+    this._onTranslated(this.x, this.y);
   }
 
   drag(tx, ty) {
@@ -596,20 +631,20 @@ class AnnotationEditor {
     if (this._mustFixPosition) {
       switch (rotation) {
         case 0:
-          x = Math.max(0, Math.min(pageWidth - width, x));
-          y = Math.max(0, Math.min(pageHeight - height, y));
+          x = MathClamp(x, 0, pageWidth - width);
+          y = MathClamp(y, 0, pageHeight - height);
           break;
         case 90:
-          x = Math.max(0, Math.min(pageWidth - height, x));
-          y = Math.min(pageHeight, Math.max(width, y));
+          x = MathClamp(x, 0, pageWidth - height);
+          y = MathClamp(y, width, pageHeight);
           break;
         case 180:
-          x = Math.min(pageWidth, Math.max(width, x));
-          y = Math.min(pageHeight, Math.max(height, y));
+          x = MathClamp(x, width, pageWidth);
+          y = MathClamp(y, height, pageHeight);
           break;
         case 270:
-          x = Math.min(pageWidth, Math.max(height, x));
-          y = Math.max(0, Math.min(pageHeight - width, y));
+          x = MathClamp(x, height, pageWidth);
+          y = MathClamp(y, 0, pageHeight - width);
           break;
       }
     }
@@ -984,15 +1019,14 @@ class AnnotationEditor {
       );
     } else if (isHorizontal) {
       ratioX =
-        Math.max(
-          minWidth,
-          Math.min(1, Math.abs(oppositePoint[0] - point[0] - deltaX))
-        ) / savedWidth;
+        MathClamp(Math.abs(oppositePoint[0] - point[0] - deltaX), minWidth, 1) /
+        savedWidth;
     } else {
       ratioY =
-        Math.max(
+        MathClamp(
+          Math.abs(oppositePoint[1] - point[1] - deltaY),
           minHeight,
-          Math.min(1, Math.abs(oppositePoint[1] - point[1] - deltaY))
+          1
         ) / savedHeight;
     }
 
@@ -1027,6 +1061,14 @@ class AnnotationEditor {
   }
 
   /**
+   * Get the toolbar buttons for this editor.
+   * @returns {Array<Array<string|object|null>>|null}
+   */
+  get toolbarButtons() {
+    return null;
+  }
+
+  /**
    * Add a toolbar for this editor.
    * @returns {Promise<EditorToolbar|null>}
    */
@@ -1036,9 +1078,14 @@ class AnnotationEditor {
     }
     this._editToolbar = new EditorToolbar(this);
     this.div.append(this._editToolbar.render());
-    if (this.#altText) {
-      await this._editToolbar.addAltText(this.#altText);
+    const { toolbarButtons } = this;
+    if (toolbarButtons) {
+      for (const [name, tool] of toolbarButtons) {
+        await this._editToolbar.addButton(name, tool);
+      }
     }
+    this._editToolbar.addButton("comment", this.addCommentButton());
+    this._editToolbar.addButton("delete");
 
     return this._editToolbar;
   }
@@ -1068,17 +1115,20 @@ class AnnotationEditor {
     return this.div.getBoundingClientRect();
   }
 
-  async addAltTextButton() {
-    if (this.#altText) {
-      return;
+  /**
+   * Create the alt text for this editor.
+   * @returns {object}
+   */
+  createAltText() {
+    if (!this.#altText) {
+      AltText.initialize(AnnotationEditor._l10n);
+      this.#altText = new AltText(this);
+      if (this.#accessibilityData) {
+        this.#altText.data = this.#accessibilityData;
+        this.#accessibilityData = null;
+      }
     }
-    AltText.initialize(AnnotationEditor._l10n);
-    this.#altText = new AltText(this);
-    if (this.#accessibilityData) {
-      this.#altText.data = this.#accessibilityData;
-      this.#accessibilityData = null;
-    }
-    await this.addEditToolbar();
+    return this.#altText;
   }
 
   get altTextData() {
@@ -1115,18 +1165,86 @@ class AnnotationEditor {
     return this.#altText?.hasData() ?? false;
   }
 
+  addCommentButton() {
+    if (this.#comment) {
+      return this.#comment;
+    }
+    return (this.#comment = new Comment(this));
+  }
+
+  get commentColor() {
+    return null;
+  }
+
+  get comment() {
+    const comment = this.#comment;
+    return {
+      text: comment.data.text,
+      date: comment.data.date,
+      deleted: comment.isDeleted(),
+      color: this.commentColor,
+    };
+  }
+
+  set comment(text) {
+    if (!this.#comment) {
+      this.#comment = new Comment(this);
+    }
+    this.#comment.data = text;
+  }
+
+  setCommentData(text) {
+    if (!this.#comment) {
+      this.#comment = new Comment(this);
+    }
+    this.#comment.setInitialText(text);
+  }
+
+  get hasEditedComment() {
+    return this.#comment?.hasBeenEdited();
+  }
+
+  async editComment() {
+    if (!this.#comment) {
+      this.#comment = new Comment(this);
+    }
+    this.#comment.edit();
+  }
+
+  addComment(serialized) {
+    if (this.hasEditedComment) {
+      const DEFAULT_POPUP_WIDTH = 180;
+      const DEFAULT_POPUP_HEIGHT = 100;
+      const [, , , trY] = serialized.rect;
+      const [pageWidth] = this.pageDimensions;
+      const [pageX] = this.pageTranslation;
+      const blX = pageX + pageWidth + 1;
+      const blY = trY - DEFAULT_POPUP_HEIGHT;
+      const trX = blX + DEFAULT_POPUP_WIDTH;
+      serialized.popup = {
+        contents: this.comment.text,
+        deleted: this.comment.deleted,
+        rect: [blX, blY, trX, trY],
+      };
+    }
+  }
+
   /**
    * Render this editor in a div.
    * @returns {HTMLDivElement | null}
    */
   render() {
-    this.div = document.createElement("div");
-    this.div.setAttribute("data-editor-rotation", (360 - this.rotation) % 360);
-    this.div.className = this.name;
-    this.div.setAttribute("id", this.id);
-    this.div.tabIndex = this.#disabled ? -1 : 0;
+    const div = (this.div = document.createElement("div"));
+    div.setAttribute("data-editor-rotation", (360 - this.rotation) % 360);
+    div.className = this.name;
+    div.setAttribute("id", this.id);
+    div.tabIndex = this.#disabled ? -1 : 0;
+    div.setAttribute("role", "application");
+    if (this.defaultL10nId) {
+      div.setAttribute("data-l10n-id", this.defaultL10nId);
+    }
     if (!this._isVisible) {
-      this.div.classList.add("hidden");
+      div.classList.add("hidden");
     }
 
     this.setInForeground();
@@ -1134,23 +1252,22 @@ class AnnotationEditor {
 
     const [parentWidth, parentHeight] = this.parentDimensions;
     if (this.parentRotation % 180 !== 0) {
-      this.div.style.maxWidth = `${((100 * parentHeight) / parentWidth).toFixed(
+      div.style.maxWidth = `${((100 * parentHeight) / parentWidth).toFixed(
         2
       )}%`;
-      this.div.style.maxHeight = `${(
-        (100 * parentWidth) /
-        parentHeight
-      ).toFixed(2)}%`;
+      div.style.maxHeight = `${((100 * parentWidth) / parentHeight).toFixed(
+        2
+      )}%`;
     }
 
     const [tx, ty] = this.getInitialTranslation();
     this.translate(tx, ty);
 
-    bindEvents(this, this.div, ["pointerdown"]);
+    bindEvents(this, div, ["keydown", "pointerdown", "dblclick"]);
 
     if (this.isResizable && this._uiManager._supportsPinchToZoom) {
       this.#touchManager ||= new TouchManager({
-        container: this.div,
+        container: div,
         isPinchingDisabled: () => !this.isSelected,
         onPinchStart: this.#touchPinchStartCallback.bind(this),
         onPinching: this.#touchPinchCallback.bind(this),
@@ -1161,7 +1278,7 @@ class AnnotationEditor {
 
     this._uiManager._editorUndoBar?.hide();
 
-    return this.div;
+    return div;
   }
 
   #touchPinchStartCallback() {
@@ -1253,10 +1370,6 @@ class AnnotationEditor {
     }
 
     this.#selectOnPointerEvent(event);
-  }
-
-  get isSelected() {
-    return this._uiManager.isSelected(this);
   }
 
   #selectOnPointerEvent(event) {
@@ -1460,6 +1573,15 @@ class AnnotationEditor {
   }
 
   /**
+   * Get the rect in page coordinates without any translation.
+   * It's used when serializing the editor.
+   * @returns {Array<number>}
+   */
+  getPDFRect() {
+    return this.getRect(0, 0);
+  }
+
+  /**
    * Executed once this editor has been rendered.
    * @param {boolean} focus - true if the editor should be focused.
    */
@@ -1475,16 +1597,30 @@ class AnnotationEditor {
 
   /**
    * Enable edit mode.
+   * @returns {boolean} - true if the edit mode has been enabled.
    */
   enableEditMode() {
+    if (this.isInEditMode()) {
+      return false;
+    }
+    this.parent.setEditingState(false);
     this.#isInEditMode = true;
+
+    return true;
   }
 
   /**
    * Disable edit mode.
+   * @returns {boolean} - true if the edit mode has been disabled.
    */
   disableEditMode() {
+    if (!this.isInEditMode()) {
+      return false;
+    }
+    this.parent.setEditingState(true);
     this.#isInEditMode = false;
+
+    return true;
   }
 
   /**
@@ -1590,9 +1726,11 @@ class AnnotationEditor {
       parent,
       id: parent.getNextId(),
       uiManager,
+      annotationElementId: data.annotationElementId,
     });
     editor.rotation = data.rotation;
     editor.#accessibilityData = data.accessibilityData;
+    editor._isCopy = data.isCopy || false;
 
     const [pageWidth, pageHeight] = editor.pageDimensions;
     const [x, y, width, height] = editor.getRectInCurrentCoords(
@@ -1669,7 +1807,6 @@ class AnnotationEditor {
     if (this.isResizable) {
       this.#createResizers();
       this.#resizersDiv.classList.remove("hidden");
-      bindEvents(this, this.div, ["keydown"]);
     }
   }
 
@@ -1808,6 +1945,10 @@ class AnnotationEditor {
    * Select this editor.
    */
   select() {
+    if (this.isSelected && this._editToolbar) {
+      return;
+    }
+    this.isSelected = true;
     this.makeResizable();
     this.div?.classList.add("selectedEditor");
     if (!this._editToolbar) {
@@ -1829,6 +1970,10 @@ class AnnotationEditor {
    * Unselect this editor.
    */
   unselect() {
+    if (!this.isSelected) {
+      return;
+    }
+    this.isSelected = false;
     this.#resizersDiv?.classList.add("hidden");
     this.div?.classList.remove("selectedEditor");
     if (this.div?.contains(document.activeElement)) {
@@ -1862,15 +2007,43 @@ class AnnotationEditor {
   enableEditing() {}
 
   /**
+   * Check if the content of this editor can be changed.
+   * For example, a FreeText editor can be changed (the user can change the
+   * text), but a Stamp editor cannot.
+   * @returns {boolean}
+   */
+  get canChangeContent() {
+    return false;
+  }
+
+  /**
    * The editor is about to be edited.
    */
-  enterInEditMode() {}
+  enterInEditMode() {
+    if (!this.canChangeContent) {
+      return;
+    }
+    this.enableEditMode();
+    this.div.focus();
+  }
+
+  /**
+   * ondblclick callback.
+   * @param {MouseEvent} event
+   */
+  dblclick(event) {
+    this.enterInEditMode();
+    this.parent.updateToolbar({
+      mode: this.constructor._editorType,
+      editId: this.id,
+    });
+  }
 
   /**
    * @returns {HTMLElement | null} the element requiring an alt text.
    */
-  getImageForAltText() {
-    return null;
+  getElementForAltText() {
+    return this.div;
   }
 
   /**
@@ -2000,6 +2173,10 @@ class AnnotationEditor {
    * @returns {HTMLElement|null}
    */
   renderAnnotationElement(annotation) {
+    if (this.deleted) {
+      annotation.hide();
+      return null;
+    }
     let content = annotation.container.querySelector(".annotationContent");
     if (!content) {
       content = document.createElement("div");

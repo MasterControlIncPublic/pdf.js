@@ -30,7 +30,9 @@ class DrawingOptions {
       return;
     }
     for (const [name, value] of Object.entries(properties)) {
-      this.updateProperty(name, value);
+      if (!name.startsWith("_")) {
+        this.updateProperty(name, value);
+      }
     }
   }
 
@@ -65,6 +67,8 @@ class DrawingEditor extends AnnotationEditor {
 
   #mustBeCommitted;
 
+  _colorPicker = null;
+
   _drawId = null;
 
   static _currentDrawId = -1;
@@ -91,6 +95,10 @@ class DrawingEditor extends AnnotationEditor {
     super(params);
     this.#mustBeCommitted = params.mustBeCommitted || false;
 
+    this._addOutlines(params);
+  }
+
+  _addOutlines(params) {
     if (params.drawOutlines) {
       this.#createDrawOutlines(params);
       this.#addToDrawLayer();
@@ -100,6 +108,9 @@ class DrawingEditor extends AnnotationEditor {
   #createDrawOutlines({ drawOutlines, drawId, drawingOptions }) {
     this.#drawOutlines = drawOutlines;
     this._drawingOptions ||= drawingOptions;
+    if (!this.annotationElementId) {
+      this._uiManager.a11yAlert(`pdfjs-editor-${this.editorType}-added-alert`);
+    }
 
     if (drawId >= 0) {
       this._drawId = drawId;
@@ -231,6 +242,9 @@ class DrawingEditor extends AnnotationEditor {
         this._drawId,
         options.toSVGProperties()
       );
+      if (type === this.colorType) {
+        this._colorPicker?.update(val);
+      }
     };
     this.addCommands({
       cmd: setter.bind(this, value),
@@ -274,9 +288,9 @@ class DrawingEditor extends AnnotationEditor {
   }
 
   /** @inheritdoc */
-  _onTranslating(x, y) {
+  _onTranslating(_x, _y) {
     this.parent?.drawLayer.updateProperties(this._drawId, {
-      bbox: this.#rotateBox(x, y),
+      bbox: this.#rotateBox(),
     });
   }
 
@@ -622,6 +636,12 @@ class DrawingEditor extends AnnotationEditor {
       return this.div;
     }
 
+    let baseX, baseY;
+    if (this._isCopy) {
+      baseX = this.x;
+      baseY = this.y;
+    }
+
     const div = super.render();
     div.classList.add("draw");
 
@@ -633,6 +653,10 @@ class DrawingEditor extends AnnotationEditor {
     this.setDims(this.width * parentWidth, this.height * parentHeight);
     this._uiManager.addShouldRescale(this);
     this.disableEditing();
+
+    if (this._isCopy) {
+      this._moveAfterPaste(baseX, baseY);
+    }
 
     return div;
   }
@@ -834,7 +858,7 @@ class DrawingEditor extends AnnotationEditor {
     parent.toggleDrawing(true);
     this._cleanup(false);
 
-    if (event) {
+    if (event?.target === parent.div) {
       parent.drawLayer.updateProperties(
         this._currentDrawId,
         DrawingEditor.#currentDraw.end(event.offsetX, event.offsetY)
@@ -964,7 +988,7 @@ class DrawingEditor extends AnnotationEditor {
   /** @inheritdoc */
   renderAnnotationElement(annotation) {
     annotation.updateEdited({
-      rect: this.getRect(0, 0),
+      rect: this.getPDFRect(),
     });
 
     return null;

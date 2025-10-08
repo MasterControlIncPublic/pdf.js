@@ -681,11 +681,15 @@ class XRef {
     // When no trailer dictionary candidate exists, try picking the first
     // dictionary that contains a /Root entry (fixes issue18986.pdf).
     if (!trailerDicts.length) {
-      for (const [num, entry] of this.entries.entries()) {
-        if (!entry) {
+      // In case, this.entries is a sparse array we don't want to
+      // iterate over empty entries so we use the `in` operator instead of
+      // using for..of on entries() or a for with the array length.
+      for (const num in this.entries) {
+        if (!Object.hasOwn(this.entries, num)) {
           continue;
         }
-        const ref = Ref.get(num, entry.gen);
+        const entry = this.entries[num];
+        const ref = Ref.get(parseInt(num), entry.gen);
         let obj;
 
         try {
@@ -693,6 +697,7 @@ class XRef {
         } catch {
           continue;
         }
+
         if (obj instanceof BaseStream) {
           obj = obj.dict;
         }
@@ -842,7 +847,6 @@ class XRef {
 
     if (xrefEntry === null) {
       // The referenced entry can be free.
-      this._cacheMap.set(num, xrefEntry);
       return xrefEntry;
     }
     // Prevent circular references, in corrupt PDF documents, from hanging the
@@ -962,6 +966,15 @@ class XRef {
         );
       }
       nums[i] = num;
+
+      // The entry in the xref table is the object number followed by the index.
+      // So if index (gen number) is not the same as the index (i), we fix it
+      // (fixes bug 1978317).
+      const entry = this.getEntry(num);
+      if (entry?.offset === tableOffset && entry.gen !== i) {
+        entry.gen = i;
+      }
+
       offsets[i] = offset;
     }
 

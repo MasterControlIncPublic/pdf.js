@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+import { MathClamp } from "pdfjs-lib";
+
 const DEFAULT_SCALE_VALUE = "auto";
 const DEFAULT_SCALE = 1.0;
 const DEFAULT_SCALE_DELTA = 1.1;
@@ -118,7 +120,17 @@ function scrollIntoView(element, spot, scrollMatches = false) {
       offsetY += spot.top;
     }
     if (spot.left !== undefined) {
-      offsetX += spot.left;
+      if (scrollMatches) {
+        const elementWidth = element.getBoundingClientRect().width;
+        const padding = MathClamp(
+          (parent.clientWidth - elementWidth) / 2,
+          20,
+          400
+        );
+        offsetX += spot.left - padding;
+      } else {
+        offsetX += spot.left;
+      }
       parent.scrollLeft = offsetX;
     }
   }
@@ -554,10 +566,11 @@ function getVisibleElements({
       continue;
     }
 
-    const hiddenHeight =
-      Math.max(0, top - currentHeight) + Math.max(0, viewBottom - bottom);
-    const hiddenWidth =
-      Math.max(0, left - currentWidth) + Math.max(0, viewRight - right);
+    const minY = Math.max(0, top - currentHeight);
+    const minX = Math.max(0, left - currentWidth);
+
+    const hiddenHeight = minY + Math.max(0, viewBottom - bottom);
+    const hiddenWidth = minX + Math.max(0, viewRight - right);
 
     const fractionHeight = (viewHeight - hiddenHeight) / viewHeight,
       fractionWidth = (viewWidth - hiddenWidth) / viewWidth;
@@ -567,6 +580,18 @@ function getVisibleElements({
       id: view.id,
       x: currentWidth,
       y: currentHeight,
+      visibleArea:
+        // We only specify which part of the page is visible when it's not
+        // the full page, as there is no point in handling a partial page
+        // rendering otherwise.
+        percent === 100
+          ? null
+          : {
+              minX,
+              minY,
+              maxX: Math.min(viewRight, right) - currentWidth,
+              maxY: Math.min(viewBottom, bottom) - currentHeight,
+            },
       view,
       percent,
       widthPercent: (fractionWidth * 100) | 0,
@@ -663,10 +688,6 @@ const docStyle =
     ? null
     : document.documentElement.style;
 
-function clamp(v, min, max) {
-  return Math.min(Math.max(v, min), max);
-}
-
 class ProgressBar {
   #classList = null;
 
@@ -688,7 +709,7 @@ class ProgressBar {
   }
 
   set percent(val) {
-    this.#percent = clamp(val, 0, 100);
+    this.#percent = MathClamp(val, 0, 100);
 
     if (isNaN(val)) {
       this.#classList.add("indeterminate");

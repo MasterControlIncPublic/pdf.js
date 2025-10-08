@@ -22,7 +22,6 @@ import artifactoryUpload from "gulp-artifactory-upload";
 import autoprefixer from "autoprefixer";
 import babel from "@babel/core";
 import crypto from "crypto";
-import { fileURLToPath } from "url";
 import fs from "fs";
 import gulp from "gulp";
 import hljs from "highlight.js";
@@ -32,9 +31,9 @@ import Metalsmith from "metalsmith";
 import ordered from "ordered-read-streams";
 import path from "path";
 import postcss from "gulp-postcss";
-import postcssDarkThemeClass from "postcss-dark-theme-class";
 import postcssDirPseudoClass from "postcss-dir-pseudo-class";
 import postcssDiscardComments from "postcss-discard-comments";
+import postcssLightDarkFunction from "@csstools/postcss-light-dark-function";
 import postcssNesting from "postcss-nesting";
 import { preprocess } from "./external/builder/builder.mjs";
 import relative from "metalsmith-html-relative";
@@ -47,7 +46,7 @@ import webpack2 from "webpack";
 import webpackStream from "webpack-stream";
 import zip from "gulp-zip";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = import.meta.dirname;
 
 const BUILD_DIR = "build/";
 const L10N_DIR = "l10n/";
@@ -88,7 +87,7 @@ const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
 
 const ENV_TARGETS = [
   "last 2 versions",
-  "Chrome >= 103",
+  "Chrome >= 110",
   "Firefox ESR",
   "Safari >= 16.4",
   "Node >= 20",
@@ -105,7 +104,7 @@ const AUTOPREFIXER_CONFIG = {
 const BABEL_TARGETS = ENV_TARGETS.join(", ");
 
 const BABEL_PRESET_ENV_OPTS = Object.freeze({
-  corejs: "3.39.0",
+  corejs: "3.45.0",
   exclude: ["web.structured-clone"],
   shippedProposals: true,
   useBuiltIns: "usage",
@@ -200,6 +199,7 @@ function createWebpackAlias(defines) {
   const libraryAlias = {
     "display-cmap_reader_factory": "src/display/stubs.js",
     "display-standard_fontdata_factory": "src/display/stubs.js",
+    "display-wasm_factory": "src/display/stubs.js",
     "display-fetch_stream": "src/display/stubs.js",
     "display-network": "src/display/stubs.js",
     "display-node_stream": "src/display/stubs.js",
@@ -224,6 +224,7 @@ function createWebpackAlias(defines) {
     "web-preferences": "",
     "web-print_service": "",
     "web-secondary_toolbar": "web/secondary_toolbar.js",
+    "web-signature_manager": "web/signature_manager.js",
     "web-toolbar": "web/toolbar.js",
   };
 
@@ -232,6 +233,7 @@ function createWebpackAlias(defines) {
       "src/display/cmap_reader_factory.js";
     libraryAlias["display-standard_fontdata_factory"] =
       "src/display/standard_fontdata_factory.js";
+    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
 
@@ -248,6 +250,7 @@ function createWebpackAlias(defines) {
       "src/display/cmap_reader_factory.js";
     libraryAlias["display-standard_fontdata_factory"] =
       "src/display/standard_fontdata_factory.js";
+    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
     libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
     libraryAlias["display-network"] = "src/display/network.js";
     libraryAlias["display-node_stream"] = "src/display/node_stream.js";
@@ -307,6 +310,12 @@ function createWebpackConfig(
   const licenseHeaderLibre = fs
     .readFileSync("./src/license_header_libre.js")
     .toString();
+  const versionInfoHeader = [
+    "/**",
+    ` * pdfjsVersion = ${versionInfo.version}`,
+    ` * pdfjsBuild = ${versionInfo.commit}`,
+    " */",
+  ].join("\n");
   const enableSourceMaps =
     !bundleDefines.MOZCENTRAL &&
     !bundleDefines.CHROME &&
@@ -340,9 +349,39 @@ function createWebpackConfig(
   const plugins = [];
   if (!disableLicenseHeader) {
     plugins.push(
-      new webpack2.BannerPlugin({ banner: licenseHeaderLibre, raw: true })
+      new webpack2.BannerPlugin({
+        banner: licenseHeaderLibre + "\n" + versionInfoHeader,
+        raw: true,
+      })
     );
   }
+  plugins.push({
+    /** @param {import('webpack').Compiler} compiler */
+    apply(compiler) {
+      const errors = [];
+
+      compiler.hooks.afterCompile.tap("VerifyImportMeta", compilation => {
+        for (const asset of compilation.getAssets()) {
+          if (asset.name.endsWith(".mjs")) {
+            const source = asset.source.source();
+            if (
+              typeof source === "string" &&
+              /new URL\([^,)]*,\s*import\.meta\.url/.test(source)
+            ) {
+              errors.push(
+                `Output module ${asset.name} uses new URL(..., import.meta.url)`
+              );
+            }
+          }
+        }
+      });
+      compiler.hooks.afterEmit.tap("VerifyImportMeta", compilation => {
+        // Emit the errors after emitting the files, so that it's possible to
+        // look at the contents of the invalid bundle.
+        compilation.errors.push(...errors);
+      });
+    },
+  });
 
   const alias = createWebpackAlias(bundleDefines);
   const experiments = isModule ? { outputModule: true } : undefined;
@@ -366,9 +405,8 @@ function createWebpackConfig(
                   // V8 chokes on very long sequences, work around that.
                   sequences: false,
                 },
-                mangle: {
-                  // Ensure that the `tweakWebpackOutput` function works.
-                  reserved: ["__webpack_exports__"],
+                format: {
+                  comments: /@lic|webpackIgnore|@vite-ignore|pdfjsVersion/i,
                 },
                 keep_classnames: true,
                 keep_fnames: true,
@@ -391,6 +429,7 @@ function createWebpackConfig(
       parser: {
         javascript: {
           importMeta: false,
+          url: false,
         },
       },
       rules: [
@@ -500,13 +539,6 @@ function checkChromePreferencesFile(chromePrefsPath, webPrefs) {
   return ret;
 }
 
-function tweakWebpackOutput(jsName) {
-  return replace(
-    /((?:\s|,)__webpack_exports__)(?:\s?)=(?:\s?)({};)/gm,
-    (match, p1, p2) => `${p1} = globalThis.${jsName} = ${p2}`
-  );
-}
-
 function createMainBundle(defines) {
   const mainFileConfig = createWebpackConfig(defines, {
     filename: defines.MINIFIED ? "pdf.min.mjs" : "pdf.mjs",
@@ -516,8 +548,7 @@ function createMainBundle(defines) {
   });
   return gulp
     .src("./src/pdf.js", { encoding: false })
-    .pipe(webpack2Stream(mainFileConfig))
-    .pipe(tweakWebpackOutput("pdfjsLib"));
+    .pipe(webpack2Stream(mainFileConfig));
 }
 
 function createScriptingBundle(defines, extraOptions = undefined) {
@@ -585,8 +616,7 @@ function createSandboxBundle(defines, extraOptions = undefined) {
 
   return gulp
     .src("./src/pdf.sandbox.js", { encoding: false })
-    .pipe(webpack2Stream(sandboxFileConfig))
-    .pipe(tweakWebpackOutput("pdfjsSandbox"));
+    .pipe(webpack2Stream(sandboxFileConfig));
 }
 
 function createWorkerBundle(defines) {
@@ -598,8 +628,7 @@ function createWorkerBundle(defines) {
   });
   return gulp
     .src("./src/pdf.worker.js", { encoding: false })
-    .pipe(webpack2Stream(workerFileConfig))
-    .pipe(tweakWebpackOutput("pdfjsWorker"));
+    .pipe(webpack2Stream(workerFileConfig));
 }
 
 function createWebBundle(defines, options) {
@@ -647,8 +676,7 @@ function createComponentsBundle(defines) {
   });
   return gulp
     .src("./web/pdf_viewer.component.js", { encoding: false })
-    .pipe(webpack2Stream(componentsFileConfig))
-    .pipe(tweakWebpackOutput("pdfjsViewer"));
+    .pipe(webpack2Stream(componentsFileConfig));
 }
 
 function createImageDecodersBundle(defines) {
@@ -662,8 +690,7 @@ function createImageDecodersBundle(defines) {
   });
   return gulp
     .src("./src/pdf.image_decoders.js", { encoding: false })
-    .pipe(webpack2Stream(componentsFileConfig))
-    .pipe(tweakWebpackOutput("pdfjsImageDecoders"));
+    .pipe(webpack2Stream(componentsFileConfig));
 }
 
 function createCMapBundle() {
@@ -673,19 +700,45 @@ function createCMapBundle() {
   });
 }
 
+function createICCBundle() {
+  return gulp.src(["external/iccs/*.icc", "external/iccs/LICENSE"], {
+    base: "external/iccs",
+    encoding: false,
+  });
+}
+
 function createStandardFontBundle() {
   return gulp.src(
     [
       "external/standard_fonts/*.pfb",
       "external/standard_fonts/*.ttf",
-      "external/standard_fonts/LICENSE_FOXIT",
-      "external/standard_fonts/LICENSE_LIBERATION",
+      "external/standard_fonts/LICENSE_*",
     ],
     {
       base: "external/standard_fonts",
       encoding: false,
     }
   );
+}
+
+function createWasmBundle() {
+  return ordered([
+    gulp.src(
+      [
+        "external/openjpeg/*.wasm",
+        "external/openjpeg/openjpeg_nowasm_fallback.js",
+        "external/openjpeg/LICENSE_*",
+      ],
+      {
+        base: "external/openjpeg",
+        encoding: false,
+      }
+    ),
+    gulp.src(["external/qcms/*.wasm", "external/qcms/LICENSE_*"], {
+      base: "external/qcms",
+      encoding: false,
+    }),
+  ]);
 }
 
 function checkFile(filePath) {
@@ -1109,7 +1162,9 @@ function buildGeneric(defines, dir) {
       })
       .pipe(gulp.dest(dir + "web")),
     createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
+    createICCBundle().pipe(gulp.dest(dir + "web/iccs")),
     createStandardFontBundle().pipe(gulp.dest(dir + "web/standard_fonts")),
+    createWasmBundle().pipe(gulp.dest(dir + "web/wasm")),
 
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", defines)
@@ -1118,7 +1173,7 @@ function buildGeneric(defines, dir) {
           postcssDirPseudoClass(),
           discardCommentsCSS(),
           postcssNesting(),
-          postcssDarkThemeClass(),
+          postcssLightDarkFunction({ preserve: true }),
           autoprefixer(AUTOPREFIXER_CONFIG),
         ])
       )
@@ -1195,7 +1250,7 @@ function buildComponents(defines, dir) {
     "web/images/messageBar_*.svg",
     "web/images/toolbarButton-{editorHighlight,menuArrow}.svg",
     "web/images/cursor-*.svg",
-    "web/images/secondaryToolbarButton-documentProperties.svg",
+    "web/images/comment-*.svg",
   ];
 
   return ordered([
@@ -1209,6 +1264,7 @@ function buildComponents(defines, dir) {
           postcssDirPseudoClass(),
           discardCommentsCSS(),
           postcssNesting(),
+          postcssLightDarkFunction({ preserve: true }),
           autoprefixer(AUTOPREFIXER_CONFIG),
         ])
       )
@@ -1437,9 +1493,11 @@ gulp.task(
         createCMapBundle().pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/cmaps")
         ),
+        createICCBundle().pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/iccs")),
         createStandardFontBundle().pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/standard_fonts")
         ),
+        createWasmBundle().pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/wasm")),
 
         preprocessHTML("web/viewer.html", defines).pipe(
           gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
@@ -1539,8 +1597,14 @@ gulp.task(
         createCMapBundle().pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/cmaps")
         ),
+        createICCBundle().pipe(
+          gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/iccs")
+        ),
         createStandardFontBundle().pipe(
           gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/standard_fonts")
+        ),
+        createWasmBundle().pipe(
+          gulp.dest(CHROME_BUILD_CONTENT_DIR + "web/wasm")
         ),
 
         preprocessHTML("web/viewer.html", defines).pipe(
@@ -1552,7 +1616,7 @@ gulp.task(
               postcssDirPseudoClass(),
               discardCommentsCSS(),
               postcssNesting(),
-              postcssDarkThemeClass(),
+              postcssLightDarkFunction({ preserve: true }),
               autoprefixer(AUTOPREFIXER_CONFIG),
             ])
           )
@@ -1628,6 +1692,7 @@ function buildLibHelper(bundleDefines, inputStream, outputDir) {
       "pdfjs-lib": "../pdf.js",
       "display-cmap_reader_factory": "./cmap_reader_factory.js",
       "display-standard_fontdata_factory": "./standard_fontdata_factory.js",
+      "display-wasm_factory": "./wasm_factory.js",
       "display-fetch_stream": "./fetch_stream.js",
       "display-network": "./network.js",
       "display-node_stream": "./node_stream.js",
@@ -1673,6 +1738,7 @@ function buildLib(defines, dir) {
     }),
     gulp.src("test/unit/*.js", { base: ".", encoding: false }),
     gulp.src("external/openjpeg/*.js", { base: "openjpeg/", encoding: false }),
+    gulp.src("external/qcms/*.js", { base: "qcms/", encoding: false }),
   ]);
 
   return buildLibHelper(bundleDefines, inputStream, dir);
@@ -1976,20 +2042,25 @@ function createBaseline(done) {
 
 gulp.task(
   "unittestcli",
-  gulp.series(setTestEnv, "lib-legacy", function runUnitTestCli(done) {
-    const options = [
-      "node_modules/jasmine/bin/jasmine",
-      "JASMINE_CONFIG_PATH=test/unit/clitests.json",
-    ];
-    const jasmineProcess = startNode(options, { stdio: "inherit" });
-    jasmineProcess.on("close", function (code) {
-      if (code !== 0) {
-        done(new Error("Unit tests failed."));
-        return;
-      }
-      done();
-    });
-  })
+  gulp.series(
+    setTestEnv,
+    "generic-legacy",
+    "lib-legacy",
+    function runUnitTestCli(done) {
+      const options = [
+        "node_modules/jasmine/bin/jasmine",
+        "JASMINE_CONFIG_PATH=test/unit/clitests.json",
+      ];
+      const jasmineProcess = startNode(options, { stdio: "inherit" });
+      jasmineProcess.on("close", function (code) {
+        if (code !== 0) {
+          done(new Error("Unit tests failed."));
+          return;
+        }
+        done();
+      });
+    }
+  )
 );
 
 gulp.task("lint", function (done) {
@@ -2103,6 +2174,15 @@ gulp.task(
   )
 );
 
+gulp.task("dev-wasm", function () {
+  const VIEWER_WASM_OUTPUT = "web/wasm/";
+
+  fs.rmSync(VIEWER_WASM_OUTPUT, { recursive: true, force: true });
+  fs.mkdirSync(VIEWER_WASM_OUTPUT, { recursive: true });
+
+  return createWasmBundle().pipe(gulp.dest(VIEWER_WASM_OUTPUT));
+});
+
 gulp.task(
   "dev-sandbox",
   gulp.series(
@@ -2136,6 +2216,13 @@ gulp.task(
         "l10n/**/*.ftl",
         { ignoreInitial: false },
         gulp.series("locale")
+      );
+    },
+    function watchWasm() {
+      gulp.watch(
+        ["external/openjpeg/*", "external/qcms/*"],
+        { ignoreInitial: false },
+        gulp.series("dev-wasm")
       );
     },
     function watchDevSandbox() {
@@ -2297,6 +2384,8 @@ gulp.task("metalsmith", async function () {
       .use(
         layouts({
           directory: "docs/templates",
+          pattern: "**",
+          transform: "nunjucks",
         })
       )
       .use(relative())
@@ -2348,7 +2437,7 @@ function packageJson() {
     bugs: DIST_BUGS_URL,
     license: DIST_LICENSE,
     optionalDependencies: {
-      "@napi-rs/canvas": "^0.1.65",
+      "@napi-rs/canvas": "^0.1.77",
     },
     browser: {
       canvas: false,
@@ -2362,7 +2451,7 @@ function packageJson() {
       url: `git+${DIST_GIT_URL}`,
     },
     engines: {
-      node: ">=20",
+      node: ">=20.16.0 || >=22.3.0",
     },
     scripts: {},
   };
@@ -2408,7 +2497,19 @@ gulp.task(
           })
           .pipe(gulp.dest(DIST_DIR)),
         gulp
+          .src(GENERIC_DIR + "web/iccs/**/*", {
+            base: GENERIC_DIR + "web",
+            encoding: false,
+          })
+          .pipe(gulp.dest(DIST_DIR)),
+        gulp
           .src(GENERIC_DIR + "web/standard_fonts/**/*", {
+            base: GENERIC_DIR + "web",
+            encoding: false,
+          })
+          .pipe(gulp.dest(DIST_DIR)),
+        gulp
+          .src(GENERIC_DIR + "web/wasm/**/*", {
             base: GENERIC_DIR + "web",
             encoding: false,
           })

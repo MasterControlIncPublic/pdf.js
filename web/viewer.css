@@ -35,61 +35,86 @@
   --doorhanger-icon-opacity: 0.9;
   --doorhanger-height: 8px;
 
-  --main-color: hsla(208 28% 20%);
-  --body-bg-color: rgb(212 212 215);
-  --progressBar-color: rgb(10 132 255);
-  --progressBar-bg-color: rgb(221 221 222);
-  --progressBar-blend-color: rgb(116 177 239);
-  --scrollbar-color: auto;
-  --scrollbar-bg-color: auto;
-  --toolbar-icon-bg-color: rgb(255 255 255);
+  --main-color: light-dark(hsla(208 28% 20%), rgb(249 249 250));
+  --body-bg-color: light-dark(rgb(212 212 215), rgb(42 42 46));
+  --progressBar-color: light-dark(rgb(10 132 255), rgb(0 96 223));
+  --progressBar-bg-color: light-dark(rgb(221 221 222), rgb(40 40 43));
+  --progressBar-blend-color: light-dark(rgb(116 177 239), rgb(20 68 133));
+  --scrollbar-color: light-dark(auto, rgb(121 121 123));
+  --scrollbar-bg-color: light-dark(auto, rgb(35 35 39));
+  --toolbar-icon-bg-color: light-dark(rgb(255 255 255), rgb(255 255 255));
   --toolbar-icon-hover-bg-color: none;
-  --original-toolbar-icon-hover-bg-color: rgb(255 255 255);
+  --original-toolbar-icon-hover-bg-color: light-dark(
+    rgb(255 255 255),
+    rgb(255 255 255)
+  );
 
-  --sidebar-narrow-bg-color: rgb(212 212 215 / 0.9);
-  --sidebar-toolbar-bg-color: rgb(245 246 247);
-  --toolbar-bg-color: rgb(249 249 250);
-  --toolbar-border-color: rgb(184 184 184);
+  --sidebar-narrow-bg-color: light-dark(
+    rgb(212 212 215 / 0.9),
+    rgb(42 42 46 / 0.9)
+  );
+  --sidebar-toolbar-bg-color: light-dark(rgb(245 246 247), rgb(50 50 52));
+  --toolbar-bg-color: light-dark(rgb(249 249 250), rgb(56 56 61));
+  --toolbar-border-color: light-dark(rgb(184 184 184), rgb(12 12 13));
   --toolbar-box-shadow: 0 1px 0 var(--toolbar-border-color);
   --toolbar-border-bottom: none;
   --toolbarSidebar-box-shadow:
     inset calc(-1px * var(--dir-factor)) 0 0 rgb(0 0 0 / 0.25),
     0 1px 0 rgb(0 0 0 / 0.15), 0 0 1px rgb(0 0 0 / 0.1);
   --toolbarSidebar-border-bottom: none;
-  --button-hover-color: rgb(221 222 223);
+  --button-hover-color: color-mix(in srgb, currentColor 17%, transparent);
   --toggled-btn-color: none;
   --toggled-btn-bg-color: rgb(0 0 0 / 0.3);
   --toggled-hover-active-btn-color: rgb(0 0 0 / 0.4);
   --toggled-hover-btn-outline: none;
-  --dropdown-btn-bg-color: rgb(255 255 255);
+  --dropdown-btn-bg-color: light-dark(rgb(255 255 255), rgb(74 74 79));
   --dropdown-btn-border: 1px solid var(--field-border-color);
   --separator-color: rgb(0 0 0 / 0.3);
-  --field-color: var(--main-color);
-  --field-bg-color: rgb(255 255 255);
-  --field-border-color: rgb(187 187 188);
-  --treeitem-color: rgb(255 255 255 / 0.8);
-  --treeitem-bg-color: rgb(255 255 255 / 0.15);
-  --treeitem-hover-color: rgb(255 255 255 / 0.9);
-  --treeitem-selected-color: rgb(255 255 255 / 0.9);
-  --treeitem-selected-bg-color: rgb(255 255 255 / 0.25);
-  --thumbnail-hover-color: rgb(0 0 0 / 0.1);
-  --thumbnail-selected-color: rgb(0 0 0 / 0.2);
-  --doorhanger-bg-color: rgb(255 255 255);
-  --doorhanger-border-color: rgb(12 12 13 / 0.2);
-  --doorhanger-hover-color: rgb(12 12 13);
-  --doorhanger-hover-bg-color: rgb(237 237 237);
-  --doorhanger-separator-color: rgb(222 222 222);
+  --field-color: light-dark(var(--main-color), rgb(250 250 250));
+  --field-bg-color: light-dark(rgb(255 255 255), rgb(64 64 68));
+  --field-border-color: light-dark(rgb(187 187 188), rgb(115 115 115));
+  --treeitem-color: light-dark(rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.8));
+  --treeitem-bg-color: light-dark(
+    rgb(255 255 255 / 0.15),
+    rgb(255 255 255 / 0.15)
+  );
+  --treeitem-hover-color: light-dark(
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.9)
+  );
+  --treeitem-selected-color: light-dark(
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.9)
+  );
+  --treeitem-selected-bg-color: light-dark(
+    rgb(255 255 255 / 0.25),
+    rgb(255 255 255 / 0.25)
+  );
+  --thumbnail-hover-color: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
+  --thumbnail-selected-color: light-dark(
+    rgb(0 0 0 / 0.2),
+    rgb(255 255 255 / 0.2)
+  );
+  --doorhanger-bg-color: light-dark(rgb(255 255 255), #42414d);
+  --doorhanger-border-color: light-dark(rgb(12 12 13 / 0.2), rgb(39 39 43));
+  --doorhanger-hover-color: light-dark(rgb(12 12 13), rgb(249 249 250));
+  --doorhanger-separator-color: light-dark(rgb(222 222 222), rgb(92 92 97));
   --dialog-button-border: none;
-  --dialog-button-bg-color: rgb(12 12 13 / 0.1);
-  --dialog-button-hover-bg-color: rgb(12 12 13 / 0.3);
+  --dialog-button-bg-color: light-dark(rgb(12 12 13 / 0.1), rgb(92 92 97));
+  --dialog-button-hover-bg-color: light-dark(
+    rgb(12 12 13 / 0.3),
+    rgb(115 115 115)
+  );
 
   --loading-icon: url(images/loading.svg);
   --treeitem-expanded-icon: url(images/treeitem-expanded.svg);
   --treeitem-collapsed-icon: url(images/treeitem-collapsed.svg);
+  --toolbarButton-editorComment-icon: url(images/comment-editButton.svg);
   --toolbarButton-editorFreeText-icon: url(images/toolbarButton-editorFreeText.svg);
   --toolbarButton-editorHighlight-icon: url(images/toolbarButton-editorHighlight.svg);
   --toolbarButton-editorInk-icon: url(images/toolbarButton-editorInk.svg);
   --toolbarButton-editorStamp-icon: url(images/toolbarButton-editorStamp.svg);
+  --toolbarButton-editorSignature-icon: url(images/toolbarButton-editorSignature.svg);
   --toolbarButton-menuArrow-icon: url(images/toolbarButton-menuArrow.svg);
   --toolbarButton-sidebarToggle-icon: url(images/toolbarButton-sidebarToggle.svg);
   --toolbarButton-secondaryToolbarToggle-icon: url(images/toolbarButton-secondaryToolbarToggle.svg);
@@ -130,6 +155,7 @@
   );
   --secondaryToolbarButton-documentProperties-icon: url(images/secondaryToolbarButton-documentProperties.svg);
   --editorParams-stampAddImage-icon: url(images/toolbarButton-zoomIn.svg);
+  --comment-edit-button-icon: url(images/comment-editButton.svg);
 }
 
 :root:dir(rtl) {
@@ -140,54 +166,9 @@
   /*#endif*/
 }
 
-/* mc removed dark scheme for forced consistency
-@media (prefers-color-scheme: dark) {
-  :root {
-    --main-color: rgb(249 249 250);
-    --body-bg-color: rgb(42 42 46);
-    --progressBar-color: rgb(0 96 223);
-    --progressBar-bg-color: rgb(40 40 43);
-    --progressBar-blend-color: rgb(20 68 133);
-    --scrollbar-color: rgb(121 121 123);
-    --scrollbar-bg-color: rgb(35 35 39);
-    --toolbar-icon-bg-color: rgb(255 255 255);
-    --toolbar-icon-hover-bg-color: rgb(255 255 255);
-
-    --sidebar-narrow-bg-color: rgb(42 42 46 / 0.9);
-    --sidebar-toolbar-bg-color: rgb(50 50 52);
-    --toolbar-bg-color: rgb(56 56 61);
-    --toolbar-border-color: rgb(12 12 13);
-    --button-hover-color: rgb(102 102 103);
-    --toggled-btn-color: rgb(255 255 255);
-    --toggled-btn-bg-color: rgb(0 0 0 / 0.3);
-    --toggled-hover-active-btn-color: rgb(0 0 0 / 0.4);
-    --dropdown-btn-bg-color: rgb(74 74 79);
-    --separator-color: rgb(0 0 0 / 0.3);
-    --field-color: rgb(250 250 250);
-    --field-bg-color: rgb(64 64 68);
-    --field-border-color: rgb(115 115 115);
-    --treeitem-color: rgb(255 255 255 / 0.8);
-    --treeitem-bg-color: rgb(255 255 255 / 0.15);
-    --treeitem-hover-color: rgb(255 255 255 / 0.9);
-    --treeitem-selected-color: rgb(255 255 255 / 0.9);
-    --treeitem-selected-bg-color: rgb(255 255 255 / 0.25);
-    --thumbnail-hover-color: rgb(255 255 255 / 0.1);
-    --thumbnail-selected-color: rgb(255 255 255 / 0.2);
-    --doorhanger-bg-color: rgb(74 74 79);
-    --doorhanger-border-color: rgb(39 39 43);
-    --doorhanger-hover-color: rgb(249 249 250);
-    --doorhanger-hover-bg-color: rgb(93 94 98);
-    --doorhanger-separator-color: rgb(92 92 97);
-    --dialog-button-bg-color: rgb(92 92 97);
-    --dialog-button-hover-bg-color: rgb(115 115 115);
-  }
-}
-*/
-
 @media screen and (forced-colors: active) {
   :root {
     --button-hover-color: Highlight;
-    --doorhanger-hover-bg-color: Highlight;
     --toolbar-icon-opacity: 1;
     --toolbar-icon-bg-color: ButtonText;
     --toolbar-icon-hover-bg-color: ButtonFace;
@@ -258,6 +239,22 @@ body {
     z-index: 100000;
     cursor: wait;
   }
+}
+
+/* The following class is used to hide an element but keep it available to
+ * for screen readers. */
+.visuallyHidden {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  margin: 0;
+  padding: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0;
 }
 
 .hidden,
@@ -526,7 +523,7 @@ body {
   height: 16px;
 
   content: "";
-  background-color: var(--toolbar-icon-bg-color); /*TODO: do we need this?*/
+  background-color: var(--toolbar-icon-bg-color);
   mask-size: cover;
 }
 
@@ -562,10 +559,9 @@ body {
   content: "\f067";
 }
 
-#presentationModeButton::before,
-#secondaryPresentationMode::before {
-  font: 14px FontAwesome;
-  content: "\f0b2";
+#editorCommentButton::before {
+  mask-image: var(--toolbarButton-editorComment-icon);
+  transform: scaleX(var(--dir-factor));
 }
 
 #editorFreeTextButton::before {
@@ -584,24 +580,22 @@ body {
   mask-image: var(--toolbarButton-editorStamp-icon);
 }
 
+#editorSignatureButton::before {
+  mask-image: var(--toolbarButton-editorSignature-icon);
+}
+
 #printButton::before {
   font: 14px FontAwesome;
   content: "\f02f";
 }
 
-/*#if GENERIC*/
-#secondaryOpenFile::before {
-  mask-image: var(--toolbarButton-openFile-icon);
-}
-/*#endif*/
-
 #downloadButton::before {
   mask-image: var(--toolbarButton-download-icon);
 }
 
-#viewBookmark::before {
+#presentationMode::before {
   font: 14px FontAwesome;
-  content: "\f02e";
+  content: "\f0b2";
 }
 
 #currentOutlineItem::before {
@@ -644,6 +638,29 @@ body {
   border-bottom: none;
   height: 0;
   width: 100%;
+}
+
+.toggleButton {
+  display: inline;
+
+  &:has(> input:checked) {
+    color: var(--toggled-btn-color);
+    background-color: var(--toggled-btn-bg-color);
+  }
+
+  &:is(:hover, :has(> input:focus-visible)) {
+    color: var(--toggled-btn-color);
+    background-color: var(--button-hover-color);
+  }
+
+  & > input {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
 }
 
 .toolbarField {
@@ -1068,7 +1085,6 @@ dialog :link {
     }
 
     &:is(:hover, :focus-visible) {
-      background-color: var(--doorhanger-hover-bg-color);
       color: var(--doorhanger-hover-color);
     }
 
@@ -1110,13 +1126,16 @@ dialog :link {
   }
 
   .editorParamsToolbar {
+    --editor-toolbar-min-width: 220px;
+
     height: auto;
-    width: 220px;
+    min-width: var(--editor-toolbar-min-width);
+    width: max-content;
     position: absolute;
     z-index: 30000;
     cursor: default;
 
-    #editorStampAddImage::before {
+    :is(#editorStampAddImage, #editorSignatureAddSignature)::before {
       mask-image: var(--editorParams-stampAddImage-icon);
     }
 
@@ -1127,9 +1146,13 @@ dialog :link {
       font-style: normal;
       font-weight: 400;
       line-height: 150%;
-      color: var(--main-color);
       width: fit-content;
       inset-inline-start: 0;
+      color: var(--main-color);
+    }
+
+    button:is(:hover, :focus-visible) .editorParamsLabel {
+      color: var(--doorhanger-hover-color);
     }
 
     .editorParamsToolbarContainer {
@@ -1211,6 +1234,11 @@ dialog :link {
     #secondaryPresentationMode::before {
       font: 14px FontAwesome;
       content: "\f0b2";
+    }
+
+    #viewBookmark::before {
+      font: 14px FontAwesome;
+      content: "\f02e";
     }
 
     #firstPage::before {

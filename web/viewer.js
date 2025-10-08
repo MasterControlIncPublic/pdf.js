@@ -19,13 +19,6 @@ import { LinkTarget } from "./pdf_link_service.js";
 import { MCOptions } from "./mc_options.js";
 import { PDFViewerApplication } from "./app.js";
 
-/* eslint-disable-next-line no-unused-vars */
-const pdfjsVersion =
-  typeof PDFJSDev !== "undefined" ? PDFJSDev.eval("BUNDLE_VERSION") : void 0;
-/* eslint-disable-next-line no-unused-vars */
-const pdfjsBuild =
-  typeof PDFJSDev !== "undefined" ? PDFJSDev.eval("BUNDLE_BUILD") : void 0;
-
 const AppConstants =
   typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")
     ? { LinkTarget, RenderingStates, ScrollMode, SpreadMode }
@@ -41,6 +34,7 @@ function getViewerConfiguration() {
     principalContainer: document.getElementById("mainContainer"),
     mainContainer: document.getElementById("viewerContainer"),
     viewerContainer: document.getElementById("viewer"),
+    viewerAlert: document.getElementById("viewer-alert"),
     toolbar: {
       container: document.getElementById("toolbarContainer"),
       numPages: document.getElementById("numPages"),
@@ -52,7 +46,11 @@ function getViewerConfiguration() {
       zoomIn: document.getElementById("zoomInButton"),
       zoomOut: document.getElementById("zoomOutButton"),
       print: document.getElementById("printButton"),
-      presentationModeButton: document.getElementById("presentationModeButton"),
+      presentationModeButton: document.getElementById("presentationMode"),
+      editorCommentButton: document.getElementById("editorCommentButton"),
+      editorCommentParamsToolbar: document.getElementById(
+        "editorCommentParamsToolbar"
+      ),
       editorFreeTextButton: document.getElementById("editorFreeTextButton"),
       editorFreeTextParamsToolbar: document.getElementById(
         "editorFreeTextParamsToolbar"
@@ -69,6 +67,10 @@ function getViewerConfiguration() {
       editorStampButton: document.getElementById("editorStampButton"),
       editorStampParamsToolbar: document.getElementById(
         "editorStampParamsToolbar"
+      ),
+      editorSignatureButton: document.getElementById("editorSignatureButton"),
+      editorSignatureParamsToolbar: document.getElementById(
+        "editorSignatureParamsToolbar"
       ),
       download: document.getElementById("downloadButton"),
     },
@@ -214,13 +216,61 @@ function getViewerConfiguration() {
       ),
       closeButton: document.getElementById("altTextSettingsCloseButton"),
     },
+    addSignatureDialog: {
+      dialog: document.getElementById("addSignatureDialog"),
+      panels: document.getElementById("addSignatureActionContainer"),
+      typeButton: document.getElementById("addSignatureTypeButton"),
+      typeInput: document.getElementById("addSignatureTypeInput"),
+      drawButton: document.getElementById("addSignatureDrawButton"),
+      drawSVG: document.getElementById("addSignatureDraw"),
+      drawPlaceholder: document.getElementById("addSignatureDrawPlaceholder"),
+      drawThickness: document.getElementById("addSignatureDrawThickness"),
+      imageButton: document.getElementById("addSignatureImageButton"),
+      imageSVG: document.getElementById("addSignatureImage"),
+      imagePlaceholder: document.getElementById("addSignatureImagePlaceholder"),
+      imagePicker: document.getElementById("addSignatureFilePicker"),
+      imagePickerLink: document.getElementById("addSignatureImageBrowse"),
+      description: document.getElementById("addSignatureDescription"),
+      clearButton: document.getElementById("clearSignatureButton"),
+      saveContainer: document.getElementById("addSignatureSaveContainer"),
+      saveCheckbox: document.getElementById("addSignatureSaveCheckbox"),
+      errorBar: document.getElementById("addSignatureError"),
+      errorTitle: document.getElementById("addSignatureErrorTitle"),
+      errorDescription: document.getElementById("addSignatureErrorDescription"),
+      errorCloseButton: document.getElementById("addSignatureErrorCloseButton"),
+      cancelButton: document.getElementById("addSignatureCancelButton"),
+      addButton: document.getElementById("addSignatureAddButton"),
+    },
+    editSignatureDialog: {
+      dialog: document.getElementById("editSignatureDescriptionDialog"),
+      description: document.getElementById("editSignatureDescription"),
+      editSignatureView: document.getElementById("editSignatureView"),
+      cancelButton: document.getElementById("editSignatureCancelButton"),
+      updateButton: document.getElementById("editSignatureUpdateButton"),
+    },
     annotationEditorParams: {
+      editorCommentsSidebar: document.getElementById("editorCommentsSidebar"),
+      editorCommentsSidebarCount: document.getElementById(
+        "editorCommentsSidebarCount"
+      ),
+      editorCommentsSidebarTitle: document.getElementById(
+        "editorCommentsSidebarTitle"
+      ),
+      editorCommentsSidebarCloseButton: document.getElementById(
+        "editorCommentsSidebarCloseButton"
+      ),
+      editorCommentsSidebarList: document.getElementById(
+        "editorCommentsSidebarList"
+      ),
       editorFreeTextFontSize: document.getElementById("editorFreeTextFontSize"),
       editorFreeTextColor: document.getElementById("editorFreeTextColor"),
       editorInkColor: document.getElementById("editorInkColor"),
       editorInkThickness: document.getElementById("editorInkThickness"),
       editorInkOpacity: document.getElementById("editorInkOpacity"),
       editorStampAddImage: document.getElementById("editorStampAddImage"),
+      editorSignatureAddSignature: document.getElementById(
+        "editorSignatureAddSignature"
+      ),
       editorFreeHighlightThickness: document.getElementById(
         "editorFreeHighlightThickness"
       ),
@@ -233,18 +283,25 @@ function getViewerConfiguration() {
       undoButton: document.getElementById("editorUndoBarUndoButton"),
       closeButton: document.getElementById("editorUndoBarCloseButton"),
     },
+    editCommentDialog: {
+      dialog: document.getElementById("commentManagerDialog"),
+      toolbar: document.getElementById("commentManagerToolbar"),
+      actions: document.getElementById("commentActionsButton"),
+      menu: document.getElementById("commentActionsMenu"),
+      editMenuItem: document.getElementById("commentActionsEditButton"),
+      deleteMenuItem: document.getElementById("commentActionsDeleteButton"),
+      closeButton: document.getElementById("commentCloseButton"),
+      textInput: document.getElementById("commentManagerTextInput"),
+      textView: document.getElementById("commentManagerTextView"),
+      cancelButton: document.getElementById("commentManagerCancelButton"),
+      saveButton: document.getElementById("commentManagerSaveButton"),
+    },
   };
 }
 
 function setMCOptions() {
   const canPrint = new URL(location.href).searchParams.get("canPrint");
   MCOptions.set("canPrint", canPrint === "true");
-}
-
-function enablePrintingIfCanPrint() {
-  if (MCOptions.get("canPrint")) {
-    document.getElementById("printButton").classList.remove("hidden");
-  }
 }
 
 function webViewerLoad() {
@@ -274,7 +331,6 @@ function webViewerLoad() {
     }
   }
   setMCOptions();
-  enablePrintingIfCanPrint();
 
   PDFViewerApplication.run(config);
 }

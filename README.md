@@ -7,10 +7,6 @@ The `master` branch in our fork should be identical to `master` on the upstream 
 ### Synchronizing with upstream mozilla:pdf.js
 Since master is an untouched copy of Mozilla's master we can synchronize our fork as often as we'd like with no impacts to our MC functionality.
 
-You can either use the "Sync Fork" button in the github UI 
-
-OR 
-
 Perform the sync manually as described below:
 
 - add upstream remote to your working copy
@@ -25,8 +21,13 @@ Perform the sync manually as described below:
     ```
 - push `master` up to our fork's repo (include the new tags)
     ```
-    $ git push --tags master
+    $ git push --tags origin master
     ```
+
+OR
+
+You can use the "Sync Fork" button in the github UI (NOTE: I don't believe this syncs tags, so please do the manual method above!)
+
 
 ### Updating `mc-master` with changes from the upstream master
 This should be done after syncing master as described above. The idea here is to separate this type of sync from your story/defect work for better history tracking. 
@@ -52,12 +53,13 @@ Use a **squash merge PR for new feature work** so that all your development comm
 ### Changes We Have Made From Mainline
 
 * These README updates
+* Temporary fix for file loading until https://github.com/mozilla/pdf.js/issues/20137 is resolved (web/app.js)
 * The additional gulp tasks that detailed below
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
 * We don't allow annotating/inking the pdf (web/viewer.html) (currently just hiding the button, we may want to find a more pdf.js way to disable editing)
 * We change the print resolution (web/app_options.js)
-* Configurably can allow printing (web/pdf_print_service.js)
+* Configurably can allow printing (web/pdf_print_service.js, app.js)
 * Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
 * Removed dark theme (web/viewer.css)
 * Added presentation mode to the toolbar (web/toolbar.js, web/viewer.html)
@@ -125,7 +127,7 @@ We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to he
 TODO: Consider changing our tagging practice to show both which mozilla tag we're based off of and which version the mc-build process built. Perhaps something like v4.3.136-moz_v4.3.238-mc or v4.3.136-mc238
 
 # ORIGINAL README BELOW
-# PDF.js [![Build Status](https://github.com/mozilla/pdf.js/workflows/CI/badge.svg?branch=master)](https://github.com/mozilla/pdf.js/actions?query=workflow%3ACI+branch%3Amaster)
+# PDF.js [![CI](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml/badge.svg?query=branch%3Amaster)](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml?query=branch%3Amaster)
 
 [PDF.js](https://mozilla.github.io/pdf.js/) is a Portable Document Format (PDF) viewer that is built with HTML5.
 
@@ -141,7 +143,7 @@ get involved, visit:
 + [Issue Reporting Guide](https://github.com/mozilla/pdf.js/blob/master/.github/CONTRIBUTING.md)
 + [Code Contribution Guide](https://github.com/mozilla/pdf.js/wiki/Contributing)
 + [Frequently Asked Questions](https://github.com/mozilla/pdf.js/wiki/Frequently-Asked-Questions)
-+ [Good Beginner Bugs](https://github.com/mozilla/pdf.js/issues?direction=desc&labels=good-beginner-bug&page=1&sort=created&state=open)
++ [Good Beginner Bugs](https://github.com/mozilla/pdf.js/issues?q=is%3Aissue%20state%3Aopen%20label%3Agood-beginner-bug)
 + [Projects](https://github.com/mozilla/pdf.js/projects)
 
 Feel free to stop by our [Matrix room](https://chat.mozilla.org/#/room/#pdfjs:mozilla.org) for questions or guidance.

@@ -13,12 +13,12 @@
  * limitations under the License.
  */
 
+import { AnnotationEditorType, AnnotationPrefix } from "../../shared/util.js";
 import {
-  AnnotationEditorType,
-  AnnotationPrefix,
-  shadow,
-} from "../../shared/util.js";
-import { OutputScale, PixelsPerInch } from "../display_utils.js";
+  OutputScale,
+  PixelsPerInch,
+  SupportedImageMimeTypes,
+} from "../display_utils.js";
 import { AnnotationEditor } from "./editor.js";
 import { StampAnnotationElement } from "../annotation_layer.js";
 
@@ -40,6 +40,8 @@ class StampEditor extends AnnotationEditor {
 
   #canvas = null;
 
+  #missingCanvas = false;
+
   #resizeTimeoutId = null;
 
   #isSvg = false;
@@ -54,6 +56,7 @@ class StampEditor extends AnnotationEditor {
     super({ ...params, name: "stampEditor" });
     this.#bitmapUrl = params.bitmapUrl;
     this.#bitmapFile = params.bitmapFile;
+    this.defaultL10nId = "pdfjs-editor-stamp-editor";
   }
 
   /** @inheritdoc */
@@ -61,41 +64,17 @@ class StampEditor extends AnnotationEditor {
     AnnotationEditor.initialize(l10n, uiManager);
   }
 
-  static get supportedTypes() {
-    // See https://developer.mozilla.org/en-US/docs/Web/Media/Formats/Image_types
-    // to know which types are supported by the browser.
-    const types = [
-      "apng",
-      "avif",
-      "bmp",
-      "gif",
-      "jpeg",
-      "png",
-      "svg+xml",
-      "webp",
-      "x-icon",
-    ];
-    return shadow(
-      this,
-      "supportedTypes",
-      types.map(type => `image/${type}`)
-    );
-  }
-
-  static get supportedTypesStr() {
-    return shadow(this, "supportedTypesStr", this.supportedTypes.join(","));
-  }
-
   /** @inheritdoc */
   static isHandlingMimeForPasting(mime) {
-    return this.supportedTypes.includes(mime);
+    return SupportedImageMimeTypes.includes(mime);
   }
 
   /** @inheritdoc */
   static paste(item, parent) {
-    parent.pasteEditor(AnnotationEditorType.STAMP, {
-      bitmapFile: item.getAsFile(),
-    });
+    parent.pasteEditor(
+      { mode: AnnotationEditorType.STAMP },
+      { bitmapFile: item.getAsFile() }
+    );
   }
 
   /** @inheritdoc */
@@ -149,8 +128,10 @@ class StampEditor extends AnnotationEditor {
       this._uiManager.useNewAltTextFlow &&
       this.#bitmap
     ) {
-      this._editToolbar.hide();
-      this._uiManager.editAltText(this, /* firstTime = */ true);
+      this.addEditToolbar().then(() => {
+        this._editToolbar.hide();
+        this._uiManager.editAltText(this, /* firstTime = */ true);
+      });
       return;
     }
 
@@ -256,7 +237,7 @@ class StampEditor extends AnnotationEditor {
       document.body.append(input);
     }
     input.type = "file";
-    input.accept = StampEditor.supportedTypesStr;
+    input.accept = SupportedImageMimeTypes.join(",");
     const signal = this._uiManager._signal;
     this.#bitmapPromise = new Promise(resolve => {
       input.addEventListener(
@@ -352,8 +333,14 @@ class StampEditor extends AnnotationEditor {
       this.#bitmap ||
       this.#bitmapUrl ||
       this.#bitmapFile ||
-      this.#bitmapId
+      this.#bitmapId ||
+      this.#missingCanvas
     );
+  }
+
+  /** @inheritdoc */
+  get toolbarButtons() {
+    return [["altText", this.createAltText()]];
   }
 
   /** @inheritdoc */
@@ -368,37 +355,47 @@ class StampEditor extends AnnotationEditor {
     }
 
     let baseX, baseY;
-    if (this.width) {
+    if (this._isCopy) {
       baseX = this.x;
       baseY = this.y;
     }
 
     super.render();
     this.div.hidden = true;
-    this.div.setAttribute("role", "figure");
 
-    this.addAltTextButton();
+    this.createAltText();
 
-    if (this.#bitmap) {
-      this.#createCanvas();
-    } else {
-      this.#getBitmap();
+    if (!this.#missingCanvas) {
+      if (this.#bitmap) {
+        this.#createCanvas();
+      } else {
+        this.#getBitmap();
+      }
     }
 
-    if (this.width && !this.annotationElementId) {
-      // This editor was created in using copy (ctrl+c).
-      const [parentWidth, parentHeight] = this.parentDimensions;
-      this.setAt(
-        baseX * parentWidth,
-        baseY * parentHeight,
-        this.width * parentWidth,
-        this.height * parentHeight
-      );
+    if (this._isCopy) {
+      this._moveAfterPaste(baseX, baseY);
     }
 
     this._uiManager.addShouldRescale(this);
 
     return this.div;
+  }
+
+  setCanvas(annotationElementId, canvas) {
+    const { id: bitmapId, bitmap } = this._uiManager.imageManager.getFromCanvas(
+      annotationElementId,
+      canvas
+    );
+    canvas.remove();
+    if (bitmapId && this._uiManager.imageManager.isValidId(bitmapId)) {
+      this.#bitmapId = bitmapId;
+      if (bitmap) {
+        this.#bitmap = bitmap;
+      }
+      this.#missingCanvas = false;
+      this.#createCanvas();
+    }
   }
 
   /** @inheritdoc */
@@ -436,7 +433,7 @@ class StampEditor extends AnnotationEditor {
       width > MAX_RATIO * pageWidth ||
       height > MAX_RATIO * pageHeight
     ) {
-      // If the the image is too big compared to the page dimensions
+      // If the image is too big compared to the page dimensions
       // (more than MAX_RATIO) then we scale it down.
       const factor = Math.min(
         (MAX_RATIO * pageWidth) / width,
@@ -485,7 +482,10 @@ class StampEditor extends AnnotationEditor {
       action: "inserted_image",
     });
     if (this.#bitmapFileName) {
-      canvas.setAttribute("aria-label", this.#bitmapFileName);
+      this.div.setAttribute("aria-description", this.#bitmapFileName);
+    }
+    if (!this.annotationElementId) {
+      this._uiManager.a11yAlert("pdfjs-editor-stamp-added-alert");
     }
   }
 
@@ -697,11 +697,6 @@ class StampEditor extends AnnotationEditor {
     );
   }
 
-  /** @inheritdoc */
-  getImageForAltText() {
-    return this.#canvas;
-  }
-
   #serializeBitmap(toUrl) {
     if (toUrl) {
       if (this.#isSvg) {
@@ -752,20 +747,28 @@ class StampEditor extends AnnotationEditor {
   /** @inheritdoc */
   static async deserialize(data, parent, uiManager) {
     let initialData = null;
+    let missingCanvas = false;
     if (data instanceof StampAnnotationElement) {
       const {
-        data: { rect, rotation, id, structParent, popupRef },
+        data: { rect, rotation, id, structParent, popupRef, contentsObj },
         container,
         parent: {
           page: { pageNumber },
         },
+        canvas,
       } = data;
-      const canvas = container.querySelector("canvas");
-      const imageData = uiManager.imageManager.getFromCanvas(
-        container.id,
-        canvas
-      );
-      canvas.remove();
+      let bitmapId, bitmap;
+      if (canvas) {
+        delete data.canvas;
+        ({ id: bitmapId, bitmap } = uiManager.imageManager.getFromCanvas(
+          container.id,
+          canvas
+        ));
+        canvas.remove();
+      } else {
+        missingCanvas = true;
+        data._hasNoCanvas = true;
+      }
 
       // When switching to edit mode, we wait for the structure tree to be
       // ready (see pdf_viewer.js), so it's fine to use getAriaAttributesSync.
@@ -776,11 +779,12 @@ class StampEditor extends AnnotationEditor {
 
       initialData = data = {
         annotationType: AnnotationEditorType.STAMP,
-        bitmapId: imageData.id,
-        bitmap: imageData.bitmap,
+        bitmapId,
+        bitmap,
         pageIndex: pageNumber - 1,
         rect: rect.slice(0),
         rotation,
+        annotationElementId: id,
         id,
         deleted: false,
         accessibilityData: {
@@ -790,12 +794,16 @@ class StampEditor extends AnnotationEditor {
         isSvg: false,
         structParent,
         popupRef,
+        comment: contentsObj?.str || null,
       };
     }
     const editor = await super.deserialize(data, parent, uiManager);
     const { rect, bitmap, bitmapUrl, bitmapId, isSvg, accessibilityData } =
       data;
-    if (bitmapId && uiManager.imageManager.isValidId(bitmapId)) {
+    if (missingCanvas) {
+      uiManager.addMissingCanvas(data.id, editor);
+      editor.#missingCanvas = true;
+    } else if (bitmapId && uiManager.imageManager.isValidId(bitmapId)) {
       editor.#bitmapId = bitmapId;
       if (bitmap) {
         editor.#bitmap = bitmap;
@@ -809,11 +817,13 @@ class StampEditor extends AnnotationEditor {
     editor.width = (rect[2] - rect[0]) / parentWidth;
     editor.height = (rect[3] - rect[1]) / parentHeight;
 
-    editor.annotationElementId = data.id || null;
     if (accessibilityData) {
       editor.altTextData = accessibilityData;
     }
     editor._initialData = initialData;
+    if (data.comment) {
+      editor.setCommentData(data.comment);
+    }
     // No need to be add in the undo stack if the editor is created from an
     // existing one.
     editor.#hasBeenAddedInUndoStack = !!initialData;
@@ -835,11 +845,12 @@ class StampEditor extends AnnotationEditor {
       annotationType: AnnotationEditorType.STAMP,
       bitmapId: this.#bitmapId,
       pageIndex: this.pageIndex,
-      rect: this.getRect(0, 0),
+      rect: this.getPDFRect(),
       rotation: this.rotation,
       isSvg: this.#isSvg,
       structTreeParentId: this._structTreeParentId,
     };
+    this.addComment(serialized);
 
     if (isForCopying) {
       // We don't know what's the final destination (this pdf or another one)
@@ -847,6 +858,7 @@ class StampEditor extends AnnotationEditor {
       // hence we serialize the bitmap to a data url.
       serialized.bitmapUrl = this.#serializeBitmap(/* toUrl = */ true);
       serialized.accessibilityData = this.serializeAltText(true);
+      serialized.isCopy = true;
       return serialized;
     }
 
@@ -907,6 +919,7 @@ class StampEditor extends AnnotationEditor {
 
     return {
       isSame:
+        !this.hasEditedComment &&
         !this._hasBeenMoved &&
         !this._hasBeenResized &&
         isSamePageIndex &&
@@ -917,9 +930,17 @@ class StampEditor extends AnnotationEditor {
 
   /** @inheritdoc */
   renderAnnotationElement(annotation) {
-    annotation.updateEdited({
-      rect: this.getRect(0, 0),
-    });
+    if (this.deleted) {
+      annotation.hide();
+      return null;
+    }
+    const params = {
+      rect: this.getPDFRect(),
+    };
+    if (this.hasEditedComment) {
+      params.popup = this.comment;
+    }
+    annotation.updateEdited(params);
 
     return null;
   }

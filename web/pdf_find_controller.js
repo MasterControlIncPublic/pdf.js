@@ -29,7 +29,6 @@ const FindState = {
 
 const FIND_TIMEOUT = 250; // ms
 const MATCH_SCROLL_OFFSET_TOP = -50; // px
-const MATCH_SCROLL_OFFSET_LEFT = -400; // px
 
 const CHARACTERS_TO_NORMALIZE = {
   "\u2010": "-", // Hyphen
@@ -97,7 +96,7 @@ const NFKC_CHARS_TO_NORMALIZE = new Map();
 let noSyllablesRegExp = null;
 let withSyllablesRegExp = null;
 
-function normalize(text) {
+function normalize(text, options = {}) {
   // The diacritics in the text or in the query can be composed or not.
   // So we use a decomposed text using NFD (and the same for the query)
   // in order to be sure that diacritics are in the same order.
@@ -117,10 +116,13 @@ function normalize(text) {
     }
   }
 
+  const hasSyllables = syllablePositions.length > 0;
+  const ignoreDashEOL = options.ignoreDashEOL ?? false;
+
   let normalizationRegex;
-  if (syllablePositions.length === 0 && noSyllablesRegExp) {
+  if (!hasSyllables && noSyllablesRegExp) {
     normalizationRegex = noSyllablesRegExp;
-  } else if (syllablePositions.length > 0 && withSyllablesRegExp) {
+  } else if (hasSyllables && withSyllablesRegExp) {
     normalizationRegex = withSyllablesRegExp;
   } else {
     // Compile the regular expression for text normalization once.
@@ -131,22 +133,33 @@ function normalize(text) {
     // 30A0-30FF: Katakana
     const CJK = "(?:\\p{Ideographic}|[\u3040-\u30FF])";
     const HKDiacritics = "(?:\u3099|\u309A)";
-    const CompoundWord = "\\p{Ll}-\\n\\p{Lu}";
-    const regexp = `([${replace}])|([${toNormalizeWithNFKC}])|(${HKDiacritics}\\n)|(\\p{M}+(?:-\\n)?)|(${CompoundWord})|(\\S-\\n)|(${CJK}\\n)|(\\n)`;
+    const BrokenWord = `\\p{Ll}-\\n(?=\\p{Ll})|\\p{Lu}-\\n(?=\\p{L})`;
 
-    if (syllablePositions.length === 0) {
-      // Most of the syllables belong to Hangul so there are no need
-      // to search for them in a non-Hangul document.
-      // We use the \0 in order to have the same number of groups.
-      normalizationRegex = noSyllablesRegExp = new RegExp(
-        regexp + "|(\\u0000)",
-        "gum"
-      );
+    const regexps = [
+      /* p1 */ `[${replace}]`,
+      /* p2 */ `[${toNormalizeWithNFKC}]`,
+      /* p3 */ `${HKDiacritics}\\n`,
+      /* p4 */ "\\p{M}+(?:-\\n)?",
+      /* p5 */ `${BrokenWord}`,
+      /* p6 */ "\\S-\\n",
+      /* p7 */ `${CJK}\\n`,
+      /* p8 */ "\\n",
+      /* p9 */ hasSyllables
+        ? FIRST_CHAR_SYLLABLES_REG_EXP
+        : // Most of the syllables belong to Hangul so there are no need
+          // to search for them in a non-Hangul document.
+          // We use the \0 in order to have the same number of groups.
+          "\\u0000",
+    ];
+    normalizationRegex = new RegExp(
+      regexps.map(r => `(${r})`).join("|"),
+      "gum"
+    );
+
+    if (hasSyllables) {
+      withSyllablesRegExp = normalizationRegex;
     } else {
-      normalizationRegex = withSyllablesRegExp = new RegExp(
-        regexp + `|(${FIRST_CHAR_SYLLABLES_REG_EXP})`,
-        "gum"
-      );
+      noSyllablesRegExp = normalizationRegex;
     }
   }
 
@@ -281,26 +294,33 @@ function normalize(text) {
       }
 
       if (p5) {
-        // Compound word with a line break after the hyphen.
-        // Since the \n isn't in the original text, o = 3 and n = 3.
-        shiftOrigin += 1;
-        eol += 1;
-        return p5.replace("\n", "");
-      }
-
-      if (p6) {
-        // "X-\n" is removed because an hyphen at the end of a line
-        // with not a space before is likely here to mark a break
-        // in a word.
+        if (ignoreDashEOL) {
+          // Keep the - but remove the EOL.
+          shiftOrigin += 1;
+          eol += 1;
+          return p5.slice(0, -1);
+        }
+        // In "X-\ny", "-\n" is removed because an hyphen at the end of a line
+        // between two letters is likely here to mark a break in a word.
         // If X is encoded with UTF-32 then it can have a length greater than 1.
         // The \n isn't in the original text so here y = i, n = X.len - 2 and
         // o = X.len - 1.
-        const len = p6.length - 2;
+        const len = p5.length - 2;
         positions.push(i - shift + len, 1 + shift);
         shift += 1;
         shiftOrigin += 1;
         eol += 1;
-        return p6.slice(0, -2);
+        return p5.slice(0, -2);
+      }
+
+      if (p6) {
+        // A - following a non-space character that is not detected as the
+        // hyphen breaking a word in two lines needs to be preserved. It could
+        // be, for example, in a compound word or in a date.
+        // Only remove the newline.
+        shiftOrigin += 1;
+        eol += 1;
+        return p6.slice(0, -1);
       }
 
       if (p7) {
@@ -324,7 +344,7 @@ function normalize(text) {
         return " ";
       }
 
-      // p8
+      // p9
       if (i + eol === syllablePositions[syllableIndex]?.[1]) {
         // A syllable (1 char) is replaced with several chars (n) so
         // newCharsLen = n - 1.
@@ -552,10 +572,9 @@ class PDFFindController {
       return;
     }
     this._scrollMatches = false; // Ensure that scrolling only happens once.
-
     const spot = {
       top: MATCH_SCROLL_OFFSET_TOP,
-      left: selectedLeft + MATCH_SCROLL_OFFSET_LEFT,
+      left: selectedLeft,
     };
     scrollIntoView(element, spot, /* scrollMatches = */ true);
   }
@@ -703,7 +722,7 @@ class PDFFindController {
         // kind of whitespaces are replaced by a single " ".
 
         if (p1) {
-          // Escape characters like *+?... to not interfer with regexp syntax.
+          // Escape characters like *+?... to not interfere with regexp syntax.
           return `[ ]*\\${p1}[ ]*`;
         }
         if (p2) {
@@ -757,6 +776,9 @@ class PDFFindController {
   }
 
   #calculateMatch(pageIndex) {
+    if (!this.#state) {
+      return;
+    }
     const query = this.#query;
     if (query.length === 0) {
       return; // Do nothing: the matches should be wiped out already.
@@ -868,13 +890,17 @@ class PDFFindController {
 
     let deferred = Promise.resolve();
     const textOptions = { disableNormalization: true };
+    const pdfDoc = this._pdfDocument;
     for (let i = 0, ii = this._linkService.pagesCount; i < ii; i++) {
       const { promise, resolve } = Promise.withResolvers();
       this._extractTextPromises[i] = promise;
 
-      // eslint-disable-next-line arrow-body-style
-      deferred = deferred.then(() => {
-        return this._pdfDocument
+      deferred = deferred.then(async () => {
+        if (pdfDoc !== this._pdfDocument) {
+          resolve();
+          return;
+        }
+        await pdfDoc
           .getPage(i + 1)
           .then(pdfPage => pdfPage.getTextContent(textOptions))
           .then(
@@ -1171,4 +1197,4 @@ class PDFFindController {
   }
 }
 
-export { FindState, PDFFindController };
+export { FindState, getOriginalIndex, normalize, PDFFindController };

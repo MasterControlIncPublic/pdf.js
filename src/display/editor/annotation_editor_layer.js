@@ -25,12 +25,17 @@
 // eslint-disable-next-line max-len
 /** @typedef {import("../src/display/struct_tree_layer_builder.js").StructTreeLayerBuilder} StructTreeLayerBuilder */
 
-import { AnnotationEditorType, FeatureTest } from "../../shared/util.js";
+import {
+  AnnotationEditorPrefix,
+  AnnotationEditorType,
+  FeatureTest,
+} from "../../shared/util.js";
 import { AnnotationEditor } from "./editor.js";
 import { FreeTextEditor } from "./freetext.js";
 import { HighlightEditor } from "./highlight.js";
 import { InkEditor } from "./ink.js";
 import { setLayerDimensions } from "../display_utils.js";
+import { SignatureEditor } from "./signature.js";
 import { StampEditor } from "./stamp.js";
 
 /**
@@ -84,15 +89,22 @@ class AnnotationEditorLayer {
 
   #textSelectionAC = null;
 
+  #textLayerDblClickAC = null;
+
+  #lastPointerDownTimestamp = -1;
+
   #uiManager;
 
   static _initialized = false;
 
   static #editorTypes = new Map(
-    [FreeTextEditor, InkEditor, StampEditor, HighlightEditor].map(type => [
-      type._editorType,
-      type,
-    ])
+    [
+      FreeTextEditor,
+      InkEditor,
+      StampEditor,
+      HighlightEditor,
+      SignatureEditor,
+    ].map(type => [type._editorType, type])
   );
 
   /**
@@ -144,10 +156,10 @@ class AnnotationEditorLayer {
 
   /**
    * Update the toolbar if it's required to reflect the tool currently used.
-   * @param {number} mode
+   * @param {Object} options
    */
-  updateToolbar(mode) {
-    this.#uiManager.updateToolbar(mode);
+  updateToolbar(options) {
+    this.#uiManager.updateToolbar(options);
   }
 
   /**
@@ -234,6 +246,8 @@ class AnnotationEditorLayer {
     this.#isEnabling = true;
     this.div.tabIndex = 0;
     this.togglePointerEvents(true);
+    this.#textLayerDblClickAC?.abort();
+    this.#textLayerDblClickAC = null;
     const annotationElementIds = new Set();
     for (const editor of this.#editors.values()) {
       editor.enableEditing();
@@ -276,6 +290,52 @@ class AnnotationEditorLayer {
     this.#isDisabling = true;
     this.div.tabIndex = -1;
     this.togglePointerEvents(false);
+    if (this.#textLayer && !this.#textLayerDblClickAC) {
+      this.#textLayerDblClickAC = new AbortController();
+      const signal = this.#uiManager.combinedSignal(this.#textLayerDblClickAC);
+      this.#textLayer.div.addEventListener(
+        "pointerdown",
+        e => {
+          // It's the default value in Fenix:
+          // https://searchfox.org/mozilla-central/rev/beba5cde846f944c4d709e75cbe499d17af880a4/modules/libpref/init/StaticPrefList.yaml#19064
+          // and in Chrome and Windows:
+          // https://source.chromium.org/chromium/chromium/src/+/main:ui/events/event_constants.h;drc=f0f5f3ceebb00da9363ccc7a1e2c0f17b6b383ba;l=115
+          const DBL_CLICK_THRESHOLD = 500;
+          const { clientX, clientY, timeStamp } = e;
+          const lastPointerDownTimestamp = this.#lastPointerDownTimestamp;
+          if (timeStamp - lastPointerDownTimestamp > DBL_CLICK_THRESHOLD) {
+            this.#lastPointerDownTimestamp = timeStamp;
+            return;
+          }
+          this.#lastPointerDownTimestamp = -1;
+          const { classList } = this.div;
+          classList.toggle("getElements", true);
+          const elements = document.elementsFromPoint(clientX, clientY);
+          classList.toggle("getElements", false);
+          if (!this.div.contains(elements[0])) {
+            return;
+          }
+          let id;
+          const regex = new RegExp(`^${AnnotationEditorPrefix}[0-9]+$`);
+          for (const element of elements) {
+            if (regex.test(element.id)) {
+              id = element.id;
+              break;
+            }
+          }
+          if (!id) {
+            return;
+          }
+          const editor = this.#editors.get(id);
+          if (editor?.annotationElementId === null) {
+            e.stopPropagation();
+            e.preventDefault();
+            editor.dblclick();
+          }
+        },
+        { signal, capture: true }
+      );
+    }
     const changedAnnotations = new Map();
     const resetAnnotations = new Map();
     for (const editor of this.#editors.values()) {
@@ -299,6 +359,7 @@ class AnnotationEditorLayer {
       for (const editable of editables) {
         const { id } = editable.data;
         if (this.#uiManager.isDeletedAnnotationElement(id)) {
+          editable.updateEdited({ deleted: true });
           continue;
         }
         let editor = resetAnnotations.get(id);
@@ -470,7 +531,7 @@ class AnnotationEditorLayer {
 
   /**
    * An editor can have a different parent, for example after having
-   * being dragged and droped from a page to another.
+   * being dragged and dropped from a page to another.
    * @param {AnnotationEditor} editor
    */
   changeParent(editor) {
@@ -614,12 +675,12 @@ class AnnotationEditorLayer {
 
   /**
    * Paste some content into a new editor.
-   * @param {number} mode
+   * @param {Object} options
    * @param {Object} params
    */
-  pasteEditor(mode, params) {
-    this.#uiManager.updateToolbar(mode);
-    this.#uiManager.updateMode(mode);
+  async pasteEditor(options, params) {
+    this.updateToolbar(options);
+    await this.#uiManager.updateMode(options.mode);
 
     const { offsetX, offsetY } = this.#getCenterPoint();
     const id = this.getNextId();
@@ -694,8 +755,12 @@ class AnnotationEditorLayer {
   /**
    * Create and add a new editor.
    */
-  addNewEditor() {
-    this.createAndAddNewEditor(this.#getCenterPoint(), /* isCentered = */ true);
+  addNewEditor(data = {}) {
+    this.createAndAddNewEditor(
+      this.#getCenterPoint(),
+      /* isCentered = */ true,
+      data
+    );
   }
 
   /**
@@ -758,7 +823,11 @@ class AnnotationEditorLayer {
       return;
     }
 
-    if (this.#uiManager.getMode() === AnnotationEditorType.STAMP) {
+    const currentMode = this.#uiManager.getMode();
+    if (
+      currentMode === AnnotationEditorType.STAMP ||
+      currentMode === AnnotationEditorType.SIGNATURE
+    ) {
       this.#uiManager.unselectAll();
       return;
     }
@@ -805,7 +874,9 @@ class AnnotationEditorLayer {
   }
 
   startDrawingSession(event) {
-    this.div.focus();
+    this.div.focus({
+      preventScroll: true,
+    });
     if (this.#drawingAC) {
       this.#currentEditorType.startDrawing(this, this.#uiManager, false, event);
       return;
