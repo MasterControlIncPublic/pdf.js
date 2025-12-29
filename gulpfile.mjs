@@ -2272,11 +2272,11 @@ gulp.task(
   gulp.series("clean", "generic", function packageMcBuild(done) {
     const targetName = getTargetName();
     gulp
-      .src(BUILD_DIR + "generic/**")
+      .src(BUILD_DIR + "generic/**", { encoding: false })
       .pipe(gulp.dest(MC_DIR))
       .on("end", function () {
         gulp
-          .src(MC_DIR + "**", { base: BUILD_DIR })
+          .src(MC_DIR + "**", { base: BUILD_DIR, encoding: false })
           .pipe(zip(targetName))
           .pipe(gulp.dest(BUILD_DIR))
           .on("end", function () {
