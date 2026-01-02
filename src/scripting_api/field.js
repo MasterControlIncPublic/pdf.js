@@ -38,12 +38,12 @@ class Field extends PDFObject {
     this.doNotScroll = data.doNotScroll;
     this.doNotSpellCheck = data.doNotSpellCheck;
     this.delay = data.delay;
-    this.display = data.display;
+    this._display = data.display;
     this.doc = data.doc.wrapped;
     this.editable = data.editable;
     this.exportValues = data.exportValues;
     this.fileSelect = data.fileSelect;
-    this.hidden = data.hidden;
+    this._hidden = data.hidden;
     this.highlight = data.highlight;
     this.lineWidth = data.lineWidth;
     this.multiline = data.multiline;
@@ -195,6 +195,27 @@ class Field extends PDFObject {
 
   set borderColor(color) {
     this.strokeColor = color;
+  }
+
+  get hidden() {
+    return this._hidden;
+  }
+
+  set hidden(hidden) {
+    this._hidden = !!hidden;
+    this._send({ id: this._id, hidden: this._hidden });
+  }
+
+  get display() {
+    return this._display;
+  }
+
+  set display(display) {
+    // display values: 0=visible, 1=hidden, 2=noPrint, 3=noView
+    if (typeof display === "number" && display >= 0 && display <= 3) {
+      this._display = display;
+      this._send({ id: this._id, display: this._display });
+    }
   }
 
   get page() {

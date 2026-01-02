@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-const VIEWER_TYPE = "PDF.js";
+const VIEWER_TYPE = "mcPDF.js";
 const VIEWER_VARIATION = "Full";
 const VIEWER_VERSION = 21.00720099;
 const FORMS_VERSION = 21.00720099;

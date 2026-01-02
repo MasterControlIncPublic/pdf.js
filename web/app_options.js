@@ -165,7 +165,7 @@ const defaultOptions = {
   },
   annotationMode: {
     /** @type {number} */
-    value: 1,
+    value: 2,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   capCanvasAreaFactor: {
