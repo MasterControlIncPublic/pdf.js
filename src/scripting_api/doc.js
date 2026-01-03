@@ -90,31 +90,15 @@ class Doc extends PDFObject {
     };
 
     // Include custom metadata fields from the PDF's Info dictionary
-    // Exclude only fields that pdf.js adds (not from the PDF itself)
-    const pdfJsAddedFields = new Set([
-      // Fields added by pdf.js internals (from initialization.js and app.js)
-      'send', 'globalEval', 'externalCall', 'proxyHandler', '_document',
-      'baseURL', 'filesize', 'filename', 'metadata', 'numPages', 'URL',
-      'calculationOrder', 'actions', 'pageNum', 'layout', 'zoom', 'docID',
-      // Standard fields already processed above
-      'Title', 'Author', 'Subject', 'Keywords', 'Creator', 'Producer',
-      'CreationDate', 'ModDate', 'Trapped', 'authors', 'EncryptFilterName',
-      // PDF structure fields (not metadata)
-      'PDFFormatVersion', 'Language', 'IsLinearized', 'IsAcroFormPresent',
-      'IsXFAPresent', 'IsCollectionPresent', 'IsSignaturesPresent', 'Custom'
-    ]);
-
     for (const key in data) {
       if (data.hasOwnProperty(key)) {
         const value = data[key];
-        // Include custom metadata if: not a pdf.js field, not already in info, and is a primitive value
-        if (!pdfJsAddedFields.has(key) &&
-            value !== null &&
+        // Include custom metadata if: not already in info, and is a primitive value
+        if (value !== null &&
             value !== undefined &&
             typeof value !== 'function' &&
             typeof value !== 'object') {
-          // Add with lowercase key since InfoProxyHandler converts to lowercase
-          infoObject[key.toLowerCase()] = value;
+          infoObject[key.toLowerCase()] = value;// Add with lowercase key since InfoProxyHandler converts to lowercase
         }
       }
     }
