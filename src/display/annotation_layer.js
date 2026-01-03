@@ -1205,8 +1205,6 @@ class TextAnnotationElement extends AnnotationElement {
 class WidgetAnnotationElement extends AnnotationElement {
   render() {
     // Show only the container for unsupported field types.
-    // Apply any properties that were set via JavaScript before rendering
-    this._setDefaultPropertiesFromJS(this.container);
     return this.container;
   }
 
