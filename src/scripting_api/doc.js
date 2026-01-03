@@ -93,11 +93,11 @@ class Doc extends PDFObject {
     for (const key in data) {
       if (data.hasOwnProperty(key)) {
         const value = data[key];
-        // Include custom metadata if: not already in info, and is a primitive value
+        // Include custom metadata if not already in info and is a primitive
         if (value !== null &&
-            value !== undefined &&
-            typeof value !== 'function' &&
-            typeof value !== 'object') {
+          value !== undefined &&
+          typeof value !== 'function' &&
+          typeof value !== 'object') {
           infoObject[key.toLowerCase()] = value;// Add with lowercase key since InfoProxyHandler converts to lowercase
         }
       }
