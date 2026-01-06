@@ -136,6 +136,29 @@ function initSandbox(params) {
   globalThis.color = new Proxy(color, proxyHandler);
   globalThis.console = new Proxy(new Console({ send }), proxyHandler);
   globalThis.util = new Proxy(util, proxyHandler);
+
+  // Shadow the Date constructor to handle numeric strings (Unix timestamps as strings)
+  // This allows PDF JavaScript like "new Date('1767143202634')" to work correctly
+  const OriginalDate = globalThis.Date;
+  globalThis.Date = function (...args) {
+    // If called with a single argument that is a numeric string, parse it as an integer
+    if (
+      args.length === 1 &&
+      typeof args[0] === "string" &&
+      !isNaN(args[0]) &&
+      args[0].trim() !== ""
+    ) {
+      return new OriginalDate(parseInt(args[0], 10));
+    }
+    // Otherwise, use the original Date constructor
+    return new OriginalDate(...args);
+  };
+  // Copy static methods from the original Date constructor
+  globalThis.Date.prototype = OriginalDate.prototype;
+  globalThis.Date.parse = OriginalDate.parse;
+  globalThis.Date.UTC = OriginalDate.UTC;
+  globalThis.Date.now = OriginalDate.now;
+
   globalThis.border = Border;
   globalThis.cursor = Cursor;
   globalThis.display = Display;

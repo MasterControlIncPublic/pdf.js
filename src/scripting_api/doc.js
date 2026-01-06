@@ -23,7 +23,18 @@ const DOC_EXTERNAL = false;
 
 class InfoProxyHandler {
   static get(obj, prop) {
-    return obj[prop.toLowerCase()];
+    // First try exact match
+    if (prop in obj) {
+      return obj[prop];
+    }
+    // Fall back to case-insensitive match
+    const lowerProp = prop.toLowerCase();
+    for (const key in obj) {
+      if (key.toLowerCase() === lowerProp) {
+        return obj[key];
+      }
+    }
+    return undefined;
   }
 
   static set(obj, prop, value) {
@@ -100,7 +111,7 @@ class Doc extends PDFObject {
           typeof value !== "function" &&
           typeof value !== "object"
         ) {
-          infoObject[key.toLowerCase()] = value; // Add with lowercase key since InfoProxyHandler converts to lowercase
+          infoObject[key] = value; // Add with original casing - InfoProxyHandler handles case-insensitive access
         }
       }
     }
