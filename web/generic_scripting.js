@@ -21,6 +21,18 @@ async function docProperties(pdfDocument) {
   const { info, metadata, contentDispositionFilename, contentLength } =
     await pdfDocument.getMetadata();
 
+  // Extract page box data for all pages
+  const pages = [];
+  for (let i = 1; i <= pdfDocument.numPages; i++) {
+    const page = await pdfDocument.getPage(i);
+    const view = page.view; // [x1, y1, x2, y2] - this is the MediaBox
+    pages.push({
+      MediaBox: view,
+      CropBox: view, // Use MediaBox as CropBox if not specified
+      // Note: BleedBox, TrimBox, ArtBox are rarely used, default to MediaBox
+    });
+  }
+
   return {
     ...info,
     baseURL: baseUrl,
@@ -30,6 +42,7 @@ async function docProperties(pdfDocument) {
     authors: metadata?.get("dc:creator"),
     numPages: pdfDocument.numPages,
     URL: url,
+    pages, // Add page box data
   };
 }
 

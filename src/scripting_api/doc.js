@@ -84,6 +84,7 @@ class Doc extends PDFObject {
     this._subject = data.Subject || "";
     this._title = data.Title || "";
     this._URL = data.URL || "";
+    this._pages = data.pages || [];
 
     // info has case insensitive properties
     // and they're are read-only.
@@ -970,6 +971,36 @@ class Doc extends PDFObject {
       return searchedField;
     }
 
+    // Try Adobe Acrobat .pageNum notation (e.g., "fieldName.0")
+    // Check if the name ends with a dot followed by digits
+    const pageNumMatch = cName.match(/^(.+)\.(\d+)$/);
+    if (pageNumMatch) {
+      const baseName = pageNumMatch[1];
+      const pageNum = parseInt(pageNumMatch[2], 10);
+
+      // Look for field with matching base name and page number
+      for (const [name, field] of this._fields.entries()) {
+        if (name === baseName || name.endsWith("." + baseName)) {
+          // Check if this field or its children are on the requested page
+          const children = field.obj._kidIds ? this._getChildren(name) : [field];
+          for (const child of children) {
+            if (child.obj._page === pageNum) {
+              this._fields.set(cName, child);
+              return child;
+            }
+          }
+        }
+      }
+
+      // If no exact page match, try just the base name
+      // (for single-page fields, ignore the page number)
+      const baseField = this._fields.get(baseName);
+      if (baseField) {
+        this._fields.set(cName, baseField);
+        return baseField;
+      }
+    }
+
     const parts = cName.split("#");
     let childIndex = NaN;
     if (parts.length === 2) {
@@ -1077,8 +1108,42 @@ class Doc extends PDFObject {
     /* Not implemented */
   }
 
-  getPageBox() {
-    /* TODO */
+  getPageBox(cBox = "CropBox", nPage = this._pageNum) {
+    // Handle object parameter: {cBox, nPage}
+    if (typeof cBox === "object" && cBox !== null) {
+      nPage = cBox.nPage ?? this._pageNum;
+      cBox = cBox.cBox ?? "CropBox";
+    }
+
+    // Normalize box type (case-insensitive)
+    const boxType = String(cBox).toLowerCase();
+    const boxMap = {
+      mediabox: "MediaBox",
+      cropbox: "CropBox",
+      bleedbox: "BleedBox",
+      trimbox: "TrimBox",
+      artbox: "ArtBox",
+    };
+    const normalizedBox = boxMap[boxType] || "CropBox";
+
+    // Validate page number
+    if (nPage < 0 || nPage >= this.numPages) {
+      throw new Error("Invalid page number");
+    }
+
+    // Get page data
+    const page = this._pages[nPage];
+    if (!page) {
+      // Return default US Letter size if no page data
+      return [0, 0, 612, 792];
+    }
+
+    // Try requested box type, fall back to CropBox, then MediaBox
+    return (
+      page[normalizedBox] ||
+      page.CropBox ||
+      page.MediaBox || [0, 0, 612, 792]
+    );
   }
 
   getPageLabel() {

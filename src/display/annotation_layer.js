@@ -565,6 +565,29 @@ class AnnotationElement {
           rotation: angle,
         });
       },
+      rect: event => {
+        const rect = event.detail.rect;
+        if (!Array.isArray(rect) || rect.length !== 4) {
+          return;
+        }
+
+        // PDF coordinates: [left, bottom, right, top]
+        const [left, bottom, right, top] = rect;
+        const width = right - left;
+        const height = top - bottom;
+
+        // Update container position and size
+        // Note: May need coordinate system conversion depending on page rendering
+        this.container.style.left = `${left}px`;
+        this.container.style.bottom = `${bottom}px`;
+        this.container.style.width = `${width}px`;
+        this.container.style.height = `${height}px`;
+
+        // Store in annotation storage
+        this.annotationStorage.setValue(this.data.id, {
+          rect: rect.slice(), // Store a copy
+        });
+      },
     });
   }
 
@@ -598,8 +621,10 @@ class AnnotationElement {
           target: element,
         };
         action(eventProxy);
-        // The action has been consumed: no need to keep it.
-        delete storedData[actionName];
+        // Don't delete properties - they may be needed for:
+        // 1. Sibling fields (same name, different pages) that render later
+        // 2. Future re-renders of the same field
+        // delete storedData[actionName];
       }
     }
   }
@@ -1205,6 +1230,8 @@ class TextAnnotationElement extends AnnotationElement {
 class WidgetAnnotationElement extends AnnotationElement {
   render() {
     // Show only the container for unsupported field types.
+    // Apply any properties that were set via JavaScript before rendering
+    this._setDefaultPropertiesFromJS(this.container);
     return this.container;
   }
 
@@ -3699,6 +3726,13 @@ class AnnotationLayer {
         firstChild.before(canvas);
       } else {
         firstChild.after(canvas);
+      }
+
+      // If there's a visible input/textarea element, the canvas should be hidden
+      // (user is editing the field). Otherwise, show the canvas (appearance stream).
+      const inputElement = element.querySelector("input, textarea");
+      if (inputElement && !inputElement.hidden) {
+        canvas.hidden = true;
       }
 
       const editableAnnotation = this.#editableAnnotations.get(id);
