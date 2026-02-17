@@ -1810,8 +1810,8 @@ class MarkupAnnotation extends Annotation {
     });
 
     const retRef = { ref: annotationRef };
-    if (annotation.popup) {
-      const popup = annotation.popup;
+    const { popup } = annotation;
+    if (popup) {
       if (popup.deleted) {
         annotationDict.delete("Popup");
         annotationDict.delete("Contents");
@@ -5293,8 +5293,8 @@ class FileAttachmentAnnotation extends MarkupAnnotation {
   constructor(params) {
     super(params);
 
-    const { dict, xref } = params;
-    const file = new FileSpec(dict.get("FS"), xref);
+    const { dict } = params;
+    const file = new FileSpec(dict.get("FS"));
 
     this.data.annotationType = AnnotationType.FILEATTACHMENT;
     this.data.hasOwnCanvas = this.data.noRotate;
