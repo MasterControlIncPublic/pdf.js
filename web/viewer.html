@@ -121,7 +121,7 @@ See https://github.com/adobe-type-tools/cmap-resources
                 </button>
                 <div
                   id="viewsManager"
-                  class="menuContainer sidebar"
+                  class="menuContainer sidebar mcSidebar"
                   hidden="true"
                   role="dialog"
                   aria-describedby="viewsManagerHeaderLabel"
@@ -187,7 +187,7 @@ See https://github.com/adobe-type-tools/cmap-resources
                         <span data-l10n-id="pdfjs-current-outline-item-button-label"></span>
                       </button>
                     </div>
-                    <div id="viewsManagerStatus">
+                    <div id="viewsManagerStatus" class="hidden">
                       <div id="viewsManagerStatusAction">
                         <span
                           id="viewsManagerStatusActionLabel"
@@ -618,6 +618,10 @@ See https://github.com/adobe-type-tools/cmap-resources
                   </button>
                 </div>
 
+                <button id="presentationMode" class="toolbarButton presentationMode hiddenLargeView" title="Switch to Presentation Mode" tabindex="40" data-l10n-id="pdfjs-presentation-mode-button">
+                  <span data-l10n-id="pdfjs-presentation-mode-button-label"></span>
+                </button>
+
                 <div class="verticalToolbarSeparator hiddenMediumView"></div>
 
                 <div id="secondaryToolbarToggle" class="toolbarButtonWithContainer">
@@ -659,7 +663,7 @@ See https://github.com/adobe-type-tools/cmap-resources
                       <div class="horizontalToolbarSeparator"></div>
                       <!--#endif-->
 
-                      <button id="presentationMode" class="toolbarButton labeled" type="button" tabindex="0" data-l10n-id="pdfjs-presentation-mode-button">
+                      <button id="secondaryPresentationMode" class="toolbarButton labeled" type="button" tabindex="0" data-l10n-id="pdfjs-presentation-mode-button">
                         <span data-l10n-id="pdfjs-presentation-mode-button-label"></span>
                       </button>
 

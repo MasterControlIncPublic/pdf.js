@@ -465,19 +465,6 @@ body {
   box-sizing: border-box;
 }
 
-.treeItemToggler::before {
-  /* All matching images have a size of 16x16
-   * All relevant containers have a size of 28x28 */
-  position: absolute;
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-
-  content: "";
-  background-color: var(--toolbar-icon-bg-color);
-  mask-size: cover;
-}
-
 #sidebarToggleButton::before {
   mask-image: var(--toolbarButton-sidebarToggle-icon);
   background-color: rgb(1 1 1); /*TODO: consider 0 opacity*/
@@ -486,6 +473,7 @@ body {
 
 #viewsManagerToggleButton::before {
   mask-image: var(--toolbarButton-viewsManagerToggle-icon);
+  background-color: rgb(1 1 1); /*TODO: consider 0 opacity*/
   transform: scaleX(var(--dir-factor));
 }
 
@@ -1639,7 +1627,25 @@ dialog :link {
   border-bottom-color: #34495d;
 }
 
+/* MC Custom Styling for Views Manager (formerly sidebar) */
+#viewsManager,
 .mcSidebar {
+  background-color: #202c37 !important;
+  color-scheme: dark;
+}
+
+#viewsManagerHeader {
+  background-color: #202c37 !important;
+}
+
+#viewsManagerContent {
+  background-color: #202c37 !important;
+}
+
+#thumbnailsView,
+#outlinesView,
+#attachmentsView,
+#layersView {
   background-color: #202c37 !important;
 }
 
