@@ -53,7 +53,8 @@ Use a **squash merge PR for new feature work** so that all your development comm
 ### Changes We Have Made From Mainline
 
 * These README updates
-* Temporary fix for file loading until https://github.com/mozilla/pdf.js/issues/20137 is resolved (web/app.js)
+* Added DOMPurify sanitization for URL handling in Chrome extension to prevent XSS attacks (extensions/chromium/contentscript.js, package.json)
+* Changed ESLint sourceType to "module" for Chrome extension to support ES6 imports (eslint.config.mjs)
 * The additional gulp tasks that detailed below
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
