@@ -492,51 +492,6 @@ function getDeployUrl(isRelease = false) {
   return repoURL + "com/mastercontrol/mcPDFjs/" + version;
 }
 
-function checkChromePreferencesFile(chromePrefsPath, webPrefs) {
-  const chromePrefs = JSON.parse(fs.readFileSync(chromePrefsPath).toString());
-  const chromePrefsKeys = Object.keys(chromePrefs.properties).filter(key => {
-    const description = chromePrefs.properties[key].description;
-    // Deprecated keys are allowed in the managed preferences file.
-    // The code maintainer is responsible for adding migration logic to
-    // extensions/chromium/options/migration.js and web/chromecom.js .
-    return !description?.startsWith("DEPRECATED.");
-  });
-
-  let ret = true;
-  // Verify that every entry in webPrefs is also in preferences_schema.json.
-  for (const [key, value] of Object.entries(webPrefs)) {
-    if (!chromePrefsKeys.includes(key)) {
-      // Note: this would also reject keys that are present but marked as
-      // DEPRECATED. A key should not be marked as DEPRECATED if it is still
-      // listed in webPrefs.
-      ret = false;
-      console.log(
-        `Warning: ${chromePrefsPath} does not contain an entry for pref: ${key}`
-      );
-    } else if (chromePrefs.properties[key].default !== value) {
-      ret = false;
-      console.log(
-        `Warning: not the same values (for "${key}"): ` +
-          `${chromePrefs.properties[key].default} !== ${value}`
-      );
-    }
-  }
-
-  // Verify that preferences_schema.json does not contain entries that are not
-  // in webPrefs (app_options.js).
-  for (const key of chromePrefsKeys) {
-    if (!(key in webPrefs)) {
-      ret = false;
-      console.log(
-        `Warning: ${chromePrefsPath} contains an unrecognized pref: ${key}. ` +
-          `Remove it, or prepend "DEPRECATED. " and add migration logic to ` +
-          `extensions/chromium/options/migration.js and web/chromecom.js.`
-      );
-    }
-  }
-  return ret;
-}
-
 function createMainBundle(defines) {
   const mainFileConfig = createWebpackConfig(defines, {
     filename: defines.MINIFIED ? "pdf.min.mjs" : "pdf.mjs",
