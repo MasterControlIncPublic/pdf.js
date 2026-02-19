@@ -52,23 +52,39 @@ Use a **squash merge PR for new feature work** so that all your development comm
 
 ### Changes We Have Made From Mainline
 
+#### Build & Development
 * These README updates
-* Temporary fix for file loading until https://github.com/mozilla/pdf.js/issues/20137 is resolved (web/app.js) (issue was closed but we're still experiencing the double encoding issues)
-* Added DOMPurify sanitization for URL handling in Chrome extension to prevent XSS attacks (extensions/chromium/contentscript.js, package.json)
+* The additional gulp tasks detailed below
 * Changed ESLint sourceType to "module" for Chrome extension to support ES6 imports (eslint.config.mjs)
-* Custom dark theme styling for the views manager (formerly sidebar) - applied via mcSidebar class and CSS targeting #viewsManager, #viewsManagerHeader, #viewsManagerContent, and view containers (web/viewer.html, web/viewer.css)
-* The additional gulp tasks that detailed below
+
+#### Security
+* Added DOMPurify sanitization for URL handling in Chrome extension to prevent XSS attacks (extensions/chromium/contentscript.js, package.json)
+
+#### Bug Fixes
+* Temporary fix for file loading until https://github.com/mozilla/pdf.js/issues/20137 is resolved (web/app.js) (issue was closed but we're still experiencing the double encoding issues)
+
+#### Feature Restrictions
 * We don't allow download (web/app.js)
 * We don't allow save (web/app.js)
 * We don't allow annotating/inking the pdf (web/viewer.html) (currently just hiding the button, we may want to find a more pdf.js way to disable editing)
 * We don't allow page management actions (copy/cut/delete/save pages) - hidden via viewsManagerStatus element (web/viewer.html)
+
+#### Styling & UI Customizations
+* Custom dark theme styling for the views manager (formerly sidebar):
+  - Applied via mcSidebar class and CSS targeting #viewsManager, #viewsManagerHeader, #viewsManagerContent, and view containers (web/viewer.html, web/viewer.css)
+  - Uses `color-scheme: dark` to automatically apply light text on dark backgrounds
+* Custom thumbnail styling via mcThumbnail class (web/pdf_thumbnail_view.js, web/viewer.css)
+* Custom toolbar styling via mcToolbar class (web/viewer.html, web/viewer.css)
+* Custom viewer background via mcViewer class (web/viewer.html, web/viewer.css)
+* Use plain HTML checkboxes in findbar instead of Mozilla's custom toggle buttons (web/viewer.html - removed toggleButton class, moved toolbarLabel to label)
+* Removed Mozilla's dark theme option (web/viewer.css)
+* Added presentation mode button to main toolbar for easy access (web/viewer.html id="presentationMode", web/viewer.js configuration)
+* Removed page scroll mode from the toolbar (web/viewer.html) (didn't feel intuitive that there were other pages to scroll to)
+* Include Global-complete styles (web/viewer.html)
+
+#### Configuration Changes
 * We change the print resolution (web/app_options.js)
 * Configurably can allow printing (web/pdf_print_service.js, app.js)
-* Affect styling via css (web/pdf_thumbnail_view.js, web/viewer.css, web/viewer.html)
-* Removed dark theme (web/viewer.css)
-* Added presentation mode button to main toolbar for easy access (web/viewer.html id="presentationMode", web/viewer.js configuration)
-* Remove page scroll mode from the toolbar (web/viewer.html) (didn't feel intuitive that there were other pages to scroll to)
-* Include Global-complete styles (web/viewer.html)
 * Turned off rendering of form field values via HTML canvas due to issues with it rendering correctly with hardware acceleration on in Chromium browsers (the default) (core/annotation.js)
 * Changed AnnotationMode to "ENABLE" which disables interactive form fields. This setting may be dependent on the form field rendering change above. (web/app_options.js)
 
