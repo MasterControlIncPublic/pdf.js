@@ -136,6 +136,81 @@ function initSandbox(params) {
   globalThis.color = new Proxy(color, proxyHandler);
   globalThis.console = new Proxy(new Console({ send }), proxyHandler);
   globalThis.util = new Proxy(util, proxyHandler);
+
+  // Shadow the Date constructor to handle numeric strings (Unix timestamps as strings)
+  // This allows PDF JavaScript like "new Date('1767143202634')" to work correctly
+  const OriginalDate = globalThis.Date;
+  globalThis.Date = function (...args) {
+    // If called with a single argument that is a numeric string, parse it as an integer
+    if (
+      args.length === 1 &&
+      typeof args[0] === "string" &&
+      !isNaN(args[0]) &&
+      args[0].trim() !== ""
+    ) {
+      return new OriginalDate(parseInt(args[0], 10));
+    }
+    // Otherwise, use the original Date constructor
+    return new OriginalDate(...args);
+  };
+  // Copy static methods from the original Date constructor
+  globalThis.Date.prototype = OriginalDate.prototype;
+  globalThis.Date.parse = OriginalDate.parse;
+  globalThis.Date.UTC = OriginalDate.UTC;
+  globalThis.Date.now = OriginalDate.now;
+
+  // Add polyfill for legacy Mozilla toSource() method
+  // This allows legacy PDF JavaScript like "eval(this.info.toSource())" to work
+  if (!Object.prototype.toSource) {
+    Object.defineProperty(Object.prototype, "toSource", {
+      value: function () {
+        const toSource = (obj, visited = new WeakSet()) => {
+          if (obj === null) {
+            return "null";
+          }
+          if (obj === undefined) {
+            return "undefined";
+          }
+          if (typeof obj === "string") {
+            return JSON.stringify(obj);
+          }
+          if (typeof obj === "number" || typeof obj === "boolean") {
+            return String(obj);
+          }
+          if (typeof obj === "function") {
+            return "function()";
+          }
+
+          // Handle circular references
+          if (visited.has(obj)) {
+            return "{}";
+          }
+          visited.add(obj);
+
+          if (Array.isArray(obj)) {
+            const items = obj.map(item => toSource(item, visited));
+            return `[${items.join(", ")}]`;
+          }
+
+          // Handle plain objects
+          const pairs = [];
+          for (const key in obj) {
+            if (obj.hasOwnProperty(key)) {
+              const value = toSource(obj[key], visited);
+              pairs.push(`${key}: ${value}`);
+            }
+          }
+          return `({${pairs.join(", ")}})`;
+        };
+
+        return toSource(this);
+      },
+      writable: true,
+      configurable: true,
+      enumerable: false,
+    });
+  }
+
   globalThis.border = Border;
   globalThis.cursor = Cursor;
   globalThis.display = Display;

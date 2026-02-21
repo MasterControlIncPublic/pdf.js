@@ -1810,8 +1810,8 @@ class MarkupAnnotation extends Annotation {
     });
 
     const retRef = { ref: annotationRef };
-    if (annotation.popup) {
-      const popup = annotation.popup;
+    const { popup } = annotation;
+    if (popup) {
       if (popup.deleted) {
         annotationDict.delete("Popup");
         annotationDict.delete("Contents");
@@ -2779,10 +2779,10 @@ class TextWidgetAnnotation extends WidgetAnnotation {
       warn("Barcodes are not supported");
     }
 
-    // this.data.hasOwnCanvas = this.data.readOnly && !this.data.noHTML;
+    this.data.hasOwnCanvas = this.data.readOnly && !this.data.noHTML;
     // MasterControl turned this off to avoid issues with chromium
     // browsers with hardware accelleration on.
-    this.data.hasOwnCanvas = false;
+    // this.data.hasOwnCanvas = false;
     this._hasText = true;
 
     // The field value is always a string.
@@ -5293,8 +5293,8 @@ class FileAttachmentAnnotation extends MarkupAnnotation {
   constructor(params) {
     super(params);
 
-    const { dict, xref } = params;
-    const file = new FileSpec(dict.get("FS"), xref);
+    const { dict } = params;
+    const file = new FileSpec(dict.get("FS"));
 
     this.data.annotationType = AnnotationType.FILEATTACHMENT;
     this.data.hasOwnCanvas = this.data.noRotate;

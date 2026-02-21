@@ -27,7 +27,6 @@ import {
   stringToBytes,
   stringToPDFString,
   stringToUTF8String,
-  toHexUtil,
   unreachable,
   Util,
   warn,
@@ -61,6 +60,7 @@ import {
   RefSetCache,
 } from "./primitives.js";
 import { getXfaFontDict, getXfaFontName } from "./xfa_fonts.js";
+import { NullStream, Stream } from "./stream.js";
 import { BaseStream } from "./base_stream.js";
 import { calculateMD5 } from "./calculate_md5.js";
 import { Catalog } from "./catalog.js";
@@ -68,7 +68,6 @@ import { clearGlobalCaches } from "./cleanup_helper.js";
 import { DatasetReader } from "./dataset_reader.js";
 import { Intersector } from "./intersector.js";
 import { Linearization } from "./parser.js";
-import { NullStream } from "./stream.js";
 import { ObjectLoader } from "./object_loader.js";
 import { OperatorList } from "./operator_list.js";
 import { PartialEvaluator } from "./evaluator.js";
@@ -178,7 +177,7 @@ class Page {
     );
   }
 
-  #getBoundingBox(name) {
+  getBoundingBox(name) {
     if (this.xfaData) {
       return this.xfaData.bbox;
     }
@@ -201,7 +200,7 @@ class Page {
     return shadow(
       this,
       "mediaBox",
-      this.#getBoundingBox("MediaBox") || LETTER_SIZE_MEDIABOX
+      this.getBoundingBox("MediaBox") || LETTER_SIZE_MEDIABOX
     );
   }
 
@@ -210,7 +209,7 @@ class Page {
     return shadow(
       this,
       "cropBox",
-      this.#getBoundingBox("CropBox") || this.mediaBox
+      this.getBoundingBox("CropBox") || this.mediaBox
     );
   }
 
@@ -270,10 +269,32 @@ class Page {
   async getContentStream() {
     const content = await this.pdfManager.ensure(this, "content");
 
-    if (content instanceof BaseStream) {
+    if (content instanceof BaseStream && !content.isImageStream) {
+      if (content.isAsync) {
+        const bytes = await content.asyncGetBytes();
+        if (bytes) {
+          return new Stream(bytes, 0, bytes.length, content.dict);
+        }
+      }
       return content;
     }
     if (Array.isArray(content)) {
+      const promises = [];
+      for (let i = 0, ii = content.length; i < ii; i++) {
+        const item = content[i];
+        if (item instanceof BaseStream && item.isAsync) {
+          promises.push(
+            item.asyncGetBytes().then(bytes => {
+              if (bytes) {
+                content[i] = new Stream(bytes, 0, bytes.length, item.dict);
+              }
+            })
+          );
+        }
+      }
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
       return new StreamsSequenceStream(
         content,
         this.#onSubStreamError.bind(this)
@@ -442,6 +463,8 @@ class Page {
     task,
     intent,
     cacheKey,
+    pageId = this.pageIndex,
+    pageIndex = this.pageIndex,
     annotationStorage = null,
     modifiedIds = null,
   }) {
@@ -527,13 +550,12 @@ class Page {
         RESOURCES_KEYS_OPERATOR_LIST
       );
       const opList = new OperatorList(intent, sink);
-
       handler.send("StartRenderPage", {
         transparency: partialEvaluator.hasBlendModes(
           resources,
           this.nonBlendModesSet
         ),
-        pageIndex: this.pageIndex,
+        pageIndex,
         cacheKey,
       });
 
@@ -1167,49 +1189,6 @@ class PDFDocument {
     });
   }
 
-  #collectSignatureCertificates(
-    fields,
-    collectedSignatureCertificates,
-    visited = new RefSet()
-  ) {
-    if (!Array.isArray(fields)) {
-      return;
-    }
-    for (let field of fields) {
-      if (field instanceof Ref) {
-        if (visited.has(field)) {
-          continue;
-        }
-        visited.put(field);
-      }
-      field = this.xref.fetchIfRef(field);
-      if (!(field instanceof Dict)) {
-        continue;
-      }
-      if (field.has("Kids")) {
-        this.#collectSignatureCertificates(
-          field.get("Kids"),
-          collectedSignatureCertificates,
-          visited
-        );
-        continue;
-      }
-      const isSignature = isName(field.get("FT"), "Sig");
-      if (!isSignature) {
-        continue;
-      }
-      const value = field.get("V");
-      if (!(value instanceof Dict)) {
-        continue;
-      }
-      const subFilter = value.get("SubFilter");
-      if (!(subFilter instanceof Name)) {
-        continue;
-      }
-      collectedSignatureCertificates.add(subFilter.name);
-    }
-  }
-
   get _xfaStreams() {
     const { acroForm } = this.catalog;
     if (!acroForm) {
@@ -1525,20 +1504,6 @@ class PDFDocument {
       // specification).
       const sigFlags = acroForm.get("SigFlags");
       const hasSignatures = !!(sigFlags & 0x1);
-      if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
-        if (hasSignatures) {
-          const collectedSignatureCertificates = new Set();
-          this.#collectSignatureCertificates(
-            fields,
-            collectedSignatureCertificates
-          );
-          if (collectedSignatureCertificates.size > 0) {
-            formInfo.collectedSignatureCertificates = Array.from(
-              collectedSignatureCertificates
-            );
-          }
-        }
-      }
       const hasOnlyDocumentSignatures =
         hasSignatures && this.#hasOnlyDocumentSignatures(fields);
       formInfo.hasAcroForm = hasFields && !hasOnlyDocumentSignatures;
@@ -1565,11 +1530,6 @@ class PDFDocument {
       IsCollectionPresent: !!catalog.collection,
       IsSignaturesPresent: formInfo.hasSignatures,
     };
-
-    if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
-      docInfo.collectedSignatureCertificates =
-        formInfo.collectedSignatureCertificates ?? null;
-    }
 
     let infoDict;
     try {
@@ -1667,8 +1627,8 @@ class PDFDocument {
     }
 
     return shadow(this, "fingerprints", [
-      toHexUtil(hashOriginal),
-      hashModified ? toHexUtil(hashModified) : null,
+      hashOriginal.toHex(),
+      hashModified?.toHex() ?? null,
     ]);
   }
 

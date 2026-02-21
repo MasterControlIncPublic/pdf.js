@@ -37,19 +37,15 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
 
   // Limit canvas size to 5 mega-pixels on mobile.
   // Support: Android, iOS
-  (function () {
-    if (isIOS || isAndroid) {
-      compatParams.set("maxCanvasPixels", 5242880);
-    }
-  })();
+  if (isIOS || isAndroid) {
+    compatParams.set("maxCanvasPixels", 5242880);
+  }
 
   // Don't use system fonts on Android (issue 18210).
   // Support: Android
-  (function () {
-    if (isAndroid) {
-      compatParams.set("useSystemFonts", false);
-    }
-  })();
+  if (isAndroid) {
+    compatParams.set("useSystemFonts", false);
+  }
 }
 
 const OptionKind = {
@@ -165,12 +161,20 @@ const defaultOptions = {
   },
   annotationMode: {
     /** @type {number} */
-    value: 1,
+    value: 2,
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   capCanvasAreaFactor: {
     /** @type {number} */
     value: 200,
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  commentLearnMoreUrl: {
+    /** @type {string} */
+    value:
+      typeof PDFJSDev === "undefined" || PDFJSDev.test("MOZCENTRAL")
+        ? "https://support.mozilla.org/%LOCALE%/kb/view-pdf-files-firefox-or-choose-another-viewer#w_add-a-comment-to-a-pdf"
+        : "",
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   cursorToolOnLoad: {
@@ -220,7 +224,7 @@ const defaultOptions = {
   },
   enableComment: {
     /** @type {boolean} */
-    value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
+    value: typeof PDFJSDev === "undefined",
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   enableDetailCanvas: {
@@ -267,6 +271,11 @@ const defaultOptions = {
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
   },
   enableSignatureEditor: {
+    /** @type {boolean} */
+    value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
+    kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
+  },
+  enableSplitMerge: {
     /** @type {boolean} */
     value: typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING"),
     kind: OptionKind.VIEWER + OptionKind.PREFERENCE,
@@ -569,7 +578,7 @@ if (typeof PDFJSDev === "undefined" || PDFJSDev.test("GENERIC")) {
   };
 }
 
-if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING || LIB")) {
+if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
   // Ensure that the `defaultOptions` are correctly specified.
   for (const name in defaultOptions) {
     const { value, kind, type } = defaultOptions[name];

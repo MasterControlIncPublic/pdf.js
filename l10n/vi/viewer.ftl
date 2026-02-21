@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } MB ({ $b } bytes)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } KB ({ $size_b } byte)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MB ({ $size_b } byte)
 pdfjs-document-properties-title = Tiêu đề:
 pdfjs-document-properties-author = Tác giả:
 pdfjs-document-properties-subject = Chủ đề:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Ngày sửa đổi:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date }, { $time }
 pdfjs-document-properties-creator = Người tạo:
 pdfjs-document-properties-producer = Phần mềm tạo PDF:
 pdfjs-document-properties-version = Phiên bản PDF:
@@ -267,10 +255,6 @@ pdfjs-rendering-error = Lỗi khi hiển thị trang.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date }, { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -313,9 +297,13 @@ pdfjs-highlight-floating-button1 =
     .aria-label = Đánh dấu
 pdfjs-highlight-floating-button-label = Đánh dấu
 pdfjs-comment-floating-button =
-    .title = Bình luận
-    .aria-label = Bình luận
-pdfjs-comment-floating-button-label = Bình luận
+    .title = Chú thích
+    .aria-label = Chú thích
+pdfjs-comment-floating-button-label = Chú thích
+pdfjs-editor-comment-button =
+    .title = Chú thích
+    .aria-label = Chú thích
+pdfjs-editor-comment-button-label = Chú thích
 pdfjs-editor-signature-button =
     .title = Thêm chữ ký
 pdfjs-editor-signature-button-label = Thêm chữ ký
@@ -378,20 +366,23 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Trình chỉnh sửa văn bản
     .default-content = Bắt đầu nhập…
-pdfjs-free-text =
-    .aria-label = Trình sửa văn bản
-pdfjs-free-text-default-content = Bắt đầu nhập…
-pdfjs-ink =
-    .aria-label = Trình sửa nét vẽ
-pdfjs-ink-canvas =
-    .aria-label = Hình ảnh do người dùng tạo
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title = Chú thích
+pdfjs-editor-comments-sidebar-close-button =
+    .title = Đóng thanh lề
+    .aria-label = Đóng thanh lề
+pdfjs-editor-comments-sidebar-close-button-label = Đóng thanh lề
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Bạn thấy điều gì đáng chú ý? Hãy đánh dấu và để lại chú thích.
+pdfjs-editor-comments-sidebar-no-comments-link = Tìm hiểu thêm
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Văn bản thay thế
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Chỉnh sửa văn bản thay thế
-pdfjs-editor-alt-text-edit-button-label = Chỉnh sửa văn bản thay thế
 pdfjs-editor-alt-text-dialog-label = Chọn một lựa chọn
 pdfjs-editor-alt-text-dialog-description = Văn bản thay thế sẽ hữu ích khi mọi người không thể thấy hình ảnh hoặc khi hình ảnh không tải.
 pdfjs-editor-alt-text-add-description-label = Thêm một mô tả
@@ -411,14 +402,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Trên cùng bên trái — thay đổi kích thước
-pdfjs-editor-resizer-label-top-middle = Trên cùng ở giữa — thay đổi kích thước
-pdfjs-editor-resizer-label-top-right = Trên cùng bên phải — thay đổi kích thước
-pdfjs-editor-resizer-label-middle-right = Ở giữa bên phải — thay đổi kích thước
-pdfjs-editor-resizer-label-bottom-right = Dưới cùng bên phải — thay đổi kích thước
-pdfjs-editor-resizer-label-bottom-middle = Ở giữa dưới cùng — thay đổi kích thước
-pdfjs-editor-resizer-label-bottom-left = Góc dưới bên trái — thay đổi kích thước
-pdfjs-editor-resizer-label-middle-left = Ở giữa bên trái — thay đổi kích thước
 pdfjs-editor-resizer-top-left =
     .aria-label = Trên cùng bên trái — thay đổi kích thước
 pdfjs-editor-resizer-top-middle =
@@ -606,25 +589,33 @@ pdfjs-editor-add-signature-cancel-button = Hủy bỏ
 pdfjs-editor-add-signature-add-button = Thêm
 pdfjs-editor-edit-signature-update-button = Cập nhật
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Chỉnh sửa chú thích
+pdfjs-editor-edit-comment-popup-button =
+    .title = Chỉnh sửa chú thích
+pdfjs-editor-delete-comment-popup-button-label = Xoá chú thích
+pdfjs-editor-delete-comment-popup-button =
+    .title = Xoá chú thích
+pdfjs-show-comment-button =
+    .title = Hiển thị chú thích
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Hành động
-pdfjs-editor-edit-comment-actions-button =
-    .title = Hành động
-pdfjs-editor-edit-comment-close-button-label = Đóng
-pdfjs-editor-edit-comment-close-button =
-    .title = Đóng
-pdfjs-editor-edit-comment-actions-edit-button-label = Chỉnh sửa
-pdfjs-editor-edit-comment-actions-delete-button-label = Xóa
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Nhập bình luận của bạn
-pdfjs-editor-edit-comment-manager-cancel-button = Hủy bỏ
-pdfjs-editor-edit-comment-manager-save-button = Lưu
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Chỉnh sửa chú thích
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Cập nhật
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Thêm chú thích
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Thêm
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Bắt đầu nhập…
+pdfjs-editor-edit-comment-dialog-cancel-button = Hủy bỏ
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Chỉnh sửa bình luận
+pdfjs-editor-add-comment-button =
+    .title = Thêm chú thích
 
 ## Main menu for adding/removing signatures
 

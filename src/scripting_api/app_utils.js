@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-const VIEWER_TYPE = "PDF.js";
+const VIEWER_TYPE = "Reader"; //MC need to trick our old pdfs
 const VIEWER_VARIATION = "Full";
 const VIEWER_VERSION = 21.00720099;
 const FORMS_VERSION = 21.00720099;
