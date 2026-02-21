@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } Mo ({ $b } oktetoj)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } KO ({ $size_b } oktetoj)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MO ({ $size_b } oktetoj)
 pdfjs-document-properties-title = Titolo:
 pdfjs-document-properties-author = Aŭtoro:
 pdfjs-document-properties-subject = Temo:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Dato de modifo:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date }, { $time }
 pdfjs-document-properties-creator = Kreinto:
 pdfjs-document-properties-producer = Produktinto de PDF:
 pdfjs-document-properties-version = Versio de PDF:
@@ -275,10 +263,6 @@ pdfjs-rendering-error = Okazis eraro dum la montro de la paĝo.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date }, { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -324,6 +308,10 @@ pdfjs-comment-floating-button =
     .title = Komenti
     .aria-label = Komenti
 pdfjs-comment-floating-button-label = Komenti
+pdfjs-editor-comment-button =
+    .title = Komenti
+    .aria-label = Komenti
+pdfjs-editor-comment-button-label = Komenti
 pdfjs-editor-signature-button =
     .title = Aldoni subskribon
 pdfjs-editor-signature-button-label = Aldoni subskribon
@@ -386,20 +374,27 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Teksta redaktilo
     .default-content = Komencu tajpi…
-pdfjs-free-text =
-    .aria-label = Teksta redaktilo
-pdfjs-free-text-default-content = Ektajpi…
-pdfjs-ink =
-    .aria-label = Desegnan redaktilon
-pdfjs-ink-canvas =
-    .aria-label = Bildo kreita de uzanto
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title =
+    { $count ->
+        [one] Komenti
+       *[other] Komentoj
+    }
+pdfjs-editor-comments-sidebar-close-button =
+    .title = Fermi la flankan strion
+    .aria-label = Fermi la flankan strion
+pdfjs-editor-comments-sidebar-close-button-label = Fermi la flankan strion
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Ĉu vi rimarkas ion interesan? Elstarigu tion kaj aldonu komenton.
+pdfjs-editor-comments-sidebar-no-comments-link = Pli da informo
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Alternativa teksto
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Redakti alternativan tekston
-pdfjs-editor-alt-text-edit-button-label = Redakti alternativan tekston
 pdfjs-editor-alt-text-dialog-label = Elektu eblon
 pdfjs-editor-alt-text-dialog-description = Alternativa teksto helpas personojn, en la okazoj kiam ili ne povas vidi aŭ ŝargi la bildon.
 pdfjs-editor-alt-text-add-description-label = Aldoni priskribon
@@ -419,14 +414,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Supra maldekstra angulo — ŝangi grandon
-pdfjs-editor-resizer-label-top-middle = Supra mezo — ŝanĝi grandon
-pdfjs-editor-resizer-label-top-right = Supran dekstran angulon — ŝanĝi grandon
-pdfjs-editor-resizer-label-middle-right = Dekstra mezo — ŝanĝi grandon
-pdfjs-editor-resizer-label-bottom-right = Malsupra deksta angulo — ŝanĝi grandon
-pdfjs-editor-resizer-label-bottom-middle = Malsupra mezo — ŝanĝi grandon
-pdfjs-editor-resizer-label-bottom-left = Malsupra maldekstra angulo — ŝanĝi grandon
-pdfjs-editor-resizer-label-middle-left = Maldekstra mezo — ŝanĝi grandon
 pdfjs-editor-resizer-top-left =
     .aria-label = Supra maldekstra angulo — ŝangi grandon
 pdfjs-editor-resizer-top-middle =
@@ -618,25 +605,33 @@ pdfjs-editor-add-signature-cancel-button = Nuligi
 pdfjs-editor-add-signature-add-button = Aldoni
 pdfjs-editor-edit-signature-update-button = Ĝisdatigi
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Modifi komenton
+pdfjs-editor-edit-comment-popup-button =
+    .title = Modifi komenton
+pdfjs-editor-delete-comment-popup-button-label = Forigi komenton
+pdfjs-editor-delete-comment-popup-button =
+    .title = Forigi komenton
+pdfjs-show-comment-button =
+    .title = Montri komenton
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Agoj
-pdfjs-editor-edit-comment-actions-button =
-    .title = Agoj
-pdfjs-editor-edit-comment-close-button-label = Fermi
-pdfjs-editor-edit-comment-close-button =
-    .title = Fermi
-pdfjs-editor-edit-comment-actions-edit-button-label = Modifi
-pdfjs-editor-edit-comment-actions-delete-button-label = Forigi
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Tajpu vian komenton
-pdfjs-editor-edit-comment-manager-cancel-button = Nuligi
-pdfjs-editor-edit-comment-manager-save-button = Konservi
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Modifi komenton
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Ĝisdatigi
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Aldoni komenton
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Aldoni
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Ektajpi…
+pdfjs-editor-edit-comment-dialog-cancel-button = Nuligi
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Modifi komenton
+pdfjs-editor-add-comment-button =
+    .title = Aldoni komenton
 
 ## Main menu for adding/removing signatures
 

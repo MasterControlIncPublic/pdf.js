@@ -25,6 +25,7 @@ import {
   getVerbosityLevel,
   info,
   isNodeJS,
+  MathClamp,
   RenderingIntentFlag,
   setVerbosityLevel,
   shadow,
@@ -40,11 +41,17 @@ import {
   deprecated,
   isDataScheme,
   isValidFetchUrl,
+  PagesMapper,
   PageViewport,
   RenderingCancelledException,
   StatTimer,
 } from "./display_utils.js";
 import { FontFaceObject, FontLoader } from "./font_loader.js";
+import {
+  FontInfo,
+  FontPathInfo,
+  PatternInfo,
+} from "../shared/obj-bin-transform.js";
 import {
   getDataProp,
   getFactoryUrlProp,
@@ -434,6 +441,7 @@ function getDocument(src = {}) {
     ownerDocument,
     pdfBug,
     styleElement,
+    enableHWA,
     loadingParams: {
       disableAutoFetch,
       enableXfa,
@@ -457,7 +465,8 @@ function getDocument(src = {}) {
 
       let networkStream;
       if (rangeTransport) {
-        networkStream = new PDFDataTransportStream(rangeTransport, {
+        networkStream = new PDFDataTransportStream({
+          pdfDataRangeTransport: rangeTransport,
           disableRange,
           disableStream,
         });
@@ -502,8 +511,7 @@ function getDocument(src = {}) {
           task,
           networkStream,
           transportParams,
-          transportFactory,
-          enableHWA
+          transportFactory
         );
         task._transport = transport;
         messageHandler.send("Ready", null);
@@ -518,6 +526,8 @@ function getDocument(src = {}) {
  * @typedef {Object} OnProgressParameters
  * @property {number} loaded - Currently loaded number of bytes.
  * @property {number} total - Total number of bytes in the PDF file.
+ * @property {number} percent - Currently loaded percentage, as an integer value
+ *   in the [0, 100] range. If `total` is undefined, the percentage is `NaN`.
  */
 
 /**
@@ -750,9 +760,6 @@ class PDFDocumentProxy {
       });
       Object.defineProperty(this, "getXFADatasets", {
         value: () => this._transport.getXFADatasets(),
-      });
-      Object.defineProperty(this, "getXRefPrevValue", {
-        value: () => this._transport.getXRefPrevValue(),
       });
       Object.defineProperty(this, "getStartXRefPos", {
         value: () => this._transport.getStartXRefPos(),
@@ -1028,6 +1035,24 @@ class PDFDocumentProxy {
   }
 
   /**
+   * @typedef {Object} PageInfo
+   * @property {null|Uint8Array} document
+   * @property {Array<Array<number>|number>} [includePages]
+   *  included ranges or indices.
+   * @property {Array<Array<number>|number>} [excludePages]
+   *  excluded ranges or indices.
+   */
+
+  /**
+   * @param {Array<PageInfo>} pageInfos - The pages to extract.
+   * @returns {Promise<Uint8Array>} A promise that is resolved with a
+   *   {Uint8Array} containing the full data of the saved document.
+   */
+  extractPages(pageInfos) {
+    return this._transport.extractPages(pageInfos);
+  }
+
+  /**
    * @returns {Promise<{ length: number }>} A promise that is resolved when the
    *   document's data is loaded. It is resolved with an {Object} that contains
    *   the `length` property that indicates size of the PDF data in bytes.
@@ -1242,8 +1267,14 @@ class PDFDocumentProxy {
  * @property {boolean} [isEditing] - Render the page in editing mode.
  * @property {boolean} [recordOperations] - Record the dependencies and bounding
  *   boxes of all PDF operations that render onto the canvas.
- * @property {Set<number>} [filteredOperationIndexes] - If provided, only run
- *   the PDF operations that are included in this set.
+ * @property {OperationsFilter} [operationsFilter] - If provided, only
+ *   run for which this function returns `true`.
+ */
+
+/**
+ * @callback OperationsFilter
+ * @param {number} index - The index of the operation.
+ * @returns {boolean} If false, the operation is ignored.
  */
 
 /**
@@ -1302,6 +1333,8 @@ class PDFDocumentProxy {
 class PDFPageProxy {
   #pendingCleanup = false;
 
+  #pagesMapper = PagesMapper.instance;
+
   constructor(pageIndex, pageInfo, transport, pdfBug = false) {
     this._pageIndex = pageIndex;
     this._pageInfo = pageInfo;
@@ -1314,7 +1347,7 @@ class PDFPageProxy {
 
     this._intentStates = new Map();
     this.destroyed = false;
-    this.recordedGroups = null;
+    this.recordedBBoxes = null;
   }
 
   /**
@@ -1322,6 +1355,13 @@ class PDFPageProxy {
    */
   get pageNumber() {
     return this._pageIndex + 1;
+  }
+
+  /**
+   * @param {number} value - The page number to set. First page is 1.
+   */
+  set pageNumber(value) {
+    this._pageIndex = value - 1;
   }
 
   /**
@@ -1440,7 +1480,7 @@ class PDFPageProxy {
     printAnnotationStorage = null,
     isEditing = false,
     recordOperations = false,
-    filteredOperationIndexes = null,
+    operationsFilter = null,
   }) {
     this._stats?.time("Overall");
 
@@ -1487,23 +1527,28 @@ class PDFPageProxy {
       this._pumpOperatorList(intentArgs);
     }
 
+    const recordForDebugger = Boolean(
+      this._pdfBug && globalThis.StepperManager?.enabled
+    );
+
     const shouldRecordOperations =
-      !this.recordedGroups &&
-      (recordOperations ||
-        (this._pdfBug && globalThis.StepperManager?.enabled));
+      !this.recordedBBoxes && (recordOperations || recordForDebugger);
 
     const complete = error => {
       intentState.renderTasks.delete(internalRenderTask);
 
       if (shouldRecordOperations) {
-        const recordedGroups = internalRenderTask.gfx?.dependencyTracker.take();
-        if (recordedGroups) {
-          internalRenderTask.stepper?.setOperatorGroups(recordedGroups);
-          if (recordOperations) {
-            this.recordedGroups = recordedGroups;
+        const recordedBBoxes = internalRenderTask.gfx?.dependencyTracker.take();
+        if (recordedBBoxes) {
+          if (internalRenderTask.stepper) {
+            internalRenderTask.stepper.setOperatorBBoxes(
+              recordedBBoxes,
+              internalRenderTask.gfx.dependencyTracker.takeDebugMetadata()
+            );
           }
-        } else if (recordOperations) {
-          this.recordedGroups = [];
+          if (recordOperations) {
+            this.recordedBBoxes = recordedBBoxes;
+          }
         }
       }
 
@@ -1542,7 +1587,11 @@ class PDFPageProxy {
         canvas,
         canvasContext,
         dependencyTracker: shouldRecordOperations
-          ? new CanvasDependencyTracker(canvas)
+          ? new CanvasDependencyTracker(
+              canvas,
+              intentState.operatorList.length,
+              recordForDebugger
+            )
           : null,
         viewport,
         transform,
@@ -1559,7 +1608,7 @@ class PDFPageProxy {
       pdfBug: this._pdfBug,
       pageColors,
       enableHWA: this._transport.enableHWA,
-      filteredOperationIndexes,
+      operationsFilter,
     });
 
     (intentState.renderTasks ||= new Set()).add(internalRenderTask);
@@ -1664,6 +1713,7 @@ class PDFPageProxy {
     return this._transport.messageHandler.sendWithStream(
       "GetTextContent",
       {
+        pageId: this.#pagesMapper.getPageId(this._pageIndex + 1) - 1,
         pageIndex: this._pageIndex,
         includeMarkedContent: includeMarkedContent === true,
         disableNormalization: disableNormalization === true,
@@ -1849,6 +1899,7 @@ class PDFPageProxy {
     const readableStream = this._transport.messageHandler.sendWithStream(
       "GetOperatorList",
       {
+        pageId: this.#pagesMapper.getPageId(this._pageIndex + 1) - 1,
         pageIndex: this._pageIndex,
         intent: renderingIntent,
         cacheKey,
@@ -2344,7 +2395,13 @@ class PDFWorker {
  * @ignore
  */
 class WorkerTransport {
+  downloadInfoCapability = Promise.withResolvers();
+
+  #fullReader = null;
+
   #methodPromises = new Map();
+
+  #networkStream = null;
 
   #pageCache = new Map();
 
@@ -2354,21 +2411,19 @@ class WorkerTransport {
 
   #passwordCapability = null;
 
-  constructor(
-    messageHandler,
-    loadingTask,
-    networkStream,
-    params,
-    factory,
-    enableHWA
-  ) {
+  #pagesMapper = PagesMapper.instance;
+
+  constructor(messageHandler, loadingTask, networkStream, params, factory) {
     this.messageHandler = messageHandler;
     this.loadingTask = loadingTask;
+    this.#networkStream = networkStream;
+
     this.commonObjs = new PDFObjects();
     this.fontLoader = new FontLoader({
       ownerDocument: params.ownerDocument,
       styleElement: params.styleElement,
     });
+    this.enableHWA = params.enableHWA;
     this.loadingParams = params.loadingParams;
     this._params = params;
 
@@ -2381,13 +2436,9 @@ class WorkerTransport {
     this.destroyed = false;
     this.destroyCapability = null;
 
-    this._networkStream = networkStream;
-    this._fullReader = null;
-    this._lastProgress = null;
-    this.downloadInfoCapability = Promise.withResolvers();
-    this.enableHWA = enableHWA;
-
     this.setupMessageHandler();
+
+    this.#pagesMapper.addListener(this.#updateCaches.bind(this));
 
     if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
       // For testing purposes.
@@ -2413,6 +2464,24 @@ class WorkerTransport {
     }
   }
 
+  #updateCaches() {
+    const newPageCache = new Map();
+    const newPromiseCache = new Map();
+    for (let i = 0, ii = this.#pagesMapper.pagesNumber; i < ii; i++) {
+      const prevPageIndex = this.#pagesMapper.getPrevPageNumber(i + 1) - 1;
+      const page = this.#pageCache.get(prevPageIndex);
+      if (page) {
+        newPageCache.set(i, page);
+      }
+      const promise = this.#pagePromises.get(prevPageIndex);
+      if (promise) {
+        newPromiseCache.set(i, promise);
+      }
+    }
+    this.#pageCache = newPageCache;
+    this.#pagePromises = newPromiseCache;
+  }
+
   #cacheSimpleMethod(name, data = null) {
     const cachedPromise = this.#methodPromises.get(name);
     if (cachedPromise) {
@@ -2422,6 +2491,14 @@ class WorkerTransport {
 
     this.#methodPromises.set(name, promise);
     return promise;
+  }
+
+  #onProgress({ loaded, total }) {
+    this.loadingTask.onProgress?.({
+      loaded,
+      total,
+      percent: MathClamp(Math.round((loaded / total) * 100), 0, 100),
+    });
   }
 
   get annotationStorage() {
@@ -2535,7 +2612,7 @@ class WorkerTransport {
       this.filterFactory.destroy();
       TextLayer.cleanup();
 
-      this._networkStream?.cancelAllRequests(
+      this.#networkStream?.cancelAllRequests(
         new AbortException("Worker was terminated.")
       );
 
@@ -2552,18 +2629,16 @@ class WorkerTransport {
 
     messageHandler.on("GetReader", (data, sink) => {
       assert(
-        this._networkStream,
-        "GetReader - no `IPDFStream` instance available."
+        this.#networkStream,
+        "GetReader - no `BasePDFStream` instance available."
       );
-      this._fullReader = this._networkStream.getFullReader();
-      this._fullReader.onProgress = evt => {
-        this._lastProgress = {
-          loaded: evt.loaded,
-          total: evt.total,
-        };
-      };
+      this.#fullReader = this.#networkStream.getFullReader();
+      // If stream or range turn out to be disabled, once `headersReady` is
+      // resolved, this is our only way to report loading progress.
+      this.#fullReader.onProgress = evt => this.#onProgress(evt);
+
       sink.onPull = () => {
-        this._fullReader
+        this.#fullReader
           .read()
           .then(function ({ value, done }) {
             if (done) {
@@ -2584,7 +2659,7 @@ class WorkerTransport {
       };
 
       sink.onCancel = reason => {
-        this._fullReader.cancel(reason);
+        this.#fullReader.cancel(reason);
 
         sink.ready.catch(readyReason => {
           if (this.destroyed) {
@@ -2596,40 +2671,29 @@ class WorkerTransport {
     });
 
     messageHandler.on("ReaderHeadersReady", async data => {
-      await this._fullReader.headersReady;
+      await this.#fullReader.headersReady;
 
       const { isStreamingSupported, isRangeSupported, contentLength } =
-        this._fullReader;
+        this.#fullReader;
 
-      // If stream or range are disabled, it's our only way to report
-      // loading progress.
-      if (!isStreamingSupported || !isRangeSupported) {
-        if (this._lastProgress) {
-          loadingTask.onProgress?.(this._lastProgress);
-        }
-        this._fullReader.onProgress = evt => {
-          loadingTask.onProgress?.({
-            loaded: evt.loaded,
-            total: evt.total,
-          });
-        };
+      if (isStreamingSupported && isRangeSupported) {
+        this.#fullReader.onProgress = null; // See comment in "GetReader" above.
       }
-
       return { isStreamingSupported, isRangeSupported, contentLength };
     });
 
     messageHandler.on("GetRangeReader", (data, sink) => {
       assert(
-        this._networkStream,
-        "GetRangeReader - no `IPDFStream` instance available."
+        this.#networkStream,
+        "GetRangeReader - no `BasePDFStream` instance available."
       );
-      const rangeReader = this._networkStream.getRangeReader(
+      const rangeReader = this.#networkStream.getRangeReader(
         data.begin,
         data.end
       );
 
       // When streaming is enabled, it's possible that the data requested here
-      // has already been fetched via the `_fullRequestReader` implementation.
+      // has already been fetched via the `#fullReader` implementation.
       // However, given that the PDF data is loaded asynchronously on the
       // main-thread and then sent via `postMessage` to the worker-thread,
       // it may not have been available during parsing (hence the attempt to
@@ -2637,7 +2701,7 @@ class WorkerTransport {
       //
       // To avoid wasting time and resources here, we'll thus *not* dispatch
       // range requests if the data was already loaded but has not been sent to
-      // the worker-thread yet (which will happen via the `_fullRequestReader`).
+      // the worker-thread yet (which will happen via the `#fullReader`).
       if (!rangeReader) {
         sink.close();
         return;
@@ -2675,6 +2739,7 @@ class WorkerTransport {
     });
 
     messageHandler.on("GetDoc", ({ pdfInfo }) => {
+      this.#pagesMapper.pagesNumber = pdfInfo.numPages;
       this._numPages = pdfInfo.numPages;
       this._htmlForXfa = pdfInfo.htmlForXfa;
       delete pdfInfo.htmlForXfa;
@@ -2710,10 +2775,7 @@ class WorkerTransport {
     messageHandler.on("DataLoaded", data => {
       // For consistency: Ensure that progress is always reported when the
       // entire PDF file has been loaded, regardless of how it was fetched.
-      loadingTask.onProgress?.({
-        loaded: data.length,
-        total: data.length,
-      });
+      this.#onProgress({ loaded: data.length, total: data.length });
 
       this.downloadInfoCapability.resolve(data);
     });
@@ -2745,11 +2807,17 @@ class WorkerTransport {
             break;
           }
 
+          const fontData = new FontInfo(exportedData);
           const inspectFont =
             this._params.pdfBug && globalThis.FontInspector?.enabled
               ? (font, url) => globalThis.FontInspector.fontAdded(font, url)
               : null;
-          const font = new FontFaceObject(exportedData, inspectFont);
+          const font = new FontFaceObject(
+            fontData,
+            inspectFont,
+            exportedData.extra,
+            exportedData.charProcOperatorList
+          );
 
           this.fontLoader
             .bind(font)
@@ -2761,7 +2829,7 @@ class WorkerTransport {
                 // rather than waiting for a `PDFDocumentProxy.cleanup` call.
                 // Since `font.data` could be very large, e.g. in some cases
                 // multiple megabytes, this will help reduce memory usage.
-                font.data = null;
+                font.clearData();
               }
               this.commonObjs.resolve(id, font);
             });
@@ -2784,9 +2852,14 @@ class WorkerTransport {
           }
           break;
         case "FontPath":
+          this.commonObjs.resolve(id, new FontPathInfo(exportedData));
+          break;
         case "Image":
-        case "Pattern":
           this.commonObjs.resolve(id, exportedData);
+          break;
+        case "Pattern":
+          const pattern = new PatternInfo(exportedData);
+          this.commonObjs.resolve(id, pattern.getIR());
           break;
         default:
           throw new Error(`Got unknown common object type ${type}`);
@@ -2825,10 +2898,7 @@ class WorkerTransport {
       if (this.destroyed) {
         return; // Ignore any pending requests if the worker was terminated.
       }
-      loadingTask.onProgress?.({
-        loaded: data.loaded,
-        total: data.total,
-      });
+      this.#onProgress(data);
     });
 
     messageHandler.on("FetchBinaryData", async data => {
@@ -2869,7 +2939,7 @@ class WorkerTransport {
           isPureXfa: !!this._htmlForXfa,
           numPages: this._numPages,
           annotationStorage: map,
-          filename: this._fullReader?.filename ?? null,
+          filename: this.#fullReader?.filename ?? null,
         },
         transfer
       )
@@ -2878,30 +2948,35 @@ class WorkerTransport {
       });
   }
 
+  extractPages(pageInfos) {
+    return this.messageHandler.sendWithPromise("ExtractPages", { pageInfos });
+  }
+
   getPage(pageNumber) {
     if (
       !Number.isInteger(pageNumber) ||
       pageNumber <= 0 ||
-      pageNumber > this._numPages
+      pageNumber > this.#pagesMapper.pagesNumber
     ) {
       return Promise.reject(new Error("Invalid page request."));
     }
+    const pageIndex = pageNumber - 1;
+    const newPageIndex = this.#pagesMapper.getPageId(pageNumber) - 1;
 
-    const pageIndex = pageNumber - 1,
-      cachedPromise = this.#pagePromises.get(pageIndex);
+    const cachedPromise = this.#pagePromises.get(pageIndex);
     if (cachedPromise) {
       return cachedPromise;
     }
     const promise = this.messageHandler
       .sendWithPromise("GetPage", {
-        pageIndex,
+        pageIndex: newPageIndex,
       })
       .then(pageInfo => {
         if (this.destroyed) {
           throw new Error("Transport destroyed");
         }
         if (pageInfo.refStr) {
-          this.#pageRefCache.set(pageInfo.refStr, pageNumber);
+          this.#pageRefCache.set(pageInfo.refStr, newPageIndex);
         }
 
         const page = new PDFPageProxy(
@@ -2917,19 +2992,20 @@ class WorkerTransport {
     return promise;
   }
 
-  getPageIndex(ref) {
+  async getPageIndex(ref) {
     if (!isRefProxy(ref)) {
-      return Promise.reject(new Error("Invalid pageIndex request."));
+      throw new Error("Invalid pageIndex request.");
     }
-    return this.messageHandler.sendWithPromise("GetPageIndex", {
+    const index = await this.messageHandler.sendWithPromise("GetPageIndex", {
       num: ref.num,
       gen: ref.gen,
     });
+    return this.#pagesMapper.getPageNumber(index + 1) - 1;
   }
 
   getAnnotations(pageIndex, intent) {
     return this.messageHandler.sendWithPromise("GetAnnotations", {
-      pageIndex,
+      pageIndex: this.#pagesMapper.getPageId(pageIndex + 1) - 1,
       intent,
     });
   }
@@ -2996,13 +3072,13 @@ class WorkerTransport {
 
   getPageJSActions(pageIndex) {
     return this.messageHandler.sendWithPromise("GetPageJSActions", {
-      pageIndex,
+      pageIndex: this.#pagesMapper.getPageId(pageIndex + 1) - 1,
     });
   }
 
   getStructTree(pageIndex) {
     return this.messageHandler.sendWithPromise("GetStructTree", {
-      pageIndex,
+      pageIndex: this.#pagesMapper.getPageId(pageIndex + 1) - 1,
     });
   }
 
@@ -3031,8 +3107,9 @@ class WorkerTransport {
       .then(results => ({
         info: results[0],
         metadata: results[1] ? new Metadata(results[1]) : null,
-        contentDispositionFilename: this._fullReader?.filename ?? null,
-        contentLength: this._fullReader?.contentLength ?? null,
+        contentDispositionFilename: this.#fullReader?.filename ?? null,
+        contentLength: this.#fullReader?.contentLength ?? null,
+        hasStructTree: results[2],
       }));
     this.#methodPromises.set(name, promise);
     return promise;
@@ -3071,7 +3148,10 @@ class WorkerTransport {
       return null;
     }
     const refStr = ref.gen === 0 ? `${ref.num}R` : `${ref.num}R${ref.gen}`;
-    return this.#pageRefCache.get(refStr) ?? null;
+    const pageIndex = this.#pageRefCache.get(refStr);
+    return pageIndex >= 0
+      ? this.#pagesMapper.getPageNumber(pageIndex + 1)
+      : null;
   }
 }
 
@@ -3079,7 +3159,7 @@ class WorkerTransport {
  * Allows controlling of the rendering tasks.
  */
 class RenderTask {
-  #internalRenderTask = null;
+  _internalRenderTask = null;
 
   /**
    * Callback for incremental rendering -- a function that will be called
@@ -3100,12 +3180,12 @@ class RenderTask {
   onError = null;
 
   constructor(internalRenderTask) {
-    this.#internalRenderTask = internalRenderTask;
+    this._internalRenderTask = internalRenderTask;
 
     if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
       // For testing purposes.
       Object.defineProperty(this, "getOperatorList", {
-        value: () => this.#internalRenderTask.operatorList,
+        value: () => this._internalRenderTask.operatorList,
       });
     }
   }
@@ -3115,7 +3195,7 @@ class RenderTask {
    * @type {Promise<void>}
    */
   get promise() {
-    return this.#internalRenderTask.capability.promise;
+    return this._internalRenderTask.capability.promise;
   }
 
   /**
@@ -3126,7 +3206,7 @@ class RenderTask {
    * @param {number} [extraDelay]
    */
   cancel(extraDelay = 0) {
-    this.#internalRenderTask.cancel(/* error = */ null, extraDelay);
+    this._internalRenderTask.cancel(/* error = */ null, extraDelay);
   }
 
   /**
@@ -3134,11 +3214,11 @@ class RenderTask {
    * @type {boolean}
    */
   get separateAnnots() {
-    const { separateAnnots } = this.#internalRenderTask.operatorList;
+    const { separateAnnots } = this._internalRenderTask.operatorList;
     if (!separateAnnots) {
       return false;
     }
-    const { annotationCanvasMap } = this.#internalRenderTask;
+    const { annotationCanvasMap } = this._internalRenderTask;
     return (
       separateAnnots.form ||
       (separateAnnots.canvas && annotationCanvasMap?.size > 0)
@@ -3169,7 +3249,7 @@ class InternalRenderTask {
     pdfBug = false,
     pageColors = null,
     enableHWA = false,
-    filteredOperationIndexes = null,
+    operationsFilter = null,
   }) {
     this.callback = callback;
     this.params = params;
@@ -3201,7 +3281,7 @@ class InternalRenderTask {
     this._canvasContext = params.canvas ? null : params.canvasContext;
     this._enableHWA = enableHWA;
     this._dependencyTracker = params.dependencyTracker;
-    this._filteredOperationIndexes = filteredOperationIndexes;
+    this._operationsFilter = operationsFilter;
   }
 
   get completed() {
@@ -3288,6 +3368,9 @@ class InternalRenderTask {
       this.graphicsReadyCallback ||= this._continueBound;
       return;
     }
+    this.gfx.dependencyTracker?.growOperationsCount(
+      this.operatorList.fnArray.length
+    );
     this.stepper?.updateOperatorList(this.operatorList);
 
     if (this.running) {
@@ -3328,14 +3411,13 @@ class InternalRenderTask {
       this.operatorListIdx,
       this._continueBound,
       this.stepper,
-      this._filteredOperationIndexes
+      this._operationsFilter
     );
     if (this.operatorListIdx === this.operatorList.argsArray.length) {
       this.running = false;
       if (this.operatorList.lastChunk) {
         this.gfx.endDrawing();
         InternalRenderTask.#canvasInUse.delete(this._canvas);
-
         this.callback();
       }
     }

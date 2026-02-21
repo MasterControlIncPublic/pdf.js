@@ -108,6 +108,12 @@ const PermissionFlag = {
   PRINT_HIGH_QUALITY: 0x800,
 };
 
+const MeshFigureType = {
+  TRIANGLES: 1,
+  LATTICE: 2,
+  PATCH: 3,
+};
+
 const TextRenderingMode = {
   FILL: 0,
   STROKE: 1,
@@ -348,7 +354,8 @@ const DrawOPS = {
   moveTo: 0,
   lineTo: 1,
   curveTo: 2,
-  closePath: 3,
+  quadraticCurveTo: 3,
+  closePath: 4,
 };
 
 const PasswordResponses = {
@@ -374,7 +381,7 @@ function getVerbosityLevel() {
 function info(msg) {
   if (verbosity >= VerbosityLevel.INFOS) {
     // eslint-disable-next-line no-console
-    console.log(`Info: ${msg}`);
+    console.info(`Info: ${msg}`);
   }
 }
 
@@ -382,7 +389,7 @@ function info(msg) {
 function warn(msg) {
   if (verbosity >= VerbosityLevel.WARNINGS) {
     // eslint-disable-next-line no-console
-    console.log(`Warning: ${msg}`);
+    console.warn(`Warning: ${msg}`);
   }
 }
 
@@ -640,6 +647,23 @@ class FeatureTest {
       this,
       "isImageDecoderSupported",
       typeof ImageDecoder !== "undefined"
+    );
+  }
+
+  static get isFloat16ArraySupported() {
+    return shadow(
+      this,
+      "isFloat16ArraySupported",
+      typeof Float16Array !== "undefined"
+    );
+  }
+
+  static get isSanitizerSupported() {
+    return shadow(
+      this,
+      "isSanitizerSupported",
+      // eslint-disable-next-line no-undef
+      typeof Sanitizer !== "undefined"
     );
   }
 
@@ -1211,44 +1235,6 @@ function MathClamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
 }
 
-// TODO: Remove this once `Uint8Array.prototype.toHex` is generally available.
-function toHexUtil(arr) {
-  if (Uint8Array.prototype.toHex) {
-    return arr.toHex();
-  }
-  return Array.from(arr, num => hexNumbers[num]).join("");
-}
-
-// TODO: Remove this once `Uint8Array.prototype.toBase64` is generally
-//       available.
-function toBase64Util(arr) {
-  if (Uint8Array.prototype.toBase64) {
-    return arr.toBase64();
-  }
-  return btoa(bytesToString(arr));
-}
-
-// TODO: Remove this once `Uint8Array.fromBase64` is generally available.
-function fromBase64Util(str) {
-  if (Uint8Array.fromBase64) {
-    return Uint8Array.fromBase64(str);
-  }
-  return stringToBytes(atob(str));
-}
-
-// TODO: Remove this once https://bugzilla.mozilla.org/show_bug.cgi?id=1928493
-//       is fixed.
-if (
-  (typeof PDFJSDev === "undefined" || PDFJSDev.test("SKIP_BABEL")) &&
-  typeof Promise.try !== "function"
-) {
-  Promise.try = function (fn, ...args) {
-    return new Promise(resolve => {
-      resolve(fn(...args));
-    });
-  };
-}
-
 // TODO: Remove this once the `javascript.options.experimental.math_sumprecise`
 //       preference is removed from Firefox.
 if (typeof Math.sumPrecise !== "function") {
@@ -1314,7 +1300,6 @@ export {
   FeatureTest,
   FONT_IDENTITY_MATRIX,
   FormatError,
-  fromBase64Util,
   getModificationDate,
   getUuid,
   getVerbosityLevel,
@@ -1327,6 +1312,7 @@ export {
   LINE_DESCENT_FACTOR,
   LINE_FACTOR,
   MathClamp,
+  MeshFigureType,
   normalizeUnicode,
   objectSize,
   OPS,
@@ -1343,8 +1329,6 @@ export {
   stringToPDFString,
   stringToUTF8String,
   TextRenderingMode,
-  toBase64Util,
-  toHexUtil,
   UnknownErrorException,
   unreachable,
   updateUrlHash,

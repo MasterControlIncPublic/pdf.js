@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } MB ({ $b } bytes)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } KB ({ $size_b } bytes)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MB ({ $size_b } bytes)
 pdfjs-document-properties-title = Titel:
 pdfjs-document-properties-author = Auteur:
 pdfjs-document-properties-subject = Underwerp:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Bewurkingsdatum:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date }, { $time }
 pdfjs-document-properties-creator = Makker:
 pdfjs-document-properties-producer = PDF-makker:
 pdfjs-document-properties-version = PDF-ferzje:
@@ -193,8 +181,8 @@ pdfjs-layers-button =
     .title = Lagen toane (dûbelklik om alle lagen nei de standertsteat werom te setten)
 pdfjs-layers-button-label = Lagen
 pdfjs-thumbs-button =
-    .title = Foarbylden toane
-pdfjs-thumbs-button-label = Foarbylden
+    .title = Miniatueren toane
+pdfjs-thumbs-button-label = Miniatueren
 pdfjs-current-outline-item-button =
     .title = Aktueel item yn ynhâldsopjefte sykje
 pdfjs-current-outline-item-button-label = Aktueel item yn ynhâldsopjefte
@@ -212,7 +200,7 @@ pdfjs-thumb-page-title =
 # Variables:
 #   $page (Number) - the page number
 pdfjs-thumb-page-canvas =
-    .aria-label = Foarbyld fan side { $page }
+    .aria-label = Miniatuer fan side { $page }
 
 ## Find panel button title and messages
 
@@ -275,10 +263,6 @@ pdfjs-rendering-error = Der is in flater bard by it renderjen fan de side.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date }, { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -324,6 +308,10 @@ pdfjs-comment-floating-button =
     .title = Opmerking
     .aria-label = Opmerking
 pdfjs-comment-floating-button-label = Opmerking
+pdfjs-editor-comment-button =
+    .title = Opmerking
+    .aria-label = Opmerking
+pdfjs-editor-comment-button-label = Opmerking
 pdfjs-editor-signature-button =
     .title = Hantekening tafoegje
 pdfjs-editor-signature-button-label = Hantekening tafoegje
@@ -386,20 +374,27 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Tekstbewurker
     .default-content = Start mei typen…
-pdfjs-free-text =
-    .aria-label = Tekstbewurker
-pdfjs-free-text-default-content = Begjin mei typen…
-pdfjs-ink =
-    .aria-label = Tekeningbewurker
-pdfjs-ink-canvas =
-    .aria-label = Troch brûker makke ôfbylding
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title =
+    { $count ->
+        [one] Opmerking
+       *[other] Opmerkingen
+    }
+pdfjs-editor-comments-sidebar-close-button =
+    .title = De sydbalke slute
+    .aria-label = De sydbalke slute
+pdfjs-editor-comments-sidebar-close-button-label = De sydbalke slute
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Sjogge jo wat it neamen wurdich? Markearje it en lit in opmerking efter.
+pdfjs-editor-comments-sidebar-no-comments-link = Mear ynfo
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Alternative tekst
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Alternative tekst bewurkje
-pdfjs-editor-alt-text-edit-button-label = Alternative tekst bewurkje
 pdfjs-editor-alt-text-dialog-label = Kies in opsje
 pdfjs-editor-alt-text-dialog-description = Alternative tekst helpt wannear’t minsken de ôfbylding net sjen kinne of wannear’t dizze net laden wurdt.
 pdfjs-editor-alt-text-add-description-label = Foegje in beskriuwing ta
@@ -419,14 +414,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Linkerboppehoek – formaat wizigje
-pdfjs-editor-resizer-label-top-middle = Midden boppe – formaat wizigje
-pdfjs-editor-resizer-label-top-right = Rjochterboppehoek – formaat wizigje
-pdfjs-editor-resizer-label-middle-right = Midden rjochts – formaat wizigje
-pdfjs-editor-resizer-label-bottom-right = Rjochterûnderhoek – formaat wizigje
-pdfjs-editor-resizer-label-bottom-middle = Midden ûnder – formaat wizigje
-pdfjs-editor-resizer-label-bottom-left = Linkerûnderhoek – formaat wizigje
-pdfjs-editor-resizer-label-middle-left = Links midden – formaat wizigje
 pdfjs-editor-resizer-top-left =
     .aria-label = Linkerboppehoek – formaat wizigje
 pdfjs-editor-resizer-top-middle =
@@ -618,25 +605,33 @@ pdfjs-editor-add-signature-cancel-button = Annulearje
 pdfjs-editor-add-signature-add-button = Tafoegje
 pdfjs-editor-edit-signature-update-button = Bywurkje
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Opmerking bewurkje
+pdfjs-editor-edit-comment-popup-button =
+    .title = Opmerking bewurkje
+pdfjs-editor-delete-comment-popup-button-label = Opmerking fuortsmite
+pdfjs-editor-delete-comment-popup-button =
+    .title = Opmerking fuortsmite
+pdfjs-show-comment-button =
+    .title = Opmerking toane
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Aksjes
-pdfjs-editor-edit-comment-actions-button =
-    .title = Aksjes
-pdfjs-editor-edit-comment-close-button-label = Slute
-pdfjs-editor-edit-comment-close-button =
-    .title = Slute
-pdfjs-editor-edit-comment-actions-edit-button-label = Bewurkje
-pdfjs-editor-edit-comment-actions-delete-button-label = Fuortsmite
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Fier jo opmerking yn
-pdfjs-editor-edit-comment-manager-cancel-button = Annulearje
-pdfjs-editor-edit-comment-manager-save-button = Bewarje
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Opmerking bewurkje
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Bywurkje
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Opmerking tafoegje
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Tafoegje
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Begjin mei typen…
+pdfjs-editor-edit-comment-dialog-cancel-button = Annulearje
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Opmerking bewurkje
+pdfjs-editor-add-comment-button =
+    .title = Opmerking tafoegje
 
 ## Main menu for adding/removing signatures
 

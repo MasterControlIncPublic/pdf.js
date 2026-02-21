@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } MB ({ $b } bayt)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } KB ({ $size_b } bayt)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MB ({ $size_b } bayt)
 pdfjs-document-properties-title = Başlık:
 pdfjs-document-properties-author = Yazar:
 pdfjs-document-properties-subject = Konu:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Değiştirme tarihi:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date } { $time }
 pdfjs-document-properties-creator = Oluşturan:
 pdfjs-document-properties-producer = PDF üreticisi:
 pdfjs-document-properties-version = PDF sürümü:
@@ -275,10 +263,6 @@ pdfjs-rendering-error = Sayfa yorumlanırken bir hata oluştu.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date } { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -324,6 +308,10 @@ pdfjs-comment-floating-button =
     .title = Yorum ekle
     .aria-label = Yorum ekle
 pdfjs-comment-floating-button-label = Yorum ekle
+pdfjs-editor-comment-button =
+    .title = Yorum ekle
+    .aria-label = Yorum ekle
+pdfjs-editor-comment-button-label = Yorum ekle
 pdfjs-editor-signature-button =
     .title = İmza ekle
 pdfjs-editor-signature-button-label = İmza ekle
@@ -386,20 +374,27 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Metin düzenleyicisi
     .default-content = Yazmaya başlayın…
-pdfjs-free-text =
-    .aria-label = Metin düzenleyicisi
-pdfjs-free-text-default-content = Yazmaya başlayın…
-pdfjs-ink =
-    .aria-label = Çizim düzenleyicisi
-pdfjs-ink-canvas =
-    .aria-label = Kullanıcı tarafından oluşturulan resim
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title =
+    { $count ->
+        [one] Yorum
+       *[other] Yorumlar
+    }
+pdfjs-editor-comments-sidebar-close-button =
+    .title = Kenar çubuğunu kapat
+    .aria-label = Kenar çubuğunu kapat
+pdfjs-editor-comments-sidebar-close-button-label = Kenar çubuğunu kapat
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Not almaya değer bir şey mi gördünüz? Onu işaretleyip yorum yazabilirsiniz.
+pdfjs-editor-comments-sidebar-no-comments-link = Daha fazla bilgi alın
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Alternatif metin
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Alternatif metni düzenle
-pdfjs-editor-alt-text-edit-button-label = Alternatif metni düzenle
 pdfjs-editor-alt-text-dialog-label = Bir seçenek seçin
 pdfjs-editor-alt-text-dialog-description = Alternatif metin, insanlar resmi göremediğinde veya resim yüklenmediğinde işe yarar.
 pdfjs-editor-alt-text-add-description-label = Açıklama ekle
@@ -419,14 +414,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Sol üst köşe — yeniden boyutlandır
-pdfjs-editor-resizer-label-top-middle = Üst orta — yeniden boyutlandır
-pdfjs-editor-resizer-label-top-right = Sağ üst köşe — yeniden boyutlandır
-pdfjs-editor-resizer-label-middle-right = Orta sağ — yeniden boyutlandır
-pdfjs-editor-resizer-label-bottom-right = Sağ alt köşe — yeniden boyutlandır
-pdfjs-editor-resizer-label-bottom-middle = Alt orta — yeniden boyutlandır
-pdfjs-editor-resizer-label-bottom-left = Sol alt köşe — yeniden boyutlandır
-pdfjs-editor-resizer-label-middle-left = Orta sol — yeniden boyutlandır
 pdfjs-editor-resizer-top-left =
     .aria-label = Sol üst köşe — yeniden boyutlandır
 pdfjs-editor-resizer-top-middle =
@@ -618,25 +605,33 @@ pdfjs-editor-add-signature-cancel-button = Vazgeç
 pdfjs-editor-add-signature-add-button = Ekle
 pdfjs-editor-edit-signature-update-button = Güncelle
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Yorumu düzenle
+pdfjs-editor-edit-comment-popup-button =
+    .title = Yorumu düzenle
+pdfjs-editor-delete-comment-popup-button-label = Yorumu sil
+pdfjs-editor-delete-comment-popup-button =
+    .title = Yorumu sil
+pdfjs-show-comment-button =
+    .title = Yorumu göster
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Eylemler
-pdfjs-editor-edit-comment-actions-button =
-    .title = Eylemler
-pdfjs-editor-edit-comment-close-button-label = Kapat
-pdfjs-editor-edit-comment-close-button =
-    .title = Kapat
-pdfjs-editor-edit-comment-actions-edit-button-label = Düzenle
-pdfjs-editor-edit-comment-actions-delete-button-label = Sil
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Yorumunuzu yazın
-pdfjs-editor-edit-comment-manager-cancel-button = Vazgeç
-pdfjs-editor-edit-comment-manager-save-button = Kaydet
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Yorumu düzenle
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Güncelle
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Yorum ekle
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Ekle
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Yazmaya başlayın…
+pdfjs-editor-edit-comment-dialog-cancel-button = Vazgeç
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Yorumu düzenle
+pdfjs-editor-add-comment-button =
+    .title = Yorum ekle
 
 ## Main menu for adding/removing signatures
 
