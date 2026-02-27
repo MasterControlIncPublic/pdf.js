@@ -70,16 +70,22 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * We don't allow page management actions (copy/cut/delete/save pages) - hidden via viewsManagerStatus element (web/viewer.html)
 
 #### Styling & UI Customizations
-* Custom dark theme styling for the views manager (formerly sidebar):
-  - Applied via mcSidebar class and CSS targeting #viewsManager, #viewsManagerHeader, #viewsManagerContent, and view containers (web/viewer.html, web/viewer.css)
-  - Uses `color-scheme: dark` to automatically apply light text on dark backgrounds
-* Custom thumbnail styling via mcThumbnail class (web/pdf_thumbnail_view.js, web/viewer.css)
-* Custom toolbar styling via mcToolbar class (web/viewer.html, web/viewer.css)
-* Custom viewer background via mcViewer class (web/viewer.html, web/viewer.css)
-* Use plain HTML checkboxes in findbar instead of Mozilla's custom toggle buttons (web/viewer.html - removed toggleButton class, moved toolbarLabel to label)
-* Removed Mozilla's dark theme option (web/viewer.css)
-* Added presentation mode button to main toolbar for easy access (web/viewer.html id="presentationMode", web/viewer.js configuration)
-* Removed page scroll mode from the toolbar (web/viewer.html) (didn't feel intuitive that there were other pages to scroll to)
+* **Theme & Colors**:
+  - Force light mode globally (`color-scheme: only light`) to avoid dark mode conflicts
+  - MC color variables: white toolbar, dark blue viewer (#243340), dark sidebar (#202c37)
+  - All colors centralized in `:root` CSS custom properties for easy maintenance (web/viewer.css)
+* **Views Manager (formerly sidebar)**:
+  - Dark theme with floating modal appearance (semi-transparent background with rounded corners)
+  - Light text on dark background with custom colors for thumbnails and outline tree items
+  - Applied via mcSidebar class (web/viewer.html, web/viewer.css)
+* **Box-sizing fixes**:
+  - Fixed #viewsManagerContent and #thumbnailsView to prevent horizontal scrollbar
+  - Removed problematic global `* { box-sizing: initial !important; }` rule
+* Custom toolbar styling via mcToolbar class - white background (web/viewer.html, web/viewer.css)
+* Custom viewer background via mcViewer class - dark blue (web/viewer.html, web/viewer.css)
+* Use plain HTML checkboxes in findbar instead of Mozilla's custom toggle buttons (web/viewer.html)
+* Added presentation mode button to main toolbar for easy access (web/viewer.html, web/viewer.js)
+* Removed page scroll mode from toolbar (web/viewer.html)
 * Include Global-complete styles (web/viewer.html)
 
 #### Configuration Changes

@@ -16,6 +16,9 @@
 @import url(pdf_viewer.css);
 
 :root {
+  /* MC: Force light mode only - disables dark theme support */
+  color-scheme: only light;
+
   --dir-factor: 1;
   /*#if !MOZCENTRAL*/
   --inline-start: left;
@@ -100,6 +103,17 @@
     rgb(12 12 13 / 0.3),
     rgb(115 115 115)
   );
+
+  /* MC-specific colors - using explicit values since we force light mode */
+  --mc-toolbar-bg-color: rgb(255 255 255);
+  --mc-toolbar-option-bg-color: rgb(255 255 255);
+  --mc-toolbar-option-color: hsl(208 28% 20%);
+  --mc-toolbar-after-border-color: #34495d;
+  --mc-viewer-bg-color: #243340;
+
+  /* Sidebar colors: solid for inner content, semi-transparent for floating container */
+  --mc-sidebar-bg-color: #202c37;
+  --mc-sidebar-floating-bg-color: rgb(32 44 55 / 0.92);
 
   --loading-icon: url(images/loading.svg);
   --toolbarButton-editorComment-icon: url(images/comment-editButton.svg);
@@ -1588,9 +1602,10 @@ dialog :link {
   }
 }
 
+/* MC Custom Styling - Toolbar */
 .mcToolbar {
-  background-image: none !important;
-  background-color: rgb(255 255 255) !important;
+  background-image: none;
+  background-color: var(--mc-toolbar-bg-color);
 }
 
 .mcToolbar * button,
@@ -1599,58 +1614,80 @@ dialog :link {
 }
 
 .mcToolbar option {
-  background-image: none !important;
-  background-color: rgb(255 255 255) !important;
-  color: hsl(208 28% 20%);
+  background-image: none;
+  background-color: var(--mc-toolbar-option-bg-color);
+  color: var(--mc-toolbar-option-color);
 }
 
+.mcToolbar::after {
+  border-bottom-color: var(--mc-toolbar-after-border-color);
+}
+
+/* MC Custom Styling - Viewer */
+/* Set body and container backgrounds to match viewer for floating modal effect */
+body {
+  background-color: var(--mc-viewer-bg-color) !important;
+}
+
+#outerContainer,
+#mainContainer,
 .mcViewer {
-  background-color: #243340 !important;
+  background-color: var(--mc-viewer-bg-color);
 }
 
 .mcViewer .page {
   border-image: none;
 }
 
-.mcToolbar::after {
-  border-bottom-color: #34495d;
-}
-
-/* MC Custom Styling for Views Manager (formerly sidebar) */
+/* MC Custom Styling - Views Manager (formerly sidebar) */
 #viewsManager,
 .mcSidebar {
-  background-color: #202c37 !important;
-  color-scheme: dark;
+  /* Use semi-transparent background for floating modal effect */
+  --sidebar-bg-color: var(--mc-sidebar-floating-bg-color);
+
+  /* Override text color for dark background since we force light mode */
+  --text-color: #fbfbfe;
+  color: var(--text-color);
+
+  /* Override thumbnail image border colors to work with dark background */
+  --image-border-color: #3a3944;
+  --image-hover-border-color: #52525e;
+  --image-page-number-bg: #23222b;
+  --image-current-page-number-fg: #fff;
 }
 
-#viewsManagerHeader {
-  background-color: #202c37 !important;
-}
-
-#viewsManagerContent {
-  background-color: #202c37 !important;
-}
-
+/* Set solid background for header and content areas */
+#viewsManagerHeader,
+#viewsManagerContent,
 #thumbnailsView,
 #outlinesView,
 #attachmentsView,
 #layersView {
-  background-color: #202c37 !important;
+  background-color: var(--mc-sidebar-bg-color);
 }
 
+/* Override global-complete.css .thumbnail styles for PDF thumbnails */
+#thumbnailsView .thumbnail,
 .mcThumbnail {
   padding: 0 !important;
   line-height: 0 !important;
-  background-color: #202c37 !important;
+  background-color: transparent !important;
   border: none !important;
+}
+
+/* Override tree/outline colors for dark background (force dark mode values) */
+#outlinesView.treeView,
+#layersView.treeView,
+#attachmentsView .treeView {
+  --treeitem-color: rgb(255 255 255 / 0.8);
+  --treeitem-bg-color: rgb(255 255 255 / 0.15);
+  --treeitem-hover-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-bg-color: rgb(255 255 255 / 0.25);
 }
 
 @media print {
   .disablePrint {
     display: none !important;
   }
-}
-
-* {
-  box-sizing: initial !important;
 }
