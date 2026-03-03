@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } MB ({ $b } byte)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } kB ({ $size_b } byte)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MB ({ $size_b } byte)
 pdfjs-document-properties-title = Titel:
 pdfjs-document-properties-author = Författare:
 pdfjs-document-properties-subject = Ämne:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Ändrades:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date }, { $time }
 pdfjs-document-properties-creator = Skapare:
 pdfjs-document-properties-producer = PDF-producent:
 pdfjs-document-properties-version = PDF-version:
@@ -275,10 +263,6 @@ pdfjs-rendering-error = Ett fel uppstod vid visning av sidan.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date } { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -324,6 +308,10 @@ pdfjs-comment-floating-button =
     .title = Kommentar
     .aria-label = Kommentar
 pdfjs-comment-floating-button-label = Kommentar
+pdfjs-editor-comment-button =
+    .title = Kommentar
+    .aria-label = Kommentar
+pdfjs-editor-comment-button-label = Kommentar
 pdfjs-editor-signature-button =
     .title = Lägg till signatur
 pdfjs-editor-signature-button-label = Lägg till signatur
@@ -386,20 +374,27 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Textredigerare
     .default-content = Börja skriva…
-pdfjs-free-text =
-    .aria-label = Textredigerare
-pdfjs-free-text-default-content = Börja skriva…
-pdfjs-ink =
-    .aria-label = Ritredigerare
-pdfjs-ink-canvas =
-    .aria-label = Användarskapad bild
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title =
+    { $count ->
+        [one] Kommentar
+       *[other] Kommentarer
+    }
+pdfjs-editor-comments-sidebar-close-button =
+    .title = Stäng sidofältet
+    .aria-label = Stäng sidofältet
+pdfjs-editor-comments-sidebar-close-button-label = Stäng sidofältet
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Ser du något anmärkningsvärt? Markera det och lämna en kommentar.
+pdfjs-editor-comments-sidebar-no-comments-link = Läs mer
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Alternativ text
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Redigera alternativ text
-pdfjs-editor-alt-text-edit-button-label = Redigera alternativ text
 pdfjs-editor-alt-text-dialog-label = Välj ett alternativ
 pdfjs-editor-alt-text-dialog-description = Alt text (alternativ text) hjälper till när människor inte kan se bilden eller när den inte laddas.
 pdfjs-editor-alt-text-add-description-label = Lägg till en beskrivning
@@ -419,14 +414,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Det övre vänstra hörnet — ändra storlek
-pdfjs-editor-resizer-label-top-middle = Överst i mitten — ändra storlek
-pdfjs-editor-resizer-label-top-right = Det övre högra hörnet — ändra storlek
-pdfjs-editor-resizer-label-middle-right = Mitten höger — ändra storlek
-pdfjs-editor-resizer-label-bottom-right = Nedre högra hörnet — ändra storlek
-pdfjs-editor-resizer-label-bottom-middle = Nedre mitten — ändra storlek
-pdfjs-editor-resizer-label-bottom-left = Nedre vänstra hörnet — ändra storlek
-pdfjs-editor-resizer-label-middle-left = Mitten till vänster — ändra storlek
 pdfjs-editor-resizer-top-left =
     .aria-label = Det övre vänstra hörnet — ändra storlek
 pdfjs-editor-resizer-top-middle =
@@ -618,25 +605,33 @@ pdfjs-editor-add-signature-cancel-button = Avbryt
 pdfjs-editor-add-signature-add-button = Lägg till
 pdfjs-editor-edit-signature-update-button = Uppdatera
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Redigera kommentar
+pdfjs-editor-edit-comment-popup-button =
+    .title = Redigera kommentar
+pdfjs-editor-delete-comment-popup-button-label = Ta bort kommentar
+pdfjs-editor-delete-comment-popup-button =
+    .title = Ta bort kommentar
+pdfjs-show-comment-button =
+    .title = Visa kommentar
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Åtgärder
-pdfjs-editor-edit-comment-actions-button =
-    .title = Åtgärder
-pdfjs-editor-edit-comment-close-button-label = Stäng
-pdfjs-editor-edit-comment-close-button =
-    .title = Stäng
-pdfjs-editor-edit-comment-actions-edit-button-label = Redigera
-pdfjs-editor-edit-comment-actions-delete-button-label = Ta bort
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Ange din kommentar
-pdfjs-editor-edit-comment-manager-cancel-button = Avbryt
-pdfjs-editor-edit-comment-manager-save-button = Spara
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Redigera kommentar
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Uppdatera
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Lägg till kommentar
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Lägg till
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Börja skriva…
+pdfjs-editor-edit-comment-dialog-cancel-button = Avbryt
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Redigera kommentar
+pdfjs-editor-add-comment-button =
+    .title = Lägg till kommentar
 
 ## Main menu for adding/removing signatures
 

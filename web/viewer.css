@@ -16,6 +16,9 @@
 @import url(pdf_viewer.css);
 
 :root {
+  /* MC: Force light mode only - disables dark theme support */
+  color-scheme: only light;
+
   --dir-factor: 1;
   /*#if !MOZCENTRAL*/
   --inline-start: left;
@@ -44,10 +47,6 @@
   --scrollbar-bg-color: light-dark(auto, rgb(35 35 39));
   --toolbar-icon-bg-color: light-dark(rgb(255 255 255), rgb(255 255 255));
   --toolbar-icon-hover-bg-color: none;
-  --original-toolbar-icon-hover-bg-color: light-dark(
-    rgb(255 255 255),
-    rgb(255 255 255)
-  );
 
   --sidebar-narrow-bg-color: light-dark(
     rgb(212 212 215 / 0.9),
@@ -90,11 +89,6 @@
     rgb(255 255 255 / 0.25),
     rgb(255 255 255 / 0.25)
   );
-  --thumbnail-hover-color: light-dark(rgb(0 0 0 / 0.1), rgb(255 255 255 / 0.1));
-  --thumbnail-selected-color: light-dark(
-    rgb(0 0 0 / 0.2),
-    rgb(255 255 255 / 0.2)
-  );
   --doorhanger-bg-color: light-dark(rgb(255 255 255), #42414d);
   --doorhanger-border-color: light-dark(rgb(12 12 13 / 0.2), rgb(39 39 43));
   --doorhanger-hover-color: light-dark(rgb(12 12 13), rgb(249 249 250));
@@ -106,9 +100,18 @@
     rgb(115 115 115)
   );
 
+  /* MC-specific colors - using explicit values since we force light mode */
+  --mc-toolbar-bg-color: rgb(255 255 255);
+  --mc-toolbar-option-bg-color: rgb(255 255 255);
+  --mc-toolbar-option-color: hsl(208 28% 20%);
+  --mc-toolbar-after-border-color: #34495d;
+  --mc-viewer-bg-color: #243340;
+
+  /* Sidebar colors: solid for inner content, semi-transparent for floating container */
+  --mc-sidebar-bg-color: #202c37;
+  --mc-sidebar-floating-bg-color: rgb(32 44 55 / 0.92);
+
   --loading-icon: url(images/loading.svg);
-  --treeitem-expanded-icon: url(images/treeitem-expanded.svg);
-  --treeitem-collapsed-icon: url(images/treeitem-collapsed.svg);
   --toolbarButton-editorComment-icon: url(images/comment-editButton.svg);
   --toolbarButton-editorFreeText-icon: url(images/toolbarButton-editorFreeText.svg);
   --toolbarButton-editorHighlight-icon: url(images/toolbarButton-editorHighlight.svg);
@@ -116,7 +119,8 @@
   --toolbarButton-editorStamp-icon: url(images/toolbarButton-editorStamp.svg);
   --toolbarButton-editorSignature-icon: url(images/toolbarButton-editorSignature.svg);
   --toolbarButton-menuArrow-icon: url(images/toolbarButton-menuArrow.svg);
-  --toolbarButton-sidebarToggle-icon: url(images/toolbarButton-sidebarToggle.svg);
+  --toolbarButton-viewsManagerToggle-icon: url(images/toolbarButton-viewsManagerToggle.svg);
+  /* commented out because we don't use them and linting doesn't want them to be defined, but I don't want them in our diff
   --toolbarButton-secondaryToolbarToggle-icon: url(images/toolbarButton-secondaryToolbarToggle.svg);
   --toolbarButton-pageUp-icon: url(images/toolbarButton-pageUp.svg);
   --toolbarButton-pageDown-icon: url(images/toolbarButton-pageDown.svg);
@@ -124,15 +128,20 @@
   --toolbarButton-zoomIn-icon: url(images/toolbarButton-zoomIn.svg);
   --toolbarButton-presentationMode-icon: url(images/toolbarButton-presentationMode.svg);
   --toolbarButton-print-icon: url(images/toolbarButton-print.svg);
+   */
   /*#if GENERIC*/
   --toolbarButton-openFile-icon: url(images/toolbarButton-openFile.svg);
   /*#endif*/
   --toolbarButton-download-icon: url(images/toolbarButton-download.svg);
+  /* commented out because we don't use them and linting doesn't want them to be defined, but I don't want them in our diff
   --toolbarButton-bookmark-icon: url(images/toolbarButton-bookmark.svg);
   --toolbarButton-viewThumbnail-icon: url(images/toolbarButton-viewThumbnail.svg);
   --toolbarButton-viewOutline-icon: url(images/toolbarButton-viewOutline.svg);
+
+   */
   --toolbarButton-viewAttachments-icon: url(images/toolbarButton-viewAttachments.svg);
   --toolbarButton-viewLayers-icon: url(images/toolbarButton-viewLayers.svg);
+  /* commented out because we don't use them and linting doesn't want them to be defined, but I don't want them in our diff
   --toolbarButton-currentOutlineItem-icon: url(images/toolbarButton-currentOutlineItem.svg);
   --toolbarButton-search-icon: url(images/toolbarButton-search.svg);
   --findbarButton-previous-icon: url(images/findbarButton-previous.svg);
@@ -143,10 +152,13 @@
   --secondaryToolbarButton-rotateCw-icon: url(images/secondaryToolbarButton-rotateCw.svg);
   --secondaryToolbarButton-selectTool-icon: url(images/secondaryToolbarButton-selectTool.svg);
   --secondaryToolbarButton-handTool-icon: url(images/secondaryToolbarButton-handTool.svg);
+   */
   --secondaryToolbarButton-scrollPage-icon: url(images/secondaryToolbarButton-scrollPage.svg);
+  /* commented out because we don't use them and linting doesn't want them to be defined, but I don't want them in our diff
   --secondaryToolbarButton-scrollVertical-icon: url(images/secondaryToolbarButton-scrollVertical.svg);
   --secondaryToolbarButton-scrollHorizontal-icon: url(images/secondaryToolbarButton-scrollHorizontal.svg);
   --secondaryToolbarButton-scrollWrapped-icon: url(images/secondaryToolbarButton-scrollWrapped.svg);
+   */
   --secondaryToolbarButton-spreadNone-icon: url(images/secondaryToolbarButton-spreadNone.svg);
   --secondaryToolbarButton-spreadOdd-icon: url(images/secondaryToolbarButton-spreadOdd.svg);
   --secondaryToolbarButton-spreadEven-icon: url(images/secondaryToolbarButton-spreadEven.svg);
@@ -292,29 +304,6 @@ body {
   margin: 0;
 }
 
-#sidebarContainer {
-  position: absolute;
-  inset-block: var(--toolbar-height) 0;
-  inset-inline-start: calc(-1 * var(--sidebar-width));
-  width: var(--sidebar-width);
-  visibility: hidden;
-  z-index: 1;
-  font: message-box;
-  border-top: 1px solid transparent;
-  border-inline-end: var(--doorhanger-border-color-whcm);
-  transition-property: inset-inline-start;
-  transition-duration: var(--sidebar-transition-duration);
-  transition-timing-function: var(--sidebar-transition-timing-function);
-}
-
-#outerContainer:is(.sidebarMoving, .sidebarOpen) #sidebarContainer {
-  visibility: visible;
-}
-
-#outerContainer.sidebarOpen #sidebarContainer {
-  inset-inline-start: 0;
-}
-
 #mainContainer {
   position: absolute;
   inset: 0;
@@ -344,11 +333,6 @@ body {
 #viewerContainer:not(.pdfPresentationMode) {
   transition-duration: var(--sidebar-transition-duration);
   transition-timing-function: var(--sidebar-transition-timing-function);
-}
-
-#outerContainer.sidebarOpen #viewerContainer:not(.pdfPresentationMode) {
-  inset-inline-start: var(--sidebar-width);
-  transition-property: inset-inline-start;
 }
 
 #sidebarContainer :is(input, button, select) {
@@ -396,25 +380,6 @@ body {
     height: 100%;
     padding-inline-end: 2px;
   }
-}
-
-#sidebarResizer {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-end: -6px;
-  width: 6px;
-  z-index: 200;
-  cursor: ew-resize;
-}
-
-#outerContainer.sidebarOpen #loadingBar {
-  inset-inline-start: var(--sidebar-width);
-}
-
-#outerContainer.sidebarResizing
-  :is(#sidebarContainer, #viewerContainer, #loadingBar) {
-  /* Improve responsiveness and avoid visual glitches when the sidebar is resized. */
-  transition-duration: 0s;
 }
 
 .doorHanger,
@@ -514,21 +479,8 @@ body {
   box-sizing: border-box;
 }
 
-.treeItemToggler::before {
-  /* All matching images have a size of 16x16
-   * All relevant containers have a size of 28x28 */
-  position: absolute;
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-
-  content: "";
-  background-color: var(--toolbar-icon-bg-color);
-  mask-size: cover;
-}
-
-#sidebarToggleButton::before {
-  mask-image: var(--toolbarButton-sidebarToggle-icon);
+#viewsManagerToggleButton::before {
+  mask-image: var(--toolbarButton-viewsManagerToggle-icon);
   background-color: rgb(1 1 1); /*TODO: consider 0 opacity*/
   transform: scaleX(var(--dir-factor));
 }
@@ -732,150 +684,6 @@ body {
     inset-inline-end: 4px;
   }
 }
-
-#thumbnailView,
-#outlineView,
-#attachmentsView,
-#layersView {
-  position: absolute;
-  width: calc(100% - 8px);
-  inset-block: 0;
-  padding: 4px 4px 0;
-  overflow: auto;
-  user-select: none;
-}
-
-#thumbnailView {
-  width: calc(100% - 60px);
-  padding: 10px 30px 0;
-}
-
-#thumbnailView > a:is(:active, :focus) {
-  outline: 0;
-}
-
-.thumbnail {
-  /* Define these variables here, and not in :root, since the individual
-     thumbnails may have different sizes. */
-  --thumbnail-width: 0;
-  --thumbnail-height: 0;
-
-  float: var(--inline-start);
-  width: var(--thumbnail-width);
-  height: var(--thumbnail-height);
-  margin: 0 10px 5px;
-  padding: 1px;
-  border: 7px solid transparent;
-  border-radius: 2px;
-}
-
-#thumbnailView > a:last-of-type > .thumbnail {
-  margin-bottom: 10px;
-}
-
-a:focus > .thumbnail,
-.thumbnail:hover {
-  border-color: var(--thumbnail-hover-color);
-}
-
-.thumbnail.selected {
-  border-color: var(--thumbnail-selected-color) !important;
-}
-
-.thumbnailImage {
-  width: var(--thumbnail-width);
-  height: var(--thumbnail-height);
-  opacity: 0.9;
-}
-
-a:focus > .thumbnail > .thumbnailImage,
-.thumbnail:hover > .thumbnailImage {
-  opacity: 0.95;
-}
-
-.thumbnail.selected > .thumbnailImage {
-  opacity: 1 !important;
-}
-
-.thumbnail:not([data-loaded]) > .thumbnailImage {
-  width: calc(var(--thumbnail-width) - 2px);
-  height: calc(var(--thumbnail-height) - 2px);
-  border: 1px dashed rgb(132 132 132);
-}
-
-.treeWithDeepNesting > .treeItem,
-.treeItem > .treeItems {
-  margin-inline-start: 20px;
-}
-
-.treeItem > a {
-  text-decoration: none;
-  display: inline-block;
-  /* Subtract the right padding (left, in RTL mode) of the container: */
-  min-width: calc(100% - 4px);
-  height: auto;
-  margin-bottom: 1px;
-  padding: 2px 0 5px;
-  padding-inline-start: 4px;
-  border-radius: 2px;
-  color: var(--treeitem-color);
-  font-size: 13px;
-  line-height: 15px;
-  user-select: none;
-  white-space: normal;
-  cursor: pointer;
-}
-
-#layersView .treeItem > a * {
-  cursor: pointer;
-}
-
-#layersView .treeItem > a > label {
-  padding-inline-start: 4px;
-}
-
-#layersView .treeItem > a > label > input {
-  float: var(--inline-start);
-  margin-top: 1px;
-}
-
-.treeItemToggler {
-  position: relative;
-  float: var(--inline-start);
-  height: 0;
-  width: 0;
-  color: rgb(255 255 255 / 0.5);
-}
-
-.treeItemToggler::before {
-  inset-inline-end: 4px;
-  mask-image: var(--treeitem-expanded-icon);
-}
-
-.treeItemToggler.treeItemsHidden::before {
-  mask-image: var(--treeitem-collapsed-icon);
-  transform: scaleX(var(--dir-factor));
-}
-
-.treeItemToggler.treeItemsHidden ~ .treeItems {
-  display: none;
-}
-
-.treeItem.selected > a {
-  background-color: var(--treeitem-selected-bg-color);
-  color: var(--treeitem-selected-color);
-}
-
-.treeItemToggler:hover,
-.treeItemToggler:hover + a,
-.treeItemToggler:hover ~ .treeItems,
-.treeItem > a:hover {
-  background-color: var(--treeitem-bg-color);
-  background-clip: padding-box;
-  border-radius: 2px;
-  color: var(--treeitem-hover-color);
-}
-
 #outlineOptionsContainer {
   display: none;
 
@@ -1113,7 +921,6 @@ dialog :link {
   }
 
   .menuContainer {
-    width: 100%;
     height: auto;
     max-height: calc(
       var(--viewer-container-height) - var(--toolbar-height) -
@@ -1769,7 +1576,7 @@ dialog :link {
   #sidebarContainer {
     background-color: var(--sidebar-narrow-bg-color);
   }
-  #outerContainer.sidebarOpen #viewerContainer {
+  #outerContainer.viewsManagerOpen #viewerContainer {
     inset-inline-start: 0 !important;
   }
 }
@@ -1800,9 +1607,10 @@ dialog :link {
   }
 }
 
+/* MC Custom Styling - Toolbar */
 .mcToolbar {
-  background-image: none !important;
-  background-color: rgb(255 255 255) !important;
+  background-image: none;
+  background-color: var(--mc-toolbar-bg-color);
 }
 
 .mcToolbar * button,
@@ -1811,40 +1619,80 @@ dialog :link {
 }
 
 .mcToolbar option {
-  background-image: none !important;
-  background-color: rgb(255 255 255) !important;
-  color: hsl(208 28% 20%);
+  background-image: none;
+  background-color: var(--mc-toolbar-option-bg-color);
+  color: var(--mc-toolbar-option-color);
 }
 
+.mcToolbar::after {
+  border-bottom-color: var(--mc-toolbar-after-border-color);
+}
+
+/* MC Custom Styling - Viewer */
+/* Set body and container backgrounds to match viewer for floating modal effect */
+body {
+  background-color: var(--mc-viewer-bg-color) !important;
+}
+
+#outerContainer,
+#mainContainer,
 .mcViewer {
-  background-color: #243340 !important;
+  background-color: var(--mc-viewer-bg-color);
 }
 
 .mcViewer .page {
   border-image: none;
 }
 
-.mcToolbar::after {
-  border-bottom-color: #34495d;
-}
-
+/* MC Custom Styling - Views Manager (formerly sidebar) */
+#viewsManager,
 .mcSidebar {
-  background-color: #202c37 !important;
+  /* Use semi-transparent background for floating modal effect */
+  --sidebar-bg-color: var(--mc-sidebar-floating-bg-color);
+
+  /* Override text color for dark background since we force light mode */
+  --text-color: #fbfbfe;
+  color: var(--text-color);
+
+  /* Override thumbnail image border colors to work with dark background */
+  --image-border-color: #3a3944;
+  --image-hover-border-color: #52525e;
+  --image-page-number-bg: #23222b;
+  --image-current-page-number-fg: #fff;
 }
 
+/* Set solid background for header and content areas */
+#viewsManagerHeader,
+#viewsManagerContent,
+#thumbnailsView,
+#outlinesView,
+#attachmentsView,
+#layersView {
+  background-color: var(--mc-sidebar-bg-color);
+}
+
+/* Override global-complete.css .thumbnail styles for PDF thumbnails */
+#thumbnailsView .thumbnail,
 .mcThumbnail {
   padding: 0 !important;
   line-height: 0 !important;
-  background-color: #202c37 !important;
+  background-color: transparent !important;
   border: none !important;
+}
+
+/* Override tree/outline colors for dark background (force dark mode values) */
+#outlinesView.treeView,
+#layersView.treeView,
+#attachmentsView .treeView {
+  --treeitem-color: rgb(255 255 255 / 0.8);
+  --treeitem-bg-color: rgb(255 255 255 / 0.15);
+  --treeitem-hover-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-color: rgb(255 255 255 / 0.9);
+  --treeitem-selected-bg-color: rgb(255 255 255 / 0.25);
 }
 
 @media print {
   .disablePrint {
     display: none !important;
   }
-}
-
-* {
-  box-sizing: initial !important;
 }

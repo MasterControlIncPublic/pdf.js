@@ -112,14 +112,6 @@ pdfjs-document-properties-size-kb = { NUMBER($kb, maximumSignificantDigits: 3) }
 #   $mb (Number) - the PDF file size in megabytes
 #   $b (Number) - the PDF file size in bytes
 pdfjs-document-properties-size-mb = { NUMBER($mb, maximumSignificantDigits: 3) } MB ({ $b } bajtow)
-# Variables:
-#   $size_kb (Number) - the PDF file size in kilobytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-kb = { $size_kb } KB ({ $size_b } bajtow)
-# Variables:
-#   $size_mb (Number) - the PDF file size in megabytes
-#   $size_b (Number) - the PDF file size in bytes
-pdfjs-document-properties-mb = { $size_mb } MB ({ $size_b } bajtow)
 pdfjs-document-properties-title = Titul:
 pdfjs-document-properties-author = Awtor:
 pdfjs-document-properties-subject = Předmjet:
@@ -129,10 +121,6 @@ pdfjs-document-properties-modification-date = Datum změny:
 # Variables:
 #   $dateObj (Date) - the creation/modification date and time of the PDF file
 pdfjs-document-properties-date-time-string = { DATETIME($dateObj, dateStyle: "short", timeStyle: "medium") }
-# Variables:
-#   $date (Date) - the creation/modification date of the PDF file
-#   $time (Time) - the creation/modification time of the PDF file
-pdfjs-document-properties-date-string = { $date }, { $time }
 pdfjs-document-properties-creator = Awtor:
 pdfjs-document-properties-producer = PDF-zhotowjer:
 pdfjs-document-properties-version = PDF-wersija:
@@ -279,10 +267,6 @@ pdfjs-rendering-error = Při zwobraznjenju strony je zmylk wustupił.
 
 ## Annotations
 
-# Variables:
-#   $date (Date) - the modification date of the annotation
-#   $time (Time) - the modification time of the annotation
-pdfjs-annotation-date-string = { $date }, { $time }
 # .alt: This is used as a tooltip.
 # Variables:
 #   $type (String) - an annotation type from a list defined in the PDF spec
@@ -328,6 +312,10 @@ pdfjs-comment-floating-button =
     .title = Komentować
     .aria-label = Komentować
 pdfjs-comment-floating-button-label = Komentować
+pdfjs-editor-comment-button =
+    .title = Komentować
+    .aria-label = Komentować
+pdfjs-editor-comment-button-label = Komentować
 pdfjs-editor-signature-button =
     .title = Signaturu přidać
 pdfjs-editor-signature-button-label = Signaturu přidać
@@ -390,20 +378,29 @@ pdfjs-editor-add-saved-signature-button =
 pdfjs-free-text2 =
     .aria-label = Tekstowy editor
     .default-content = Započńće pisać …
-pdfjs-free-text =
-    .aria-label = Tekstowy editor
-pdfjs-free-text-default-content = Započńće pisać…
-pdfjs-ink =
-    .aria-label = Rysowanski editor
-pdfjs-ink-canvas =
-    .aria-label = Wobraz wutworjeny wot wužiwarja
+# Used to show how many comments are present in the pdf file.
+# Variables:
+#   $count (Number) - the number of comments.
+pdfjs-editor-comments-sidebar-title =
+    { $count ->
+        [one] { $count } komentar
+        [two] { $count } komentaraj
+        [few] { $count } komentary
+       *[other] { $count } komentarow
+    }
+pdfjs-editor-comments-sidebar-close-button =
+    .title = Bóčnicu začinić
+    .aria-label = Bóčnicu začinić
+pdfjs-editor-comments-sidebar-close-button-label = Bóčnicu začinić
+# Instructional copy to add a comment by selecting text or an annotations.
+pdfjs-editor-comments-sidebar-no-comments1 = Widźiće něšto přispomnjenja hódneho? Wuzběhńće to a zawostajće komentar.
+pdfjs-editor-comments-sidebar-no-comments-link = Dalše informacije
 
 ## Alt-text dialog
 
 pdfjs-editor-alt-text-button-label = Alternatiwny tekst
 pdfjs-editor-alt-text-edit-button =
     .aria-label = Alternatiwny tekst wobdźěłać
-pdfjs-editor-alt-text-edit-button-label = Alternatiwny tekst wobdźěłać
 pdfjs-editor-alt-text-dialog-label = Nastajenje wubrać
 pdfjs-editor-alt-text-dialog-description = Alternatiwny tekst pomha, hdyž ludźo njemóža wobraz widźeć abo hdyž so wobraz njezačita.
 pdfjs-editor-alt-text-add-description-label = Wopisanje přidać
@@ -423,14 +420,6 @@ pdfjs-editor-alt-text-button =
 ## Editor resizers
 ## This is used in an aria label to help to understand the role of the resizer.
 
-pdfjs-editor-resizer-label-top-left = Horjeka nalěwo – wulkosć změnić
-pdfjs-editor-resizer-label-top-middle = Horjeka wosrjedź – wulkosć změnić
-pdfjs-editor-resizer-label-top-right = Horjeka naprawo – wulkosć změnić
-pdfjs-editor-resizer-label-middle-right = Wosrjedź naprawo – wulkosć změnić
-pdfjs-editor-resizer-label-bottom-right = Deleka naprawo – wulkosć změnić
-pdfjs-editor-resizer-label-bottom-middle = Deleka wosrjedź – wulkosć změnić
-pdfjs-editor-resizer-label-bottom-left = Deleka nalěwo – wulkosć změnić
-pdfjs-editor-resizer-label-middle-left = Wosrjedź nalěwo – wulkosć změnić
 pdfjs-editor-resizer-top-left =
     .aria-label = Horjeka nalěwo – wulkosć změnić
 pdfjs-editor-resizer-top-middle =
@@ -624,25 +613,33 @@ pdfjs-editor-add-signature-cancel-button = Přetorhnyć
 pdfjs-editor-add-signature-add-button = Přidać
 pdfjs-editor-edit-signature-update-button = Aktualizować
 
+## Comment popup
+
+pdfjs-editor-edit-comment-popup-button-label = Komentar wobdźěłać
+pdfjs-editor-edit-comment-popup-button =
+    .title = Komentar wobdźěłać
+pdfjs-editor-delete-comment-popup-button-label = Komentar wotstronić
+pdfjs-editor-delete-comment-popup-button =
+    .title = Komentar wotstronić
+pdfjs-show-comment-button =
+    .title = Komentar pokazać
+
 ##  Edit a comment dialog
 
-pdfjs-editor-edit-comment-actions-button-label = Akcije
-pdfjs-editor-edit-comment-actions-button =
-    .title = Akcije
-pdfjs-editor-edit-comment-close-button-label = Začinić
-pdfjs-editor-edit-comment-close-button =
-    .title = Začinić
-pdfjs-editor-edit-comment-actions-edit-button-label = Wobdźěłać
-pdfjs-editor-edit-comment-actions-delete-button-label = Zhašeć
-pdfjs-editor-edit-comment-manager-text-input =
-    .placeholder = Zapodajće swój komentar
-pdfjs-editor-edit-comment-manager-cancel-button = Přetorhnyć
-pdfjs-editor-edit-comment-manager-save-button = Składować
+# An existing comment is edited
+pdfjs-editor-edit-comment-dialog-title-when-editing = Komentar wobdźěłać
+pdfjs-editor-edit-comment-dialog-save-button-when-editing = Aktualizować
+# No existing comment
+pdfjs-editor-edit-comment-dialog-title-when-adding = Komentar přidać
+pdfjs-editor-edit-comment-dialog-save-button-when-adding = Přidać
+pdfjs-editor-edit-comment-dialog-text-input =
+    .placeholder = Započńće pisać…
+pdfjs-editor-edit-comment-dialog-cancel-button = Přetorhnyć
 
 ## Edit a comment button in the editor toolbar
 
-pdfjs-editor-edit-comment-button =
-    .title = Komentar wobdźěłać
+pdfjs-editor-add-comment-button =
+    .title = Komentar přidać
 
 ## Main menu for adding/removing signatures
 

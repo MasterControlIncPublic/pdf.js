@@ -15,11 +15,14 @@
 
 import {
   BaseException,
+  DrawOPS,
   FeatureTest,
+  MathClamp,
   shadow,
   Util,
   warn,
 } from "../shared/util.js";
+import { XfaLayer } from "./xfa_layer.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -770,9 +773,495 @@ const SupportedImageMimeTypes = [
   "image/x-icon",
 ];
 
+class ColorScheme {
+  static get isDarkMode() {
+    return shadow(
+      this,
+      "isDarkMode",
+      !!window?.matchMedia?.("(prefers-color-scheme: dark)").matches
+    );
+  }
+}
+
+class CSSConstants {
+  static get commentForegroundColor() {
+    const element = document.createElement("span");
+    element.classList.add("comment", "sidebar");
+    const { style } = element;
+    style.width = style.height = "0";
+    style.display = "none";
+    style.color = "var(--comment-fg-color)";
+    document.body.append(element);
+    const { color } = window.getComputedStyle(element);
+    element.remove();
+    return shadow(this, "commentForegroundColor", getRGB(color));
+  }
+}
+
+function applyOpacity(r, g, b, opacity) {
+  opacity = Math.min(Math.max(opacity ?? 1, 0), 1);
+  const white = 255 * (1 - opacity);
+  r = Math.round(r * opacity + white);
+  g = Math.round(g * opacity + white);
+  b = Math.round(b * opacity + white);
+  return [r, g, b];
+}
+
+function RGBToHSL(rgb, output) {
+  const r = rgb[0] / 255;
+  const g = rgb[1] / 255;
+  const b = rgb[2] / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) {
+    // achromatic
+    output[0] = output[1] = 0; // hue and saturation are 0
+  } else {
+    const d = max - min;
+    output[1] = l < 0.5 ? d / (max + min) : d / (2 - max - min);
+    // hue
+    switch (max) {
+      case r:
+        output[0] = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        break;
+      case g:
+        output[0] = ((b - r) / d + 2) * 60;
+        break;
+      case b:
+        output[0] = ((r - g) / d + 4) * 60;
+        break;
+    }
+  }
+  output[2] = l;
+}
+
+function HSLToRGB(hsl, output) {
+  const h = hsl[0];
+  const s = hsl[1];
+  const l = hsl[2];
+  const c = (1 - Math.abs(2 * l - 1)) * s; // chroma
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+
+  switch (Math.floor(h / 60)) {
+    case 0:
+      output[0] = c + m;
+      output[1] = x + m;
+      output[2] = m;
+      break;
+    case 1:
+      output[0] = x + m;
+      output[1] = c + m;
+      output[2] = m;
+      break;
+    case 2:
+      output[0] = m;
+      output[1] = c + m;
+      output[2] = x + m;
+      break;
+    case 3:
+      output[0] = m;
+      output[1] = x + m;
+      output[2] = c + m;
+      break;
+    case 4:
+      output[0] = x + m;
+      output[1] = m;
+      output[2] = c + m;
+      break;
+    case 5:
+    case 6:
+      output[0] = c + m;
+      output[1] = m;
+      output[2] = x + m;
+      break;
+  }
+}
+
+function computeLuminance(x) {
+  return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+}
+
+function contrastRatio(hsl1, hsl2, output) {
+  HSLToRGB(hsl1, output);
+  output.map(computeLuminance);
+  const lum1 = 0.2126 * output[0] + 0.7152 * output[1] + 0.0722 * output[2];
+  HSLToRGB(hsl2, output);
+  output.map(computeLuminance);
+  const lum2 = 0.2126 * output[0] + 0.7152 * output[1] + 0.0722 * output[2];
+  return lum1 > lum2
+    ? (lum1 + 0.05) / (lum2 + 0.05)
+    : (lum2 + 0.05) / (lum1 + 0.05);
+}
+
+// Cache for the findContrastColor function, to improve performance.
+const contrastCache = new Map();
+
+/**
+ * Find a color that has sufficient contrast against a fixed color.
+ * The luminance (in HSL color space) of the base color is adjusted
+ * until the contrast ratio between the base color and the fixed color
+ * is at least the minimum contrast ratio required by WCAG 2.1.
+ * @param {Array<number>} baseColor
+ * @param {Array<number>} fixedColor
+ * @returns {string}
+ */
+function findContrastColor(baseColor, fixedColor) {
+  const key =
+    baseColor[0] +
+    baseColor[1] * 0x100 +
+    baseColor[2] * 0x10000 +
+    fixedColor[0] * 0x1000000 +
+    fixedColor[1] * 0x100000000 +
+    fixedColor[2] * 0x10000000000;
+  let cachedValue = contrastCache.get(key);
+  if (cachedValue) {
+    return cachedValue;
+  }
+  const array = new Float32Array(9);
+  const output = array.subarray(0, 3);
+  const baseHSL = array.subarray(3, 6);
+  RGBToHSL(baseColor, baseHSL);
+  const fixedHSL = array.subarray(6, 9);
+  RGBToHSL(fixedColor, fixedHSL);
+  const isFixedColorDark = fixedHSL[2] < 0.5;
+
+  // Use the contrast ratio requirements from WCAG 2.1.
+  // https://www.w3.org/TR/WCAG21/#contrast-minimum
+  // https://www.w3.org/TR/WCAG21/#contrast-enhanced
+  const minContrast = isFixedColorDark ? 12 : 4.5;
+
+  baseHSL[2] = isFixedColorDark
+    ? Math.sqrt(baseHSL[2])
+    : 1 - Math.sqrt(1 - baseHSL[2]);
+
+  if (contrastRatio(baseHSL, fixedHSL, output) < minContrast) {
+    let start, end;
+    if (isFixedColorDark) {
+      start = baseHSL[2];
+      end = 1;
+    } else {
+      start = 0;
+      end = baseHSL[2];
+    }
+    const PRECISION = 0.005;
+    while (end - start > PRECISION) {
+      const mid = (baseHSL[2] = (start + end) / 2);
+      if (
+        isFixedColorDark ===
+        contrastRatio(baseHSL, fixedHSL, output) < minContrast
+      ) {
+        start = mid;
+      } else {
+        end = mid;
+      }
+    }
+    baseHSL[2] = isFixedColorDark ? end : start;
+  }
+
+  HSLToRGB(baseHSL, output);
+  cachedValue = Util.makeHexColor(
+    Math.round(output[0] * 255),
+    Math.round(output[1] * 255),
+    Math.round(output[2] * 255)
+  );
+  contrastCache.set(key, cachedValue);
+  return cachedValue;
+}
+
+function renderRichText({ html, dir, className }, container) {
+  const fragment = document.createDocumentFragment();
+  if (typeof html === "string") {
+    const p = document.createElement("p");
+    p.dir = dir || "auto";
+    const lines = html.split(/(?:\r\n?|\n)/);
+    for (let i = 0, ii = lines.length; i < ii; ++i) {
+      const line = lines[i];
+      p.append(document.createTextNode(line));
+      if (i < ii - 1) {
+        p.append(document.createElement("br"));
+      }
+    }
+    fragment.append(p);
+  } else {
+    XfaLayer.render({
+      xfaHtml: html,
+      div: fragment,
+      intent: "richText",
+    });
+  }
+  fragment.firstElementChild.classList.add("richText", className);
+  container.append(fragment);
+}
+
+function makePathFromDrawOPS(data) {
+  // Using a SVG string is slightly slower than using the following loop.
+  const path = new Path2D();
+  if (!data) {
+    return path;
+  }
+  for (let i = 0, ii = data.length; i < ii; ) {
+    switch (data[i++]) {
+      case DrawOPS.moveTo:
+        path.moveTo(data[i++], data[i++]);
+        break;
+      case DrawOPS.lineTo:
+        path.lineTo(data[i++], data[i++]);
+        break;
+      case DrawOPS.curveTo:
+        path.bezierCurveTo(
+          data[i++],
+          data[i++],
+          data[i++],
+          data[i++],
+          data[i++],
+          data[i++]
+        );
+        break;
+      case DrawOPS.quadraticCurveTo:
+        path.quadraticCurveTo(data[i++], data[i++], data[i++], data[i++]);
+        break;
+      case DrawOPS.closePath:
+        path.closePath();
+        break;
+      default:
+        warn(`Unrecognized drawing path operator: ${data[i - 1]}`);
+        break;
+    }
+  }
+  return path;
+}
+
+/**
+ * Maps between page IDs and page numbers, allowing bidirectional conversion
+ * between the two representations. This is useful when the page numbering
+ * in the PDF document doesn't match the default sequential ordering.
+ */
+class PagesMapper {
+  /**
+   * Maps page IDs to their corresponding page numbers.
+   * @type {Uint32Array|null}
+   */
+  static #idToPageNumber = null;
+
+  /**
+   * Maps page numbers to their corresponding page IDs.
+   * @type {Uint32Array|null}
+   */
+  static #pageNumberToId = null;
+
+  /**
+   * Previous mapping of page IDs to page numbers.
+   * @type {Uint32Array|null}
+   */
+  static #prevIdToPageNumber = null;
+
+  /**
+   * The total number of pages.
+   * @type {number}
+   */
+  static #pagesNumber = 0;
+
+  /**
+   * Listeners for page changes.
+   * @type {Array<function>}
+   */
+  static #listeners = [];
+
+  /**
+   * Gets the total number of pages.
+   * @returns {number} The number of pages.
+   */
+  get pagesNumber() {
+    return PagesMapper.#pagesNumber;
+  }
+
+  /**
+   * Sets the total number of pages and initializes default mappings
+   * where page IDs equal page numbers (1-indexed).
+   * @param {number} n - The total number of pages.
+   */
+  set pagesNumber(n) {
+    if (PagesMapper.#pagesNumber === n) {
+      return;
+    }
+    PagesMapper.#pagesNumber = n;
+    if (n === 0) {
+      PagesMapper.#pageNumberToId = null;
+      PagesMapper.#idToPageNumber = null;
+    }
+  }
+
+  addListener(listener) {
+    PagesMapper.#listeners.push(listener);
+  }
+
+  removeListener(listener) {
+    const index = PagesMapper.#listeners.indexOf(listener);
+    if (index >= 0) {
+      PagesMapper.#listeners.splice(index, 1);
+    }
+  }
+
+  #updateListeners() {
+    for (const listener of PagesMapper.#listeners) {
+      listener();
+    }
+  }
+
+  #init(mustInit) {
+    if (PagesMapper.#pageNumberToId) {
+      return;
+    }
+    const n = PagesMapper.#pagesNumber;
+
+    // Allocate a single array for better memory locality.
+    const array = new Uint32Array(3 * n);
+    const pageNumberToId = (PagesMapper.#pageNumberToId = array.subarray(0, n));
+    const idToPageNumber = (PagesMapper.#idToPageNumber = array.subarray(
+      n,
+      2 * n
+    ));
+    if (mustInit) {
+      for (let i = 0; i < n; i++) {
+        pageNumberToId[i] = idToPageNumber[i] = i + 1;
+      }
+    }
+    PagesMapper.#prevIdToPageNumber = array.subarray(2 * n);
+  }
+
+  /**
+   * Move a set of pages to a new position while keeping ID→number mappings in
+   * sync.
+   *
+   * @param {Set<number>} selectedPages - Page numbers being moved (1-indexed).
+   * @param {number[]} pagesToMove - Ordered list of page numbers to move.
+   * @param {number} index - Zero-based insertion index in the page-number list.
+   */
+  movePages(selectedPages, pagesToMove, index) {
+    this.#init(true);
+    const pageNumberToId = PagesMapper.#pageNumberToId;
+    const idToPageNumber = PagesMapper.#idToPageNumber;
+    PagesMapper.#prevIdToPageNumber.set(idToPageNumber);
+    const movedCount = pagesToMove.length;
+    const mappedPagesToMove = new Uint32Array(movedCount);
+    let removedBeforeTarget = 0;
+
+    for (let i = 0; i < movedCount; i++) {
+      const pageIndex = pagesToMove[i] - 1;
+      mappedPagesToMove[i] = pageNumberToId[pageIndex];
+      if (pageIndex < index) {
+        removedBeforeTarget += 1;
+      }
+    }
+
+    const pagesNumber = PagesMapper.#pagesNumber;
+    // target index after removing elements that were before it
+    let adjustedTarget = index - removedBeforeTarget;
+    const remainingLen = pagesNumber - movedCount;
+    adjustedTarget = MathClamp(adjustedTarget, 0, remainingLen);
+
+    // Create the new mapping.
+    // First copy over the pages that are not being moved.
+    // Then insert the moved pages at the target position.
+    for (let i = 0, r = 0; i < pagesNumber; i++) {
+      if (!selectedPages.has(i + 1)) {
+        pageNumberToId[r++] = pageNumberToId[i];
+      }
+    }
+
+    // Shift the pages after the target position.
+    pageNumberToId.copyWithin(
+      adjustedTarget + movedCount,
+      adjustedTarget,
+      remainingLen
+    );
+    // Finally insert the moved pages.
+    pageNumberToId.set(mappedPagesToMove, adjustedTarget);
+
+    let hasChanged = false;
+    for (let i = 0, ii = pagesNumber; i < ii; i++) {
+      const id = pageNumberToId[i];
+      hasChanged ||= id !== i + 1;
+      idToPageNumber[id - 1] = i + 1;
+    }
+    this.#updateListeners();
+
+    if (!hasChanged) {
+      // Reset.
+      this.pagesNumber = 0;
+    }
+  }
+
+  /**
+   * Checks if the page mappings have been altered from their initial state.
+   * @returns {boolean} True if the mappings have been altered, false otherwise.
+   */
+  hasBeenAltered() {
+    return PagesMapper.#pageNumberToId !== null;
+  }
+
+  /**
+   * Gets the current page mapping suitable for saving.
+   * @returns {Object} An object containing the page indices.
+   */
+  getPageMappingForSaving() {
+    // Saving is index-based.
+    return {
+      pageIndices: PagesMapper.#idToPageNumber
+        ? PagesMapper.#idToPageNumber.map(x => x - 1)
+        : null,
+    };
+  }
+
+  getPrevPageNumber(pageNumber) {
+    return PagesMapper.#prevIdToPageNumber[
+      PagesMapper.#pageNumberToId[pageNumber - 1] - 1
+    ];
+  }
+
+  /**
+   * Gets the page number for a given page ID.
+   * @param {number} id - The page ID (1-indexed).
+   * @returns {number} The page number, or the ID itself if no mapping exists.
+   */
+  getPageNumber(id) {
+    return PagesMapper.#idToPageNumber?.[id - 1] ?? id;
+  }
+
+  /**
+   * Gets the page ID for a given page number.
+   * @param {number} pageNumber - The page number (1-indexed).
+   * @returns {number} The page ID, or the page number itself if no mapping
+   * exists.
+   */
+  getPageId(pageNumber) {
+    return PagesMapper.#pageNumberToId?.[pageNumber - 1] ?? pageNumber;
+  }
+
+  /**
+   * Gets or creates a singleton instance of PagesMapper.
+   * @returns {PagesMapper} The singleton instance.
+   */
+  static get instance() {
+    return shadow(this, "instance", new PagesMapper());
+  }
+
+  getMapping() {
+    return PagesMapper.#pageNumberToId.subarray(0, this.pagesNumber);
+  }
+}
+
 export {
+  applyOpacity,
+  ColorScheme,
+  CSSConstants,
   deprecated,
   fetchData,
+  findContrastColor,
   getColorValues,
   getCurrentTransform,
   getCurrentTransformInverse,
@@ -783,12 +1272,15 @@ export {
   isDataScheme,
   isPdfFile,
   isValidFetchUrl,
+  makePathFromDrawOPS,
   noContextMenu,
   OutputScale,
+  PagesMapper,
   PageViewport,
   PDFDateString,
   PixelsPerInch,
   RenderingCancelledException,
+  renderRichText,
   setLayerDimensions,
   StatTimer,
   stopEvent,
