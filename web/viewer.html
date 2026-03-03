@@ -98,7 +98,7 @@ See https://github.com/adobe-type-tools/cmap-resources
     <!--#endif-->
   </head>
 
-  <body tabindex="0" oncontextmenu="return false">
+  <body tabindex="0" oncontextmenu="return false;">
     <div id="outerContainer">
       <span id="viewer-alert" class="visuallyHidden" role="alert"></span>
 
@@ -121,7 +121,7 @@ See https://github.com/adobe-type-tools/cmap-resources
                 </button>
                 <div
                   id="viewsManager"
-                  class="menuContainer sidebar"
+                  class="menuContainer sidebar mcSidebar"
                   hidden="true"
                   role="dialog"
                   aria-describedby="viewsManagerHeaderLabel"
@@ -187,7 +187,7 @@ See https://github.com/adobe-type-tools/cmap-resources
                         <span data-l10n-id="pdfjs-current-outline-item-button-label"></span>
                       </button>
                     </div>
-                    <div id="viewsManagerStatus">
+                    <div id="viewsManagerStatus" class="hidden">
                       <div id="viewsManagerStatusAction">
                         <span
                           id="viewsManagerStatusActionLabel"
@@ -313,23 +313,23 @@ See https://github.com/adobe-type-tools/cmap-resources
                     </div>
 
                     <div id="findbarOptionsOneContainer" class="toolbarHorizontalGroup">
-                      <div class="toggleButton toolbarLabel">
+                      <div>
                         <input type="checkbox" id="findHighlightAll" tabindex="0" />
-                        <label for="findHighlightAll" data-l10n-id="pdfjs-find-highlight-checkbox"></label>
+                        <label for="findHighlightAll" class="toolbarLabel" data-l10n-id="pdfjs-find-highlight-checkbox"></label>
                       </div>
-                      <div class="toggleButton toolbarLabel">
+                      <div>
                         <input type="checkbox" id="findMatchCase" tabindex="0" />
-                        <label for="findMatchCase" data-l10n-id="pdfjs-find-match-case-checkbox-label"></label>
+                        <label for="findMatchCase" class="toolbarLabel" data-l10n-id="pdfjs-find-match-case-checkbox-label"></label>
                       </div>
                     </div>
                     <div id="findbarOptionsTwoContainer" class="toolbarHorizontalGroup">
-                      <div class="toggleButton toolbarLabel">
+                      <div>
                         <input type="checkbox" id="findMatchDiacritics" tabindex="0" />
-                        <label for="findMatchDiacritics" data-l10n-id="pdfjs-find-match-diacritics-checkbox-label"></label>
+                        <label for="findMatchDiacritics" class="toolbarLabel" data-l10n-id="pdfjs-find-match-diacritics-checkbox-label"></label>
                       </div>
-                      <div class="toggleButton toolbarLabel">
+                      <div>
                         <input type="checkbox" id="findEntireWord" tabindex="0" />
-                        <label for="findEntireWord" data-l10n-id="pdfjs-find-entire-word-checkbox-label"></label>
+                        <label for="findEntireWord" class="toolbarLabel" data-l10n-id="pdfjs-find-entire-word-checkbox-label"></label>
                       </div>
                     </div>
 
@@ -618,6 +618,16 @@ See https://github.com/adobe-type-tools/cmap-resources
                   </button>
                 </div>
 
+                <button
+                  id="presentationMode"
+                  class="toolbarButton presentationMode hiddenLargeView"
+                  title="Switch to Presentation Mode"
+                  tabindex="40"
+                  data-l10n-id="pdfjs-presentation-mode-button"
+                >
+                  <span data-l10n-id="pdfjs-presentation-mode-button-label"></span>
+                </button>
+
                 <div class="verticalToolbarSeparator hiddenMediumView"></div>
 
                 <div id="secondaryToolbarToggle" class="toolbarButtonWithContainer">
@@ -659,7 +669,13 @@ See https://github.com/adobe-type-tools/cmap-resources
                       <div class="horizontalToolbarSeparator"></div>
                       <!--#endif-->
 
-                      <button id="presentationMode" class="toolbarButton labeled" type="button" tabindex="0" data-l10n-id="pdfjs-presentation-mode-button">
+                      <button
+                        id="secondaryPresentationMode"
+                        class="toolbarButton labeled"
+                        type="button"
+                        tabindex="0"
+                        data-l10n-id="pdfjs-presentation-mode-button"
+                      >
                         <span data-l10n-id="pdfjs-presentation-mode-button-label"></span>
                       </button>
 
