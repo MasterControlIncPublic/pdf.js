@@ -21,7 +21,7 @@ class CCITTFaxStream extends DecodeStream {
   constructor(str, maybeLength, params) {
     super(maybeLength);
 
-    this.str = str;
+    this.stream = str;
     this.dict = str.dict;
 
     if (!(params instanceof Dict)) {
@@ -54,6 +54,10 @@ class CCITTFaxStream extends DecodeStream {
       this.ensureBuffer(this.bufferLength + 1);
       this.buffer[this.bufferLength++] = c;
     }
+  }
+
+  get isImageStream() {
+    return true;
   }
 }
 

@@ -36,14 +36,10 @@ import {
   VerbosityLevel,
 } from "../../src/shared/util.js";
 import {
-  build,
-  getDocument,
-  PDFDataRangeTransport,
-  PDFWorker,
-  version,
-} from "../../src/display/api.js";
-import {
+  applyOpacity,
+  CSSConstants,
   fetchData,
+  findContrastColor,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
   getRGB,
@@ -52,13 +48,22 @@ import {
   isPdfFile,
   noContextMenu,
   OutputScale,
+  PagesMapper,
   PDFDateString,
   PixelsPerInch,
   RenderingCancelledException,
+  renderRichText,
   setLayerDimensions,
   stopEvent,
   SupportedImageMimeTypes,
 } from "../../src/display/display_utils.js";
+import {
+  build,
+  getDocument,
+  PDFDataRangeTransport,
+  PDFWorker,
+  version,
+} from "../../src/display/api.js";
 import { AnnotationEditorLayer } from "../../src/display/editor/annotation_editor_layer.js";
 import { AnnotationEditorUIManager } from "../../src/display/editor/tools.js";
 import { AnnotationLayer } from "../../src/display/annotation_layer.js";
@@ -81,13 +86,16 @@ const expectedAPI = Object.freeze({
   AnnotationLayer,
   AnnotationMode,
   AnnotationType,
+  applyOpacity,
   build,
   ColorPicker,
   createValidAbsoluteUrl,
+  CSSConstants,
   DOMSVGFactory,
   DrawLayer,
   FeatureTest,
   fetchData,
+  findContrastColor,
   getDocument,
   getFilenameFromUrl,
   getPdfFilenameFromUrl,
@@ -105,6 +113,7 @@ const expectedAPI = Object.freeze({
   normalizeUnicode,
   OPS,
   OutputScale,
+  PagesMapper,
   PasswordResponses,
   PDFDataRangeTransport,
   PDFDateString,
@@ -112,6 +121,7 @@ const expectedAPI = Object.freeze({
   PermissionFlag,
   PixelsPerInch,
   RenderingCancelledException,
+  renderRichText,
   ResponseException,
   setLayerDimensions,
   shadow,

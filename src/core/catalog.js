@@ -267,6 +267,10 @@ class Catalog {
     return markInfo;
   }
 
+  get hasStructTree() {
+    return this.#catDict.has("StructTreeRoot");
+  }
+
   get structTreeRoot() {
     let structTree = null;
     try {
@@ -735,6 +739,16 @@ class Catalog {
     return rawDests;
   }
 
+  get rawPageLabels() {
+    const obj = this.#catDict.getRaw("PageLabels");
+    if (!obj) {
+      return null;
+    }
+
+    const numberTree = new NumberTree(obj, this.xref);
+    return numberTree.getAll();
+  }
+
   get pageLabels() {
     let obj = null;
     try {
@@ -749,8 +763,8 @@ class Catalog {
   }
 
   #readPageLabels() {
-    const obj = this.#catDict.getRaw("PageLabels");
-    if (!obj) {
+    const nums = this.rawPageLabels;
+    if (!nums) {
       return null;
     }
 
@@ -758,8 +772,6 @@ class Catalog {
     let style = null,
       prefix = "";
 
-    const numberTree = new NumberTree(obj, this.xref);
-    const nums = numberTree.getAll();
     let currentLabel = "",
       currentIndex = 1;
 
@@ -1045,7 +1057,7 @@ class Catalog {
     if (obj instanceof Dict && obj.has("EmbeddedFiles")) {
       const nameTree = new NameTree(obj.getRaw("EmbeddedFiles"), this.xref);
       for (const [key, value] of nameTree.getAll()) {
-        const fs = new FileSpec(value, this.xref);
+        const fs = new FileSpec(value);
         attachments ??= Object.create(null);
         attachments[stringToPDFString(key, /* keepEscapeSequence = */ true)] =
           fs.serializable;
@@ -1611,23 +1623,21 @@ class Catalog {
         case "GoToR":
           const urlDict = action.get("F");
           if (urlDict instanceof Dict) {
-            const fs = new FileSpec(
-              urlDict,
-              /* xref = */ null,
-              /* skipContent = */ true
-            );
-            const { rawFilename } = fs.serializable;
-            url = rawFilename;
+            const fs = new FileSpec(urlDict, /* skipContent = */ true);
+            ({ rawFilename: url } = fs.serializable);
           } else if (typeof urlDict === "string") {
             url = urlDict;
+          } else {
+            break;
           }
 
           // NOTE: the destination is relative to the *remote* document.
           const remoteDest = fetchRemoteDest(action);
-          if (remoteDest && typeof url === "string") {
+          if (remoteDest) {
             // NOTE: We don't use the `updateUrlHash` function here, since
-            // the `createValidAbsoluteUrl` function (see below) already
-            // handles parsing and validation of the final URL.
+            // the `createValidAbsoluteUrl` function (see below) already handles
+            // parsing/validation of the final URL and manual splitting also
+            // ensures that the `unsafeUrl` property will be available/correct.
             url = /* baseUrl = */ url.split("#", 1)[0] + "#" + remoteDest;
           }
           // The 'NewWindow' property, equal to `LinkTarget.BLANK`.
