@@ -116,13 +116,35 @@ function getCharacterType(charCode) {
 
 let NormalizeWithNFKC;
 function getNormalizeWithNFKC() {
+  // MC CUSTOMIZATION: Enable NFKC normalization for all browsers (not just Firefox)
+  //
+  // Background: Mozilla commit eee20cf13 made NFKC normalization Firefox-only due to ICU 78
+  // updates that changed how certain characters (U+A7F1) normalize. However, Kangxi radicals
+  // (U+2F00-U+2FD5) have had stable NFKC mappings since Unicode 3.2 and normalize consistently
+  // across all browsers.
+  //
+  // Issue: Our PDF publishing service (PDFTron) generates PDFs with Kangxi radicals (e.g., ⼿ U+2F3F)
+  // instead of standard CJK characters (e.g., 手 U+624B) in Japanese text. This causes search
+  // to fail in Chrome/Edge since they don't apply the Firefox-specific normalization.
+  //
+  // Solution: We enable the NFKC normalization for all browsers by removing the Firefox-only
+  // condition. This is safe because:
+  // 1. Kangxi radicals normalize identically in Chrome and Firefox
+  // 2. This restores the pre-v5.4.449 behavior that worked correctly
+  // 3. Only affects search functionality, not rendering
+  //
+  // Related: QX-28091 - Japanese locale signature manifest search failures
+  /*
   if (
     (typeof PDFJSDev === "undefined" && FeatureTest.platform.isFirefox) ||
     (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL"))
   ) {
+   */
     /* eslint-disable no-irregular-whitespace */
     NormalizeWithNFKC ||= `\xA0¨ª¯²-µ¸-º¼-¾Ĳ-ĳĿ-ŀŉſǄ-ǌǱ-ǳʰ-ʸ˘-˝ˠ-ˤʹͺ;΄-΅·ϐ-ϖϰ-ϲϴ-ϵϹևٵ-ٸक़-य़ড়-ঢ়য়ਲ਼ਸ਼ਖ਼-ਜ਼ਫ਼ଡ଼-ଢ଼ำຳໜ-ໝ༌གྷཌྷདྷབྷཛྷཀྵჼᴬ-ᴮᴰ-ᴺᴼ-ᵍᵏ-ᵪᵸᶛ-ᶿẚ-ẛάέήίόύώΆ᾽-῁ΈΉ῍-῏ΐΊ῝-῟ΰΎ῭-`ΌΏ´-῾ - ‑‗․-… ″-‴‶-‷‼‾⁇-⁉⁗ ⁰-ⁱ⁴-₎ₐ-ₜ₨℀-℃℅-ℇ℉-ℓℕ-№ℙ-ℝ℠-™ℤΩℨK-ℭℯ-ℱℳ-ℹ℻-⅀ⅅ-ⅉ⅐-ⅿ↉∬-∭∯-∰〈-〉①-⓪⨌⩴-⩶⫝̸ⱼ-ⱽⵯ⺟⻳⼀-⿕　〶〸-〺゛-゜ゟヿㄱ-ㆎ㆒-㆟㈀-㈞㈠-㉇㉐-㉾㊀-㏿ꚜ-ꚝꝰ꟱-ꟴꟸ-ꟹꭜ-ꭟꭩ豈-嗀塚晴凞-羽蘒諸逸-都飯-舘並-龎ﬀ-ﬆﬓ-ﬗיִײַ-זּטּ-לּמּנּ-סּףּ-פּצּ-ﮱﯓ-ﴽﵐ-ﶏﶒ-ﷇﷰ-﷼︐-︙︰-﹄﹇-﹒﹔-﹦﹨-﹫ﹰ-ﹲﹴﹶ-ﻼ！-ﾾￂ-ￇￊ-ￏￒ-ￗￚ-ￜ￠-￦`;
+  /*
   }
+  */
 
   if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
     const ranges = [];

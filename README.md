@@ -57,6 +57,9 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * The additional gulp tasks detailed below
 * Changed ESLint sourceType to "module" for Chrome extension to support ES6 imports (eslint.config.mjs)
 
+#### Search & Text
+* **NFKC normalization for all browsers**: Enabled Unicode NFKC normalization (including Kangxi radicals U+2F00-U+2FD5) for all browsers, not just Firefox. This fixes search issues with Japanese text where PDFTron generates Kangxi radicals (e.g., ⼿ U+2F3F) instead of standard CJK characters (e.g., 手 U+624B). Mozilla made this Firefox-only in v5.4.449 (commit eee20cf13) due to ICU 78 updates, but Kangxi radicals have stable normalization across all browsers. (web/pdf_find_utils.js)
+
 #### Security
 * Added DOMPurify sanitization for URL handling in Chrome extension to prevent XSS attacks (extensions/chromium/contentscript.js, package.json)
 * Fixed biased random number generation in Chrome extension using rejection sampling to avoid modulo bias (web/chromecom.js) - GitHub CodeQL alert #539
