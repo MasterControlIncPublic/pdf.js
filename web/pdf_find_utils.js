@@ -156,8 +156,8 @@ function getNormalizeWithNFKC() {
     (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) &&
     ((typeof PDFJSDev === "undefined" && FeatureTest.platform.isFirefox) ||
       (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")))
-  )
-  {    const ranges = [];
+  ) {
+    const ranges = [];
     const range = [];
     const diacriticsRegex = /^\p{M}$/u;
     // Some chars must be replaced by their NFKC counterpart during a search.
