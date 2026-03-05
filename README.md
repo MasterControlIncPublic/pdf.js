@@ -144,6 +144,16 @@ You can copy the result (or unzip the mc artifact) into `<site>/services/StaticC
 
 The PRs will run automated testing. You can do that locally with commands like `gulp unittest` (and possibly autofix some linting with the `--fix` argument)
 
+#### Browser Selection Cheatsheet
+Sometimes I have issues with the firefox unit test runner, so the commands below can be helpful
+```bash
+gulp unittest                # Both Firefox and Chrome (default)
+gulp unittest --noFirefox    # Chrome only
+gulp unittest --noChrome     # Firefox only
+gulp unittest --headless     # Headless mode (faster)
+```
+
+
 ### Deploying an artifact to Artifactory
 Please make sure you don't have any uncommitted changes as they'd be zipped and deployed in the artifact too. Create the following environment variables with your artifactory credentials. The password could use your artifactory API key.  `artifactory_username` and `artifactory_password`. The following commands will first call `mc-build`.
 

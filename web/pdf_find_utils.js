@@ -150,8 +150,15 @@ function getNormalizeWithNFKC() {
   }
   */
 
-  if (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) {
-    const ranges = [];
+  // MC Customization - only run in Firefox tests to avoid browser differences
+  // Chrome and Firefox differ in NFKC normalization for some edge-case
+  // characters (e.g., U+A7F1), but they agree on Kangxi radicals which is what
+  // we need
+  if (
+    (typeof PDFJSDev === "undefined" || PDFJSDev.test("TESTING")) &&
+    ((typeof PDFJSDev === "undefined" && FeatureTest.platform.isFirefox) ||
+      (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")))
+  ) {    const ranges = [];
     const range = [];
     const diacriticsRegex = /^\p{M}$/u;
     // Some chars must be replaced by their NFKC counterpart during a search.
