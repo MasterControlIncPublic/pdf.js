@@ -1670,6 +1670,8 @@ const PDFViewerApplication = {
 
     return {
       ...this.documentInfo,
+      // Flatten custom metadata from documentInfo.Custom to top level
+      ...(this.documentInfo?.Custom || {}),
       baseURL: this.baseUrl,
       filesize: this._contentLength,
       filename: this._docFilename,

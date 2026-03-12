@@ -545,8 +545,12 @@ class AnnotationElement {
       },
       hidden: event => {
         const { hidden } = event.detail;
-        this.container.style.visibility = hidden ? "hidden" : "visible";
+        if (this.container) {
+          this.container.style.visibility = hidden ? "hidden" : "visible";
+        }
+        // Always store for unrendered elements or for print behavior
         this.annotationStorage.setValue(this.data.id, {
+          hidden,
           noPrint: hidden,
           noView: hidden,
         });
@@ -606,10 +610,13 @@ class AnnotationElement {
     }
 
     // Some properties may have been updated thanks to JS.
-    const storedData = this.annotationStorage.getRawValue(this.data.id);
-    if (!storedData) {
+    const rawStoredData = this.annotationStorage.getRawValue(this.data.id);
+    if (!rawStoredData) {
       return;
     }
+
+    // IMPORTANT: Make a shallow copy to avoid modifying shared storage object
+    const storedData = Object.assign({}, rawStoredData);
 
     const commonActions = this._commonActions;
     for (const [actionName, detail] of Object.entries(storedData)) {
@@ -621,7 +628,8 @@ class AnnotationElement {
           },
           target: element,
         };
-        action(eventProxy);
+        // Call action with correct 'this' context
+        action.call(this, eventProxy);
         // The action has been consumed: no need to keep it.
         delete storedData[actionName];
       }
@@ -1284,6 +1292,8 @@ class TextAnnotationElement extends AnnotationElement {
 class WidgetAnnotationElement extends AnnotationElement {
   render() {
     // Show only the container for unsupported field types.
+    // Apply any properties that were set via JavaScript before rendering
+    this._setDefaultPropertiesFromJS(this.container);
     return this.container;
   }
 
@@ -1561,6 +1571,42 @@ class TextWidgetAnnotationElement extends WidgetAnnotationElement {
         // Reset the cursor position to the start of the field (issue 12359).
         event.target.scrollLeft = 0;
       };
+
+      // Add updatefromsandbox listener for all fields when scripting is enabled
+      // (not just fields with actions), so PDF JavaScript can update any field
+      if (this.enableScripting) {
+        element.addEventListener("updatefromsandbox", jsEvent => {
+          this.showElementAndHideCanvas(jsEvent.target);
+          const actions = {
+            value(event) {
+              elementData.userValue = event.detail.value ?? "";
+              if (!hasDateOrTime) {
+                storage.setValue(id, {
+                  value: elementData.userValue.toString(),
+                });
+              }
+              event.target.value = elementData.userValue;
+            },
+            formattedValue(event) {
+              const { formattedValue } = event.detail;
+              elementData.formattedValue = formattedValue;
+              if (
+                formattedValue !== null &&
+                formattedValue !== undefined &&
+                event.target !== document.activeElement
+              ) {
+                event.target.value = formattedValue;
+              }
+              const data = { formattedValue };
+              if (hasDateOrTime) {
+                data.value = formattedValue;
+              }
+              storage.setValue(id, data);
+            },
+          };
+          this._dispatchEventFromSandbox(actions, jsEvent);
+        });
+      }
 
       if (this.enableScripting && this.hasJSActions) {
         element.addEventListener("focus", event => {

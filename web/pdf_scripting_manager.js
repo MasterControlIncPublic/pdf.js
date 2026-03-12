@@ -376,6 +376,7 @@ class PDFScriptingManager {
         this.#pdfDocument?.annotationStorage.setValue(elementId, detail);
       }
     }
+
   }
 
   async #dispatchPageOpen(pageNumber, initialize = false) {

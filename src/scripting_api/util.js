@@ -209,6 +209,12 @@ class Util extends PDFObject {
   }
 
   printd(cFormat, oDate) {
+    // Handle undefined or invalid dates
+    if (!oDate || !(oDate instanceof Date) || isNaN(oDate.getTime())) {
+      // Return empty string for invalid dates (console may not be available yet)
+      return '';
+    }
+
     switch (cFormat) {
       case 0:
         return this.printd("D:yyyymmddHHMMss", oDate);
@@ -220,7 +226,10 @@ class Util extends PDFObject {
 
     const handlers = {
       mmmm: data => this._months[data.month],
-      mmm: data => this._months[data.month].substring(0, 3),
+      mmm: data => {
+        const month = this._months[data.month];
+        return month ? month.substring(0, 3) : '';
+      },
       mm: data => (data.month + 1).toString().padStart(2, "0"),
       m: data => (data.month + 1).toString(),
       dddd: data => this._days[data.dayOfWeek],

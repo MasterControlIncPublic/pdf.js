@@ -1580,7 +1580,8 @@ class PDFDocument {
               break;
             default:
               if (value instanceof Name) {
-                customValue = value;
+                // Convert Name objects to strings for serialization
+                customValue = value.name;
               }
               break;
           }

@@ -38,12 +38,12 @@ class Field extends PDFObject {
     this.doNotScroll = data.doNotScroll;
     this.doNotSpellCheck = data.doNotSpellCheck;
     this.delay = data.delay;
-    this.display = data.display;
+    this._display = data.display;
     this.doc = data.doc.wrapped;
     this.editable = data.editable;
     this.exportValues = data.exportValues;
     this.fileSelect = data.fileSelect;
-    this.hidden = data.hidden;
+    this._hidden = data.hidden;
     this.highlight = data.highlight;
     this.lineWidth = data.lineWidth;
     this.multiline = data.multiline;
@@ -197,6 +197,27 @@ class Field extends PDFObject {
     this.strokeColor = color;
   }
 
+  get hidden() {
+    return this._hidden;
+  }
+
+  set hidden(hidden) {
+    this._hidden = !!hidden;
+    this._send({ id: this._id, siblings: this._siblings, hidden: this._hidden });
+  }
+
+  get display() {
+    return this._display;
+  }
+
+  set display(display) {
+    // display values: 0=visible, 1=hidden, 2=noPrint, 3=noView
+    if (typeof display === "number" && display >= 0 && display <= 3) {
+      this._display = display;
+      this._send({ id: this._id, siblings: this._siblings, display: this._display });
+    }
+  }
+
   get page() {
     return this._page;
   }
@@ -267,12 +288,26 @@ class Field extends PDFObject {
     ) {
       this._originalValue = undefined;
       this._value = value;
+      // Send value update to display layer
+      this._send({
+        id: this._id,
+        siblings: this._siblings,
+        value: this._value,
+        formattedValue: this._value != null ? this._value.toString() : "",
+      });
       return;
     }
 
     this._originalValue = value;
     const _value = value.trim().replace(",", ".");
     this._value = !isNaN(_value) ? parseFloat(_value) : value;
+    // Send value update to display layer
+    this._send({
+      id: this._id,
+      siblings: this._siblings,
+      value: this._value,
+      formattedValue: this._value != null ? this._value.toString() : "",
+    });
   }
 
   get _initialValue() {
