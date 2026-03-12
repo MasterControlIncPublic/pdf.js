@@ -21,15 +21,62 @@ import { ZoomType } from "./constants.js";
 
 const DOC_EXTERNAL = false;
 
-class InfoProxyHandler {
-  static get(obj, prop) {
+const InfoProxyHandler = {
+  get(obj, prop) {
+    // Handle special method toSource() for Adlib PDFs
+    if (prop === "toSource") {
+      return function() {
+        // The Adlib PDF does eval(this.info.toSource()) to clone the object
+        // Instead of trying to serialize, just build a safe string representation
+        // that creates a new object with the same properties
+        const pairs = [];
+        for (const key in obj) {
+          if (obj.hasOwnProperty(key)) {
+            const value = obj[key];
+            // Handle different types
+            if (value === null) {
+              pairs.push(`${key}: null`);
+            } else if (value === undefined) {
+              pairs.push(`${key}: undefined`);
+            } else if (typeof value === "string") {
+              // Escape quotes in strings
+              const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n");
+              pairs.push(`${key}: "${escaped}"`);
+            } else if (typeof value === "number" || typeof value === "boolean") {
+              pairs.push(`${key}: ${value}`);
+            } else if (value instanceof Date) {
+              pairs.push(`${key}: null`); // Date objects become null for safety
+            } else if (Array.isArray(value)) {
+              pairs.push(`${key}: []`); // Arrays become empty for safety
+            }
+            // Skip functions and other complex objects
+          }
+        }
+        return `({${pairs.join(", ")}})`;
+      };
+    }
     return obj[prop.toLowerCase()];
-  }
+  },
 
-  static set(obj, prop, value) {
+  set(obj, prop, value) {
     throw new Error(`doc.info.${prop} is read-only`);
-  }
-}
+  },
+
+  ownKeys(obj) {
+    return Object.keys(obj);
+  },
+
+  getOwnPropertyDescriptor(obj, prop) {
+    // Required for ownKeys trap to work properly
+    if (prop in obj) {
+      return {
+        enumerable: true,
+        configurable: true,
+      };
+    }
+    return undefined;
+  },
+};
 
 class Doc extends PDFObject {
   constructor(data) {
@@ -113,8 +160,13 @@ class Doc extends PDFObject {
             value !== undefined &&
             typeof value !== 'function' &&
             typeof value !== 'object') {
-          // Add with lowercase key since InfoProxyHandler converts to lowercase
-          infoObject[key.toLowerCase()] = value;
+          // Add the key with its original casing for PDF JavaScript enumeration
+          infoObject[key] = value;
+          // Also add lowercase version for case-insensitive access
+          const lowerKey = key.toLowerCase();
+          if (lowerKey !== key) {
+            infoObject[lowerKey] = value;
+          }
         }
       }
     }
@@ -973,7 +1025,8 @@ class Doc extends PDFObject {
       return searchedField;
     }
 
-    const parts = cName.split("#");
+    // Handle both '#' and '.' as page separators (Adlib uses '.')
+    const parts = cName.split(/[#.]/);
     let childIndex = NaN;
     if (parts.length === 2) {
       childIndex = Math.floor(parseFloat(parts[1]));
@@ -1080,8 +1133,25 @@ class Doc extends PDFObject {
     /* Not implemented */
   }
 
-  getPageBox() {
-    /* TODO */
+  getPageBox(cBox, nPage) {
+    // cBox can be: "ArtBox", "BleedBox", "BBox", "CropBox", "MediaBox", "TrimBox"
+    // For most PDFs, CropBox and MediaBox are the same
+    // Returns [x1, y1, x2, y2] where (x1,y1) is lower-left, (x2,y2) is upper-right
+
+    if (typeof nPage !== "number" || nPage < 0 || nPage >= this._numPages) {
+      return undefined;
+    }
+
+    // TODO: HARDCODED PAGE SIZE - Need to fetch actual page dimensions from PDF
+    // Current implementation returns a static letter-size page box (8.5" x 11" = 612 x 792 points)
+    // This works for most standard PDFs but will cause field positioning issues for:
+    //   - Non-standard page sizes (A4, Legal, Tabloid, custom sizes)
+    //   - PDFs with mixed page sizes
+    //   - Landscape orientation pages
+    // To fix: Pass page dimensions during Doc initialization or implement externalCall
+    //         to fetch page boxes from the main thread synchronously
+    // Used by: Adlib PDF's Reposition() function for header/footer field positioning
+    return [0, 0, 612, 792];
   }
 
   getPageLabel() {

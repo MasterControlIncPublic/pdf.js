@@ -73,6 +73,27 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * We don't allow annotating/inking the pdf (web/viewer.html) (currently just hiding the button, we may want to find a more pdf.js way to disable editing)
 * We don't allow page management actions (copy/cut/delete/save pages) - hidden via viewsManagerStatus element (web/viewer.html)
 
+#### JavaScript Execution for MasterControl Published PDFs
+* **Purpose**: Execute embedded JavaScript in MasterControl published PDFs to manage overlays, headers, footers, and expiration logic
+* **Supported PDF types**:
+  - ADAPT PDFs: Use fields named `MC_Overlay`, `MC_Header`, `MC_Footer`
+  - Adlib PDFs: Use fields named `___MASTERContolObscure___`, `___1___`, `___2___`, `___3___`
+* **Implementation**:
+  - Custom metadata extraction from PDF Info dictionary with case-insensitive access (src/scripting_api/doc.js)
+  - Multi-page field updates via siblings mechanism - one Field object represents all instances across pages (src/scripting_api/field.js)
+  - Field property updates (hidden, value, readonly) propagate to all sibling widgets (src/scripting_api/field.js, web/pdf_scripting_manager.js)
+  - Date formatting with defensive null checks for invalid dates (src/scripting_api/util.js)
+  - Annotation storage uses shallow copy to prevent cross-field contamination when applying stored properties (src/display/annotation_layer.js)
+  - Race condition handling: hidden action always stores to annotation storage even if container not ready, ensuring properties apply on delayed render (src/display/annotation_layer.js)
+* **Key files modified**:
+  - `src/scripting_api/doc.js`: Metadata access, field retrieval, page box dimensions
+  - `src/scripting_api/field.js`: Field property setters with siblings support
+  - `src/scripting_api/util.js`: Date formatting fixes
+  - `src/display/annotation_layer.js`: Property application from storage with shallow copy fix
+  - `web/pdf_scripting_manager.js`: Dispatch events or store for unrendered fields
+  - `src/core/document.js`: Name object to string conversion for metadata
+  - `web/app.js`: Flatten custom metadata to top level
+
 #### Styling & UI Customizations
 * **Theme & Colors**:
   - Force light mode globally (`color-scheme: only light`) to avoid dark mode conflicts
