@@ -1359,6 +1359,15 @@ dialog :link {
   #findInputContainer {
     margin-inline-start: 2px;
 
+    #findPreviousButton::before,
+    #findNextButton::before {
+      /* These use a FontAwesome glyph (drawn via `color`) rather than a masked
+         icon, so clear the inherited white icon background that otherwise
+         renders as a solid square on the light find bar. */
+      background-color: transparent;
+      color: var(--mc-toolbar-option-color);
+    }
+
     #findPreviousButton::before {
       font: 14px FontAwesome;
       content: "\f104";
@@ -1765,7 +1774,11 @@ dialog :link {
     }
 
     #toolbarViewerLeft {
-      margin-inline-start: 8px;
+      /* MC: v6 added an 8px inline-start margin here (zeroed only in Firefox
+         Nova builds), which opened an off-color gap between the sidebar toggle
+         and the main container in our GENERIC build. Base/mc-master never had
+         this margin, so keep it at 0 to restore the original alignment. */
+      margin-inline-start: 0;
 
       /* --toolbar-horizontal-padding already insets the row. */
       /*#if MOZCENTRAL*/
@@ -1999,6 +2012,25 @@ body {
 #outlinesView,
 #attachmentsView,
 #layersView {
+  background-color: var(--mc-sidebar-bg-color);
+}
+
+/* The views-manager selector popup ("Pages" / "Document outline") floats on a
+   light background. Since v6, menu.css derives --menu-text-color from
+   --text-color, so our #viewsManager override (#fbfbfe, meant for the dark
+   sidebar) leaked near-white text onto the light popup, making it unreadable.
+   Reset to a readable dark value; scoped to the popup so nothing else changes. */
+#viewsManagerSelectorOptions.popupMenu {
+  --text-color: #15141a;
+  --menu-text-color: #15141a;
+}
+
+/* v6 nested its header-background rule (#viewsManager #viewsManagerHeader,
+   specificity 0,2,0) which outranks our flat #viewsManagerHeader rule (0,1,0),
+   so the header bar reverted to v6's light --header-bg while our label text
+   stayed white -> unreadable. Re-assert MC's dark header background at matching
+   specificity so the header is dark with white text, as intended. */
+#viewsManager #viewsManagerHeader {
   background-color: var(--mc-sidebar-bg-color);
 }
 

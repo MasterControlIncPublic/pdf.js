@@ -23,7 +23,10 @@
   &.viewsManagerOpen {
     #viewsManager {
       visibility: visible;
-      inset-inline-start: 8px;
+      /* MC: v6 widened this from 1px to 8px, opening an off-color gap between
+         the sidebar toggle and the panel. Restore the original 1px so the panel
+         sits flush (its 1px border is still shown, as expected). */
+      inset-inline-start: 1px;
     }
 
     #viewerContainer:not(.pdfPresentationMode) {
