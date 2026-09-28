@@ -35,15 +35,19 @@ button.hasPopupMenu {
     transparent 79%
   );
   --menuitem-text-active-fg: var(--menu-text-color);
+  --menuitem-active-border-color: var(--menuitem-border-color);
   --menuitem-focus-bg: color-mix(
     in srgb,
     var(--menu-text-color),
     transparent 93%
   );
-  --menuitem-focus-outline-color: light-dark(#0062fa, #00cadb);
+  --menuitem-focus-outline-color: var(
+    --focus-outline-color,
+    light-dark(#0062fa, #00cadb)
+  );
   --menuitem-focus-border-color: light-dark(white, black);
 
-  --menu-bg: light-dark(white, #23222b);
+  --menu-bg: var(--background-color-box, light-dark(white, #23222b));
   --menu-background-blend-mode: normal;
   --menu-box-shadow:
     0 0.375px 1.5px 0 light-dark(rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.2)),
@@ -51,7 +55,8 @@ button.hasPopupMenu {
   --menu-border-color: light-dark(rgb(21 20 26 / 0.1), rgb(251 251 254 / 0.1));
   --menuitem-border-radius: 8px;
   --menu-backdrop-filter: none;
-  --menu-text-color: light-dark(#15141a, #fbfbfe);
+  --menu-text-color: var(--text-color, light-dark(#15141a, #fbfbfe));
+  --menu-text-disabled-color: var(--menu-text-color);
   --menuitem-text-hover-fg: var(--menu-text-color);
   --menuitem-hover-bg: color-mix(
     in srgb,
@@ -59,21 +64,43 @@ button.hasPopupMenu {
     transparent 86%
   );
   --menuitem-hover-background-blend-mode: normal;
+  --disabled-opacity: 0.62;
+
+  /* Map menu states to Nova panel and menu-item tokens. Keep this before the
+     forced-colors overrides. */
+  /*#if MOZCENTRAL*/
+  @media -moz-pref("pdfjs.enableNova") and -moz-pref("browser.nova.enabled") {
+    --menuitem-gap: var(--space-small);
+    --menuitem-border-radius: var(--panel-menuitem-border-radius);
+    --menu-box-shadow: var(--box-shadow-level-2);
+    --menu-border-color: var(--border-color-deemphasized);
+    --menuitem-hover-bg: var(--button-background-color-menu-hover);
+    --menuitem-text-hover-fg: var(--button-text-color-menu-hover);
+    --menuitem-active-bg: var(--button-background-color-menu-active);
+    --menuitem-text-active-fg: var(--button-text-color-menu-active);
+    --menuitem-focus-border-color: transparent;
+    --disabled-opacity: var(--button-opacity-disabled);
+  }
+  /*#endif*/
 
   @media screen and (forced-colors: active) {
-    --menu-bg: Canvas;
+    --menu-bg: var(--background-color-box, Canvas);
     --menu-background-blend-mode: normal;
     --menu-box-shadow: none;
     --menu-backdrop-filter: none;
-    --menu-text-color: ButtonText;
+    --menu-text-color: var(--text-color, ButtonText);
+    --menu-text-disabled-color: GrayText;
     --menu-border-color: CanvasText;
     --menuitem-border-color: none;
     --menuitem-hover-bg: SelectedItemText;
     --menuitem-text-hover-fg: SelectedItem;
     --menuitem-active-bg: SelectedItemText;
+    --menuitem-active-border-color: ButtonText;
     --menuitem-text-active-fg: SelectedItem;
-    --menuitem-focus-outline-color: CanvasText;
+    --menuitem-focus-bg: ButtonFace;
+    --menuitem-focus-outline-color: var(--focus-outline-color, CanvasText);
     --menuitem-focus-border-color: none;
+    --disabled-opacity: 1;
   }
 
   display: flex;
@@ -94,16 +121,24 @@ button.hasPopupMenu {
   border: 1px solid var(--menu-border-color);
   backdrop-filter: var(--menu-backdrop-filter);
 
+  /* Rows provide their own inline inset. */
+  /*#if MOZCENTRAL*/
+  @media -moz-pref("pdfjs.enableNova") and -moz-pref("browser.nova.enabled") {
+    padding: var(--space-small) 0;
+    border-radius: var(--panel-border-radius);
+  }
+  /*#endif*/
+
   &.withMark {
     --menu-mark-icon-size: 16px;
   }
 
-  > li {
+  > button {
     display: flex;
     align-items: center;
-    list-style: none;
+    position: relative;
     width: 100%;
-    height: 24px;
+    height: 26px;
     padding-inline: calc(var(--menu-mark-icon-size) + var(--menuitem-gap))
       var(--menuitem-gap);
     gap: var(--menuitem-gap);
@@ -112,7 +147,7 @@ button.hasPopupMenu {
     border: 1px solid var(--menuitem-border-color);
     background: transparent;
 
-    &:has(button.selected)::before {
+    &.selected::after {
       content: "";
       display: inline-block;
       width: 11px;
@@ -122,84 +157,127 @@ button.hasPopupMenu {
       mask-image: var(--menuitem-checkmark-icon);
       background-color: var(--menu-text-color);
       position: absolute;
-      margin-inline-start: -16px;
+      inset-inline-start: var(--menuitem-gap);
+      top: 50%;
+      transform: translateY(-50%) scaleX(var(--dir-factor));
     }
 
-    &:has(button:disabled) {
-      opacity: 0.62;
-      pointer-events: none;
-    }
+    &:disabled {
+      opacity: var(--disabled-opacity);
 
-    &:hover {
-      background: var(--menuitem-hover-bg);
-      background-blend-mode: var(--menuitem-hover-background-blend-mode);
-      > button {
-        &:not(.noIcon)::before {
-          background-color: var(--menuitem-text-hover-fg);
-        }
-        > span {
-          color: var(--menuitem-text-hover-fg);
-        }
+      &.selected::after {
+        background-color: var(--menu-text-disabled-color);
       }
-      &:has(button.selected)::before {
-        background-color: var(--menuitem-text-hover-fg);
-      }
-    }
-
-    &:active {
-      background-color: var(--menuitem-active-bg);
-      > button > span {
-        color: var(--menuitem-text-active-fg);
-      }
-    }
-
-    &:has(> button:focus-visible) {
-      border-color: var(--menuitem-focus-border-color);
-      background-color: var(--menuitem-focus-bg);
-      outline: 2px solid var(--menuitem-focus-outline-color);
-      outline-offset: 2px;
-    }
-
-    > button {
-      display: flex;
-      flex-direction: row;
-      align-items: center;
-      width: 100%;
-      height: auto;
-      padding: var(--menuitem-gap);
-      gap: var(--menuitem-gap);
-      background: transparent;
-      border: none;
 
       &:not(.noIcon)::before {
-        display: inline-block;
-        width: var(--menu-icon-size);
-        height: var(--menu-icon-size);
-        content: "";
-        mask-size: cover;
-        mask-position: center;
-        background-color: var(--menu-text-color);
-      }
-
-      &:focus-visible {
-        outline: none;
+        background-color: var(--menu-text-disabled-color);
       }
 
       > span {
-        display: inline-block;
-        width: max-content;
-        height: auto;
-        text-align: start;
-        color: var(--menu-text-color);
-        user-select: none;
-        padding-inline-start: 6px;
-
-        font: menu;
-        font-size: 13px;
-        font-style: normal;
-        font-weight: 510;
-        line-height: normal;
+        color: var(--menu-text-disabled-color);
       }
     }
+
+    &:not(:disabled) {
+      &:hover {
+        background: var(--menuitem-hover-bg);
+        background-blend-mode: var(--menuitem-hover-background-blend-mode);
+
+        &:not(.noIcon)::before {
+          background-color: var(--menuitem-text-hover-fg);
+        }
+
+        > span {
+          color: var(--menuitem-text-hover-fg);
+        }
+
+        &.selected::after {
+          background-color: var(--menuitem-text-hover-fg);
+        }
+      }
+
+      &:active {
+        background-color: var(--menuitem-active-bg);
+        border-color: var(--menuitem-active-border-color);
+
+        > span {
+          color: var(--menuitem-text-active-fg);
+        }
+      }
+
+      &:focus-visible {
+        border-color: var(--menuitem-focus-border-color);
+        background-color: var(--menuitem-focus-bg);
+        outline: 2px solid var(--menuitem-focus-outline-color);
+        outline-offset: 2px;
+
+        /* Use the inset focus ring from Firefox panel items. */
+        /*#if MOZCENTRAL*/
+        @media -moz-pref("pdfjs.enableNova") and -moz-pref("browser.nova.enabled") {
+          outline: var(--focus-outline);
+          outline-offset: var(--focus-outline-inset);
+        }
+        /*#endif*/
+      }
+    }
+
+    &:not(.noIcon)::before {
+      display: inline-block;
+      width: var(--menu-icon-size);
+      height: var(--menu-icon-size);
+      content: "";
+      mask-size: cover;
+      mask-position: center;
+      background-color: var(--menu-text-color);
+    }
+
+    > span {
+      display: flex;
+      align-items: center;
+      align-self: stretch;
+      width: 100%;
+      min-width: max-content;
+      text-align: start;
+      color: var(--menu-text-color);
+      user-select: none;
+      padding-inline-start: 6px;
+
+      font: menu;
+      font-size: 13px;
+      font-style: normal;
+      font-weight: 510;
+      line-height: normal;
+    }
+
+    /* Match Firefox panel-item spacing. width: auto prevents the margins from
+       overflowing; add checkmark padding only where its size has a unit. */
+    /*#if MOZCENTRAL*/
+    @media -moz-pref("pdfjs.enableNova") and -moz-pref("browser.nova.enabled") {
+      height: auto;
+      min-height: var(--size-item-large);
+      width: auto;
+      margin: var(--panel-menuitem-margin);
+      padding: var(--panel-menuitem-padding);
+
+      &.selected::after {
+        inset-inline-start: var(--panel-menuitem-padding-inline);
+      }
+
+      > span {
+        padding-inline-start: 0;
+      }
+    }
+    /*#endif*/
   }
+
+  /*#if MOZCENTRAL*/
+  @media -moz-pref("pdfjs.enableNova") and -moz-pref("browser.nova.enabled") {
+    &.withMark > button {
+      padding-inline-start: calc(
+        var(--panel-menuitem-padding-inline) + var(--menu-mark-icon-size) +
+          var(--menuitem-gap)
+      );
+    }
+  }
+  /*#endif*/
 }

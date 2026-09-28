@@ -13,29 +13,37 @@
  * limitations under the License.
  */
 
+import * as babel from "@babel/core";
 import {
+  babelPluginAddHeaderComment,
   babelPluginPDFJSPreprocessor,
+  babelPluginStripSrcPath,
   preprocessPDFJSCode,
 } from "./external/builder/babel-plugin-pdfjs-preprocessor.mjs";
+import {
+  COVERAGE_FORMAT_TO_REPORTER,
+  parseCoverageFormats,
+} from "./external/ccov/coverage_format.mjs";
 import { exec, execSync, spawn, spawnSync } from "child_process";
 import artifactoryUpload from "gulp-artifactory-upload";
+import { finished, pipeline as runPipeline } from "stream/promises";
 import autoprefixer from "autoprefixer";
-import babel from "@babel/core";
 import { buildPrefsSchema } from "./external/chromium/prefs.mjs";
 import crypto from "crypto";
 import fs from "fs";
 import gulp from "gulp";
 import hljs from "highlight.js";
+import istanbulCoverage from "istanbul-lib-coverage";
+import istanbulReportGenerator from "istanbul-reports";
+import { kleur } from "./external/color_utils.mjs";
 import layouts from "@metalsmith/layouts";
+import libReport from "istanbul-lib-report";
 import markdown from "@metalsmith/markdown";
 import Metalsmith from "metalsmith";
 import ordered from "ordered-read-streams";
 import path from "path";
 import postcss from "gulp-postcss";
-import postcssDirPseudoClass from "postcss-dir-pseudo-class";
 import postcssDiscardComments from "postcss-discard-comments";
-import postcssLightDarkFunction from "@csstools/postcss-light-dark-function";
-import postcssNesting from "postcss-nesting";
 import { preprocess } from "./external/builder/builder.mjs";
 import relative from "metalsmith-html-relative";
 import rename from "gulp-rename";
@@ -66,6 +74,7 @@ const IMAGE_DECODERS_LEGACY_DIR = BUILD_DIR + "image_decoders-legacy/";
 const DEFAULT_PREFERENCES_DIR = BUILD_DIR + "default_preferences/";
 const MINIFIED_DIR = BUILD_DIR + "minified/";
 const MINIFIED_LEGACY_DIR = BUILD_DIR + "minified-legacy/";
+const INTERNAL_VIEWER_DIR = BUILD_DIR + "internal-viewer/";
 const JSDOC_BUILD_DIR = BUILD_DIR + "jsdoc/";
 const GH_PAGES_DIR = BUILD_DIR + "gh-pages/";
 const DIST_DIR = BUILD_DIR + "dist/";
@@ -73,11 +82,15 @@ const TYPES_DIR = BUILD_DIR + "types/";
 const TMP_DIR = BUILD_DIR + "tmp/";
 const PREFSTEST_DIR = BUILD_DIR + "prefstest/";
 const TYPESTEST_DIR = BUILD_DIR + "typestest/";
+const MOZCENTRAL_DIR = BUILD_DIR + "mozcentral/";
+const MOZCENTRAL_EXTENSION_DIR = MOZCENTRAL_DIR + "browser/extensions/pdfjs/";
+const MOZCENTRAL_CONTENT_DIR = MOZCENTRAL_EXTENSION_DIR + "content/";
+const MOZCENTRAL_L10N_DIR = MOZCENTRAL_DIR + "browser/locales/en-US/pdfviewer/";
+const CHROMIUM_DIR = BUILD_DIR + "chromium/";
 const COMMON_WEB_FILES = [
   "web/images/*.{png,svg,gif}",
   "web/debugger.{css,mjs}",
 ];
-const MOZCENTRAL_DIFF_FILE = "mozcentral.diff";
 
 const ARTIFACTORY_RELEASE_REPO_URL =
   "https://mastercontrol.jfrog.io/artifactory/libs-release-local/";
@@ -89,10 +102,10 @@ const config = JSON.parse(fs.readFileSync(CONFIG_FILE).toString());
 
 const ENV_TARGETS = [
   "last 2 versions",
-  "Chrome >= 110",
+  "Chrome >= 125",
   "Firefox ESR",
-  "Safari >= 16.4",
-  "Node >= 20",
+  "Safari >= 18",
+  "Node >= 22",
   "> 1%",
   "not IE > 0",
   "not dead",
@@ -105,16 +118,19 @@ const AUTOPREFIXER_CONFIG = {
 // Default Babel targets used for generic, components, minified-pre
 const BABEL_TARGETS = ENV_TARGETS.join(", ");
 
-const BABEL_PRESET_ENV_OPTS = Object.freeze({
-  corejs: "3.47.0",
+const BABEL_COREJS_OPTS = Object.freeze({
+  method: "usage-global",
+  version: "3.50.0",
   exclude: ["web.structured-clone"],
   shippedProposals: true,
-  useBuiltIns: "usage",
 });
 
 const DEFINES = Object.freeze({
   SKIP_BABEL: true,
+  WORKER_THREAD: false,
   TESTING: undefined,
+  COVERAGE: undefined,
+  INTERNAL_EVT: crypto.randomUUID(),
   // The main build targets:
   GENERIC: false,
   MOZCENTRAL: false,
@@ -124,6 +140,7 @@ const DEFINES = Object.freeze({
   COMPONENTS: false,
   LIB: false,
   IMAGE_DECODERS: false,
+  INTERNAL_VIEWER: false,
 });
 
 function transform(charEncoding, transformFunction) {
@@ -199,12 +216,8 @@ function createWebpackAlias(defines) {
     "fluent-dom": "node_modules/@fluent/dom/esm/index.js",
   };
   const libraryAlias = {
-    "display-cmap_reader_factory": "src/display/stubs.js",
-    "display-standard_fontdata_factory": "src/display/stubs.js",
-    "display-wasm_factory": "src/display/stubs.js",
-    "display-fetch_stream": "src/display/stubs.js",
-    "display-network": "src/display/stubs.js",
-    "display-node_stream": "src/display/stubs.js",
+    "display-binary_data_factory": "src/display/stubs.js",
+    "display-network_stream": "src/display/stubs.js",
     "display-node_utils": "src/display/stubs.js",
   };
   const viewerAlias = {
@@ -226,20 +239,18 @@ function createWebpackAlias(defines) {
     "web-print_service": "",
     "web-secondary_toolbar": "web/secondary_toolbar.js",
     "web-signature_manager": "web/signature_manager.js",
+    "web-digital_signature_properties_manager":
+      "web/digital_signature_properties_manager.js",
     "web-toolbar": "web/toolbar.js",
     "web-views_manager": "web/views_manager.js",
   };
 
   if (defines.CHROME) {
-    libraryAlias["display-cmap_reader_factory"] =
-      "src/display/cmap_reader_factory.js";
-    libraryAlias["display-standard_fontdata_factory"] =
-      "src/display/standard_fontdata_factory.js";
-    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
-    libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
-    libraryAlias["display-network"] = "src/display/network.js";
+    libraryAlias["display-binary_data_factory"] =
+      "src/display/binary_data_factory.js";
+    libraryAlias["display-network_stream"] = "src/display/network_stream.js";
 
-    viewerAlias["web-download_manager"] = "web/download_manager.js";
+    viewerAlias["web-download_manager"] = "web/chromecom.js";
     viewerAlias["web-external_services"] = "web/chromecom.js";
     viewerAlias["web-null_l10n"] = "web/l10n.js";
     viewerAlias["web-preferences"] = "web/chromecom.js";
@@ -248,14 +259,9 @@ function createWebpackAlias(defines) {
     // Aliases defined here must also be replicated in the paths section of
     // the tsconfig.json file for the type generation to work.
     // In the tsconfig.json files, the .js extension must be omitted.
-    libraryAlias["display-cmap_reader_factory"] =
-      "src/display/cmap_reader_factory.js";
-    libraryAlias["display-standard_fontdata_factory"] =
-      "src/display/standard_fontdata_factory.js";
-    libraryAlias["display-wasm_factory"] = "src/display/wasm_factory.js";
-    libraryAlias["display-fetch_stream"] = "src/display/fetch_stream.js";
-    libraryAlias["display-network"] = "src/display/network.js";
-    libraryAlias["display-node_stream"] = "src/display/node_stream.js";
+    libraryAlias["display-binary_data_factory"] =
+      "src/display/binary_data_factory.js";
+    libraryAlias["display-network_stream"] = "src/display/network_stream.js";
     libraryAlias["display-node_utils"] = "src/display/node_utils.js";
 
     viewerAlias["web-download_manager"] = "web/download_manager.js";
@@ -286,6 +292,35 @@ function createWebpackAlias(defines) {
   return alias;
 }
 
+/**
+ * Webpack's file and missing dependencies, keyed by output filename.
+ * @type {Map<string, Set<string>>}
+ */
+const webpackFileDeps = new Map();
+
+/** Return a Webpack plugin that records dependencies for `filename`. */
+function recordFileDeps(filename) {
+  return {
+    /** @param {import('webpack').Compiler} compiler */
+    apply(compiler) {
+      compiler.hooks.done.tap("RecordFileDependencies", ({ compilation }) => {
+        const dependencies = new Set([
+          ...compilation.fileDependencies,
+          ...compilation.missingDependencies,
+        ]);
+
+        // Preserve known dependencies after a failed compilation.
+        if (compilation.errors.length > 0) {
+          for (const dependency of webpackFileDeps.get(filename) ?? []) {
+            dependencies.add(dependency);
+          }
+        }
+        webpackFileDeps.set(filename, dependencies);
+      });
+    },
+  };
+}
+
 function createWebpackConfig(
   defines,
   output,
@@ -303,6 +338,10 @@ function createWebpackConfig(
     BUNDLE_VERSION: versionInfo.version,
     BUNDLE_BUILD: versionInfo.commit,
     TESTING: defines.TESTING ?? process.env.TESTING === "true",
+    COVERAGE:
+      defines.COVERAGE ??
+      (process.argv.includes("--coverage") ||
+        process.argv.includes("--coverage-per-test")),
     DEFAULT_FTL: defines.GENERIC ? getDefaultFtl() : "",
   };
   const licenseHeaderLibre = fs
@@ -319,7 +358,7 @@ function createWebpackConfig(
     !bundleDefines.CHROME &&
     !bundleDefines.LIB &&
     !bundleDefines.MINIFIED &&
-    !bundleDefines.TESTING &&
+    (!bundleDefines.TESTING || bundleDefines.COVERAGE) &&
     !disableSourceMaps;
   const isModule = output.library?.type === "module";
   const isMinified = bundleDefines.MINIFIED;
@@ -331,9 +370,7 @@ function createWebpackConfig(
     /node_modules[\\/]core-js/,
   ];
 
-  const babelPresets = skipBabel
-    ? undefined
-    : [["@babel/preset-env", BABEL_PRESET_ENV_OPTS]];
+  const babelPresets = skipBabel ? undefined : ["@babel/preset-env"];
   const babelPlugins = [
     [
       babelPluginPDFJSPreprocessor,
@@ -343,6 +380,12 @@ function createWebpackConfig(
       },
     ],
   ];
+  if (!skipBabel) {
+    babelPlugins.push(["babel-plugin-polyfill-corejs3", BABEL_COREJS_OPTS]);
+  }
+  if (bundleDefines.COVERAGE) {
+    babelPlugins.push("babel-plugin-istanbul");
+  }
 
   const plugins = [];
   if (!disableLicenseHeader) {
@@ -353,7 +396,7 @@ function createWebpackConfig(
       })
     );
   }
-  plugins.push({
+  plugins.push(recordFileDeps(output.filename), {
     /** @param {import('webpack').Compiler} compiler */
     apply(compiler) {
       const errors = [];
@@ -452,6 +495,46 @@ function createWebpackConfig(
 function webpack2Stream(webpackConfig) {
   // Replacing webpack1 to webpack2 in the webpack-stream.
   return webpackStream(webpackConfig, webpack2);
+}
+
+/** Write a Vinyl stream to `dest` and wait for completion. */
+function writeToDirectory(readable, dest) {
+  return runPipeline(
+    readable,
+    gulp.dest(dest),
+    // Drain `gulp.dest`'s readable side to prevent backpressure.
+    new stream.Writable({
+      objectMode: true,
+      write(_file, _encoding, callback) {
+        callback();
+      },
+    })
+  );
+}
+
+function getErrorMessages(error) {
+  if (error instanceof AggregateError) {
+    return error.errors.flatMap(getErrorMessages);
+  }
+  if (error?.plugin === "webpack-stream") {
+    // Avoid repeating webpack-stream's compilation diagnostics.
+    return [];
+  }
+  return [
+    error instanceof Error ? error.stack || error.message : String(error),
+  ];
+}
+
+function reportBuildFailure(error) {
+  console.error(kleur.red(`\n### ${error?.message || "Build failed"}`));
+  for (const message of getErrorMessages(error)) {
+    console.error(kleur.red(message));
+  }
+}
+
+/** Return a repository-relative path with POSIX separators. */
+function repoPath(filePath) {
+  return path.relative(__dirname, filePath).split(path.sep).join("/");
 }
 
 function getVersionJSON() {
@@ -573,8 +656,12 @@ function createSandboxBundle(defines, extraOptions = undefined) {
 }
 
 function createWorkerBundle(defines) {
-  const workerFileConfig = createWebpackConfig(defines, {
-    filename: defines.MINIFIED ? "pdf.worker.min.mjs" : "pdf.worker.mjs",
+  const workerDefines = {
+    ...defines,
+    WORKER_THREAD: true,
+  };
+  const workerFileConfig = createWebpackConfig(workerDefines, {
+    filename: workerDefines.MINIFIED ? "pdf.worker.min.mjs" : "pdf.worker.mjs",
     library: {
       type: "module",
     },
@@ -662,8 +749,8 @@ function createStandardFontBundle() {
   );
 }
 
-function createWasmBundle() {
-  return ordered([
+function createWasmBundle({ includeQuickJS = true } = {}) {
+  const sources = [
     gulp.src(
       [
         "external/openjpeg/*.wasm",
@@ -679,11 +766,33 @@ function createWasmBundle() {
       base: "external/qcms",
       encoding: false,
     }),
-    gulp.src(["external/jbig2/*.wasm", "external/jbig2/LICENSE_*"], {
-      base: "external/jbig2",
-      encoding: false,
-    }),
-  ]);
+    gulp.src(
+      [
+        "external/jbig2/*.wasm",
+        "external/jbig2/jbig2_nowasm_fallback.js",
+        "external/jbig2/LICENSE_*",
+      ],
+      {
+        base: "external/jbig2",
+        encoding: false,
+      }
+    ),
+  ];
+  if (includeQuickJS) {
+    sources.push(
+      gulp.src(
+        [
+          "external/quickjs/quickjs-eval.js",
+          "external/quickjs/quickjs-eval.wasm",
+        ],
+        {
+          base: "external/quickjs",
+          encoding: false,
+        }
+      )
+    );
+  }
+  return ordered(sources);
 }
 
 function checkFile(filePath) {
@@ -718,7 +827,19 @@ function getTempFile(prefix, suffix) {
   return filePath;
 }
 
-function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
+function getArgValue(name) {
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === name && i + 1 < process.argv.length) {
+      return process.argv[i + 1];
+    }
+    if (process.argv[i].startsWith(name + "=")) {
+      return process.argv[i].slice(name.length + 1);
+    }
+  }
+  return null;
+}
+
+function runTests(testsName, { bot = false } = {}) {
   return new Promise((resolve, reject) => {
     console.log("\n### Running " + testsName + " tests");
 
@@ -734,15 +855,12 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
           // causing a timeout, hence disabling them for now.
           forceNoChrome = true;
         }
-        if (xfaOnly) {
-          args.push("--xfaOnly");
-        }
         args.push("--manifestFile=" + PDF_TEST);
         collectArgs(
-          {
-            names: ["-t", "--testfilter"],
-            hasValue: true,
-          },
+          [
+            { names: ["-t", "--testfilter"], hasValue: true },
+            { names: ["-j", "--jobs"], hasValue: true },
+          ],
           args
         );
         break;
@@ -771,11 +889,45 @@ function runTests(testsName, { bot = false, xfaOnly = false } = {}) {
     if (process.argv.includes("--headless")) {
       args.push("--headless");
     }
+    if (
+      process.argv.includes("--coverage") ||
+      process.argv.includes("--coverage-per-test")
+    ) {
+      args.push("--coverage");
+    }
+    if (process.argv.includes("--coverage-output")) {
+      args.push(
+        "--coverageOutput",
+        process.argv[process.argv.indexOf("--coverage-output") + 1]
+      );
+    }
+    const coverageFormatsArg = getArgValue("--coverage-formats");
+    if (coverageFormatsArg) {
+      args.push("--coverageFormats", coverageFormatsArg);
+    }
+    if (process.argv.includes("--coverage-per-test")) {
+      args.push("--coveragePerTest");
+    }
+
+    if (testsName === "browser") {
+      let shouldRun;
+      try {
+        shouldRun = applyCodeTestFilter(args);
+      } catch (error) {
+        reject(error);
+        return;
+      }
+      if (!shouldRun) {
+        resolve();
+        return;
+      }
+    }
 
     const testProcess = startNode(args, { cwd: TEST_DIR, stdio: "inherit" });
     testProcess.on("close", function (code) {
       if (code !== 0) {
         reject(new Error(`Running ${testsName} tests failed.`));
+        return;
       }
       resolve();
     });
@@ -788,20 +940,181 @@ function collectArgs(options, args) {
   }
   for (let i = 0, ii = process.argv.length; i < ii; i++) {
     const arg = process.argv[i];
-    const option = options.find(opt => opt.names.includes(arg));
-    if (!option) {
+
+    // Exact name match (flag only, or flag with space-separated value).
+    const exactOption = options.find(opt => opt.names.includes(arg));
+    if (exactOption) {
+      if (!exactOption.hasValue) {
+        args.push(arg);
+        continue;
+      }
+      const next = process.argv[i + 1];
+      if (next && !next.startsWith("-")) {
+        args.push(arg, next);
+        i += 1;
+      }
       continue;
     }
-    if (!option.hasValue) {
-      args.push(arg);
-      continue;
-    }
-    const next = process.argv[i + 1];
-    if (next && !next.startsWith("-")) {
-      args.push(arg, next);
-      i += 1;
+
+    // Also handle --flag=value and -fvalue (concatenated short) forms.
+    for (const option of options) {
+      if (!option.hasValue) {
+        continue;
+      }
+      let matched = false;
+      for (const name of option.names) {
+        if (name.startsWith("--") && arg.startsWith(name + "=")) {
+          // --flag=value
+          args.push(name, arg.slice(name.length + 1));
+          matched = true;
+          break;
+        }
+        if (
+          !name.startsWith("--") &&
+          arg.startsWith(name) &&
+          arg.length > name.length
+        ) {
+          // -fvalue (short option with concatenated value)
+          args.push(name, arg.slice(name.length));
+          matched = true;
+          break;
+        }
+      }
+      if (matched) {
+        break;
+      }
     }
   }
+}
+
+// Builds the coverage_search command line. By default the published index is
+// downloaded; an explicit --index=<path> selects a local index instead, used
+// read-only so it's never overwritten by the published copy.
+function getCoverageSearchArgs(codeArg) {
+  const searchArgs = [
+    path.join(__dirname, "external/ccov/coverage_search.mjs"),
+    `--code=${codeArg}`,
+  ];
+  const indexArg = getArgValue("--index");
+  if (indexArg === "") {
+    // An explicit but empty value (e.g. an unset shell variable expanding to
+    // `--index=`) almost certainly isn't intended; fail loudly rather than
+    // silently falling back to the downloaded index.
+    throw new Error("--index was given without a value");
+  }
+  if (indexArg) {
+    searchArgs.push(`--index=${indexArg}`, "--no-download");
+  } else if (process.argv.includes("--no-download")) {
+    searchArgs.push("--no-download");
+  }
+  return searchArgs;
+}
+
+// Returns the set of test IDs defined in the local ref-test manifest, or null
+// when it can't be read. Used to drop coverage-derived IDs that don't exist on
+// this branch (e.g. a test renamed since the published index was built), which
+// would otherwise make test.mjs reject the entire run.
+function readManifestTestIds() {
+  try {
+    const manifestFile = process.env.PDF_TEST || "test_manifest.json";
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(__dirname, TEST_DIR, manifestFile), "utf8")
+    );
+    return new Set(manifest.map(entry => entry.id));
+  } catch {
+    return null;
+  }
+}
+
+// For a --code=<file>::<line|function> argument, runs coverage_search to find
+// the ref tests that exercise that location and returns their IDs (an empty
+// array when none match locally). Returns null when --code wasn't given; throws
+// when the search itself fails.
+function resolveCodeTestIds() {
+  const codeArg = getArgValue("--code");
+  if (!codeArg) {
+    return null;
+  }
+  // Inherit stderr so the index download progress is visible; stdout is
+  // captured because it carries the matching test IDs.
+  const result = spawnSync("node", getCoverageSearchArgs(codeArg), {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  if (result.status !== 0) {
+    // status is null when the child couldn't be spawned or was killed by a
+    // signal; surface the real cause instead of a generic message.
+    throw new Error(
+      result.error
+        ? `coverage_search failed: ${result.error.message}`
+        : `coverage_search failed (exit code ${result.status})`
+    );
+  }
+  let testIds = result.stdout.trim().split("\n").filter(Boolean);
+
+  // The published index is built from master, so some covering tests may not
+  // exist on this branch. Drop them (with a note) rather than letting test.mjs
+  // reject the whole run — and silently exit 0 — on the first unknown ID.
+  const knownIds = readManifestTestIds();
+  if (knownIds) {
+    const missing = testIds.filter(id => !knownIds.has(id));
+    if (missing.length) {
+      console.log(
+        `\n### Ignoring ${missing.length} covered test(s) not in the manifest:\n` +
+          missing.map(id => `  ${id}`).join("\n")
+      );
+      testIds = testIds.filter(id => knownIds.has(id));
+    }
+  }
+
+  if (testIds.length === 0) {
+    console.log(`\n### No tests found covering "${codeArg}"`);
+  } else {
+    console.log(
+      `\n### Found ${testIds.length} test(s) covering "${codeArg}":\n` +
+        testIds.map(id => `  ${id}`).join("\n")
+    );
+  }
+  return testIds;
+}
+
+function appendTestFilters(args, testIds) {
+  const existingIds = new Set();
+
+  // collectArgs always normalizes filters to the space-separated
+  // `-t <id>` / `--testfilter <id>` form, so that's the only shape to read.
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "-t" || args[i] === "--testfilter") {
+      if (i + 1 < args.length) {
+        existingIds.add(args[++i]);
+      }
+    }
+  }
+  for (const id of testIds) {
+    if (!existingIds.has(id)) {
+      // Pass the id as a separate argument: node's parseArgs parses the short
+      // form `-t=<id>` as the literal value "=<id>", which matches no test and
+      // aborts the run with "Unrecognized test IDs".
+      args.push("-t", id);
+      existingIds.add(id);
+    }
+  }
+}
+
+// Applies the --code coverage filter to `args`. Returns false when the run
+// should be skipped (--code was given but resolved to no runnable tests), and
+// true otherwise (no --code, or matching tests were appended). Throws when the
+// coverage search itself fails.
+function applyCodeTestFilter(args) {
+  const codeTestIds = resolveCodeTestIds();
+  if (codeTestIds === null) {
+    return true; // No --code argument; run normally.
+  }
+  if (codeTestIds.length === 0) {
+    return false; // Nothing (runnable) covers the requested location.
+  }
+  appendTestFilters(args, codeTestIds);
+  return true;
 }
 
 function makeRef(done, bot) {
@@ -825,13 +1138,44 @@ function makeRef(done, bot) {
   if (process.argv.includes("--headless")) {
     args.push("--headless");
   }
+  if (
+    process.argv.includes("--coverage") ||
+    process.argv.includes("--coverage-per-test")
+  ) {
+    args.push("--coverage");
+  }
+  if (process.argv.includes("--coverage-output")) {
+    args.push(
+      "--coverageOutput",
+      process.argv[process.argv.indexOf("--coverage-output") + 1]
+    );
+  }
+  const coverageFormatsArg = getArgValue("--coverage-formats");
+  if (coverageFormatsArg) {
+    args.push("--coverageFormats", coverageFormatsArg);
+  }
+  if (process.argv.includes("--coverage-per-test")) {
+    args.push("--coveragePerTest");
+  }
   collectArgs(
-    {
-      names: ["-t", "--testfilter"],
-      hasValue: true,
-    },
+    [
+      { names: ["-t", "--testfilter"], hasValue: true },
+      { names: ["-j", "--jobs"], hasValue: true },
+    ],
     args
   );
+
+  let shouldRun;
+  try {
+    shouldRun = applyCodeTestFilter(args);
+  } catch (error) {
+    done(error);
+    return;
+  }
+  if (!shouldRun) {
+    done();
+    return;
+  }
 
   const testProcess = startNode(args, { cwd: TEST_DIR, stdio: "inherit" });
   testProcess.on("close", function (code) {
@@ -843,6 +1187,38 @@ function makeRef(done, bot) {
   });
 }
 
+// Prints the IDs of tests that exercised a given source file location, using
+// the per-test coverage index published to the pdf.js.refs repository. The
+// index is downloaded on demand, cached locally, and only re-downloaded when
+// it has changed. Run with --code=<file>::<line|function>, e.g.
+// --code=canvas.js::205 (add --no-download to reuse the cached index offline).
+gulp.task("coverage_search", function (done) {
+  const codeArg = getArgValue("--code");
+  if (!codeArg) {
+    done(new Error('Missing --code argument, e.g. --code="canvas.js::205"'));
+    return;
+  }
+  let searchArgs;
+  try {
+    searchArgs = getCoverageSearchArgs(codeArg);
+  } catch (error) {
+    done(error);
+    return;
+  }
+  const result = spawnSync("node", searchArgs, { stdio: "inherit" });
+  if (result.status !== 0) {
+    done(
+      new Error(
+        result.error
+          ? `coverage_search failed: ${result.error.message}`
+          : `coverage_search failed (exit code ${result.status})`
+      )
+    );
+    return;
+  }
+  done();
+});
+
 gulp.task("default", function (done) {
   console.log("Available tasks:");
   const tasks = Object.keys(gulp.registry().tasks());
@@ -852,6 +1228,28 @@ gulp.task("default", function (done) {
     }
     console.log("  " + taskName);
   }
+  done();
+});
+
+gulp.task("release-brotli", async function (done) {
+  const hashIndex = process.argv.indexOf("--hash");
+  if (hashIndex === -1 || hashIndex + 1 >= process.argv.length) {
+    throw new Error('Missing "--hash <commit-hash>" argument.');
+  }
+  console.log();
+  console.log("### Getting Brotli js file for release");
+
+  const OUTPUT_DIR = "./external/brotli/";
+  const hash = process.argv[hashIndex + 1];
+  const url = `https://raw.githubusercontent.com/google/brotli/${hash}/js/decode.js`;
+  const outputPath = OUTPUT_DIR + "decode.js";
+  const res = await fetch(url);
+  const fileStream = fs.createWriteStream(outputPath, { flags: "w" });
+  await finished(stream.Readable.fromWeb(res.body).pipe(fileStream));
+  fileStream.end();
+
+  console.log(`Brotli js file saved to: ${outputPath}`);
+
   done();
 });
 
@@ -876,10 +1274,7 @@ function createBuildNumber(done) {
       const version = config.versionPrefix + buildNumber;
 
       exec('git log --format="%h" -n 1', function (err2, stdout2, stderr2) {
-        let buildCommit = "";
-        if (!err2) {
-          buildCommit = stdout2.replace("\n", "");
-        }
+        const buildCommit = !err2 ? stdout2.replace("\n", "") : "";
 
         createStringSource(
           "version.json",
@@ -900,7 +1295,7 @@ function createBuildNumber(done) {
   );
 }
 
-function buildDefaultPreferences(defines, dir) {
+function createDefaultPreferencesBundle(defines, dir) {
   console.log(`\n### Building default preferences (${dir})`);
 
   const bundleDefines = {
@@ -923,20 +1318,29 @@ function buildDefaultPreferences(defines, dir) {
   );
   return gulp
     .src("web/app_options.js", { encoding: false })
-    .pipe(webpack2Stream(defaultPreferencesConfig))
-    .pipe(gulp.dest(DEFAULT_PREFERENCES_DIR + dir));
+    .pipe(webpack2Stream(defaultPreferencesConfig));
 }
 
-function getDefaultPreferences(dir) {
+function buildDefaultPreferences(defines, dir) {
+  return createDefaultPreferencesBundle(defines, dir).pipe(
+    gulp.dest(DEFAULT_PREFERENCES_DIR + dir)
+  );
+}
+
+let defaultPreferencesId = 0;
+
+async function getDefaultPreferences(dir) {
   console.log(`\n### Parsing default preferences (${dir})`);
 
-  const require = process
-    .getBuiltinModule("module")
-    .createRequire(import.meta.url);
-
-  const { AppOptions, OptionKind } = require(
-    "./" + DEFAULT_PREFERENCES_DIR + dir + "app_options.mjs"
+  const url = new URL(
+    `${DEFAULT_PREFERENCES_DIR}${dir}app_options.mjs`,
+    import.meta.url
   );
+  // Node caches ES modules by URL; vary it to reload this bundle in watch mode.
+  url.searchParams.set("id", defaultPreferencesId++);
+
+  // eslint-disable-next-line no-unsanitized/method
+  const { AppOptions, OptionKind } = await import(url.href);
 
   const prefs = AppOptions.getAll(
     OptionKind.PREFERENCE,
@@ -980,7 +1384,7 @@ gulp.task("locale", function () {
     if (!checkDir(dirPath)) {
       continue;
     }
-    if (!/^[a-z][a-z]([a-z])?(-[A-Z][A-Z])?$/.test(locale)) {
+    if (!/^[a-z]{2,3}(?:-[A-Z]{2})?$/.test(locale)) {
       console.log("Skipping invalid locale: " + locale);
       continue;
     }
@@ -1059,6 +1463,10 @@ function discardCommentsCSS() {
 }
 
 function preprocessHTML(source, defines) {
+  defines = {
+    ...defines,
+    TESTING: defines.TESTING ?? process.env.TESTING === "true",
+  };
   const outName = getTempFile("~preprocess", ".html");
   preprocess(source, outName, defines);
   const out = fs.readFileSync(outName).toString();
@@ -1093,15 +1501,7 @@ function buildGeneric(defines, dir) {
 
     preprocessHTML("web/viewer.html", defines).pipe(gulp.dest(dir + "web")),
     preprocessCSS("web/viewer.css", defines)
-      .pipe(
-        postcss([
-          postcssDirPseudoClass(),
-          discardCommentsCSS(),
-          postcssNesting(),
-          postcssLightDarkFunction({ preserve: true }),
-          autoprefixer(AUTOPREFIXER_CONFIG),
-        ])
-      )
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
       .pipe(gulp.dest(dir + "web")),
 
     gulp
@@ -1161,15 +1561,7 @@ function buildComponents(defines, dir) {
       .src(COMPONENTS_IMAGES, { encoding: false })
       .pipe(gulp.dest(dir + "images")),
     preprocessCSS("web/pdf_viewer.css", defines)
-      .pipe(
-        postcss([
-          postcssDirPseudoClass(),
-          discardCommentsCSS(),
-          postcssNesting(),
-          postcssLightDarkFunction({ preserve: true }),
-          autoprefixer(AUTOPREFIXER_CONFIG),
-        ])
-      )
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
       .pipe(gulp.dest(dir)),
   ]);
 }
@@ -1287,7 +1679,7 @@ gulp.task(
   )
 );
 
-function createDefaultPrefsFile() {
+async function createDefaultPrefsFile() {
   console.log("\n### Building mozilla-central preferences file");
 
   const defaultFileName = "PdfJsDefaultPrefs.js",
@@ -1298,7 +1690,7 @@ function createDefaultPrefsFile() {
     "// THIS FILE IS GENERATED AUTOMATICALLY, DO NOT EDIT MANUALLY!\n//\n" +
     `// Any overrides should be placed in \`${overrideFileName}\`.\n`;
 
-  const prefs = getDefaultPreferences("mozcentral/");
+  const prefs = await getDefaultPreferences("mozcentral/");
   const buf = [];
 
   for (const name in prefs) {
@@ -1316,114 +1708,449 @@ function createDefaultPrefsFile() {
   return createStringSource(defaultFileName, buf.join("\n"));
 }
 
-function replaceMozcentralCSS() {
-  return replace(/var\(--(inline-(?:start|end))\)/g, "$1");
+/**
+ * Build the mozilla-central staging tree.
+ * @param {Set<string>|null} [changedFiles] - Absolute changed paths. Omit for
+ *   a full build.
+ * @returns {Promise<boolean>} Whether any output was built.
+ */
+async function buildMozcentral(changedFiles = null) {
+  console.log("\n### Building mozilla-central extension");
+  const defines = { ...DEFINES, MOZCENTRAL: true };
+  const gvDefines = { ...defines, GECKOVIEW: true };
+
+  const MOZCENTRAL_BUILD_DIR = MOZCENTRAL_CONTENT_DIR + "build",
+    MOZCENTRAL_WEB_DIR = MOZCENTRAL_CONTENT_DIR + "web";
+
+  const MOZCENTRAL_WEB_FILES = [
+    ...COMMON_WEB_FILES,
+    "!web/images/toolbarButton-openFile.svg",
+  ];
+  const MOZCENTRAL_AUTOPREFIXER_CONFIG = {
+    overrideBrowserslist: ["last 1 firefox versions"],
+  };
+
+  const fullBuild = !changedFiles;
+  const changedPaths = fullBuild ? [] : [...changedFiles].map(repoPath);
+
+  if (fullBuild) {
+    // Clear the staging tree before a full build.
+    fs.rmSync(MOZCENTRAL_DIR, { recursive: true, force: true });
+  }
+
+  // Rebuild bundles with unknown or changed Webpack dependencies.
+  function bundleChanged(filename) {
+    const deps = webpackFileDeps.get(filename);
+    return !deps || [...changedFiles].some(file => deps.has(file));
+  }
+  // Match changed paths for non-Webpack outputs.
+  function sourceChanged(regExp) {
+    return changedPaths.some(p => regExp.test(p));
+  }
+
+  // Map outputs to their builders and watch dependencies.
+  const units = [
+    { bundle: "pdf.mjs", create: () => createMainBundle(defines) },
+    {
+      bundle: "pdf.scripting.mjs",
+      create: () => createScriptingBundle(defines),
+    },
+    { bundle: "pdf.worker.mjs", create: () => createWorkerBundle(defines) },
+    {
+      files: /^src\/pdf\.sandbox\.external\.js$/,
+      create: () => createSandboxExternal(defines),
+    },
+    {
+      bundle: "viewer.mjs",
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () => createWebBundle(defines),
+    },
+    {
+      bundle: "viewer-geckoview.mjs",
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () => createGVWebBundle(gvDefines),
+    },
+    {
+      files: /^web\/(images\/|debugger\.)/,
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () =>
+        gulp.src(MOZCENTRAL_WEB_FILES, { base: "web/", encoding: false }),
+    },
+    {
+      files: /^external\/bcmaps\//,
+      dest: MOZCENTRAL_WEB_DIR + "/cmaps",
+      create: createCMapBundle,
+    },
+    {
+      files: /^external\/iccs\//,
+      dest: MOZCENTRAL_WEB_DIR + "/iccs",
+      create: createICCBundle,
+    },
+    {
+      files: /^external\/standard_fonts\//,
+      dest: MOZCENTRAL_WEB_DIR + "/standard_fonts",
+      create: createStandardFontBundle,
+    },
+    {
+      files: /^external\/(jbig2|openjpeg|qcms)\//,
+      dest: MOZCENTRAL_WEB_DIR + "/wasm",
+      create: () => createWasmBundle({ includeQuickJS: false }),
+    },
+    // HTML includes and CSS imports aren't tracked individually; a top-level
+    // HTML or CSS change rebuilds both corresponding variants.
+    {
+      files: /^web\/[^/]+\.html$/,
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () => preprocessHTML("web/viewer.html", defines),
+    },
+    {
+      files: /^web\/[^/]+\.html$/,
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () => preprocessHTML("web/viewer-geckoview.html", gvDefines),
+    },
+    {
+      files: /^web\/[^/]+\.css$/,
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () =>
+        preprocessCSS("web/viewer.css", defines).pipe(
+          postcss([
+            discardCommentsCSS(),
+            autoprefixer(MOZCENTRAL_AUTOPREFIXER_CONFIG),
+          ])
+        ),
+    },
+    {
+      files: /^web\/[^/]+\.css$/,
+      dest: MOZCENTRAL_WEB_DIR,
+      create: () =>
+        preprocessCSS("web/viewer-geckoview.css", gvDefines).pipe(
+          postcss([
+            discardCommentsCSS(),
+            autoprefixer(MOZCENTRAL_AUTOPREFIXER_CONFIG),
+          ])
+        ),
+    },
+    {
+      files: /^l10n\/en-US\/[^/]+\.ftl$/,
+      dest: MOZCENTRAL_L10N_DIR,
+      create: () => gulp.src("l10n/en-US/*.ftl", { encoding: false }),
+    },
+    {
+      files: /^LICENSE$/,
+      dest: MOZCENTRAL_EXTENSION_DIR,
+      create: () => gulp.src("LICENSE", { encoding: false }),
+    },
+    // PdfJsDefaultPrefs.js is generated from this bundle.
+    {
+      bundle: "app_options.mjs",
+      dest: DEFAULT_PREFERENCES_DIR + "mozcentral/",
+      create: () => createDefaultPreferencesBundle(defines, "mozcentral/"),
+    },
+  ];
+
+  const builds = [];
+  let prefsBuildIndex = -1;
+
+  for (const { bundle, files, dest = MOZCENTRAL_BUILD_DIR, create } of units) {
+    if (fullBuild || (bundle ? bundleChanged(bundle) : sourceChanged(files))) {
+      if (bundle === "app_options.mjs") {
+        prefsBuildIndex = builds.length;
+      }
+      builds.push(
+        // Convert synchronous builder errors to rejections so all units settle.
+        (async () => {
+          await writeToDirectory(create(), dest);
+        })()
+      );
+    }
+  }
+
+  if (builds.length === 0) {
+    console.log("Nothing to rebuild.");
+    return false;
+  }
+
+  // Even after a failure, wait for every unit before the next watch build.
+  const results = await Promise.allSettled(builds);
+  const errors = results
+    .filter(({ status }) => status === "rejected")
+    .map(({ reason }) => reason);
+
+  // Generate preferences after their bundle succeeds, even if another unit
+  // failed: the next build may reuse this bundle before synchronizing.
+  if (prefsBuildIndex >= 0 && results[prefsBuildIndex].status === "fulfilled") {
+    try {
+      await writeToDirectory(
+        await createDefaultPrefsFile(),
+        MOZCENTRAL_EXTENSION_DIR
+      );
+    } catch (error) {
+      errors.push(error);
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "The mozilla-central build failed.");
+  }
+  return true;
 }
 
 gulp.task(
   "mozcentral",
-  gulp.series(
-    createBuildNumber,
-    function scriptingMozcentral() {
-      const defines = { ...DEFINES, MOZCENTRAL: true };
-      return buildDefaultPreferences(defines, "mozcentral/");
-    },
-    function createMozcentral() {
-      console.log("\n### Building mozilla-central extension");
-      const defines = { ...DEFINES, MOZCENTRAL: true };
-      const gvDefines = { ...defines, GECKOVIEW: true };
-
-      const MOZCENTRAL_DIR = BUILD_DIR + "mozcentral/",
-        MOZCENTRAL_EXTENSION_DIR = MOZCENTRAL_DIR + "browser/extensions/pdfjs/",
-        MOZCENTRAL_CONTENT_DIR = MOZCENTRAL_EXTENSION_DIR + "content/",
-        MOZCENTRAL_L10N_DIR =
-          MOZCENTRAL_DIR + "browser/locales/en-US/pdfviewer/";
-
-      const MOZCENTRAL_WEB_FILES = [
-        ...COMMON_WEB_FILES,
-        "!web/images/toolbarButton-openFile.svg",
-      ];
-      const MOZCENTRAL_AUTOPREFIXER_CONFIG = {
-        overrideBrowserslist: ["last 1 firefox versions"],
-      };
-
-      // Clear out everything in the firefox extension build directory
-      fs.rmSync(MOZCENTRAL_DIR, { recursive: true, force: true });
-
-      return ordered([
-        createMainBundle(defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "build")
-        ),
-        createScriptingBundle(defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "build")
-        ),
-        createSandboxExternal(defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "build")
-        ),
-        createWorkerBundle(defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "build")
-        ),
-        createWebBundle(defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
-        ),
-        createGVWebBundle(gvDefines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
-        ),
-        gulp
-          .src(MOZCENTRAL_WEB_FILES, { base: "web/", encoding: false })
-          .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")),
-        createCMapBundle().pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/cmaps")
-        ),
-        createICCBundle().pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/iccs")),
-        createStandardFontBundle().pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/standard_fonts")
-        ),
-        createWasmBundle().pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web/wasm")),
-
-        preprocessHTML("web/viewer.html", defines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
-        ),
-        preprocessHTML("web/viewer-geckoview.html", gvDefines).pipe(
-          gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")
-        ),
-
-        preprocessCSS("web/viewer.css", defines)
-          .pipe(
-            postcss([
-              discardCommentsCSS(),
-              autoprefixer(MOZCENTRAL_AUTOPREFIXER_CONFIG),
-            ])
-          )
-          .pipe(replaceMozcentralCSS())
-          .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")),
-
-        preprocessCSS("web/viewer-geckoview.css", gvDefines)
-          .pipe(
-            postcss([
-              discardCommentsCSS(),
-              autoprefixer(MOZCENTRAL_AUTOPREFIXER_CONFIG),
-            ])
-          )
-          .pipe(replaceMozcentralCSS())
-          .pipe(gulp.dest(MOZCENTRAL_CONTENT_DIR + "web")),
-
-        gulp
-          .src("l10n/en-US/*.ftl", { encoding: false })
-          .pipe(gulp.dest(MOZCENTRAL_L10N_DIR)),
-        gulp
-          .src("LICENSE", { encoding: false })
-          .pipe(gulp.dest(MOZCENTRAL_EXTENSION_DIR)),
-        createDefaultPrefsFile().pipe(gulp.dest(MOZCENTRAL_EXTENSION_DIR)),
-      ]);
+  gulp.series(createBuildNumber, async function createMozcentral() {
+    try {
+      return await buildMozcentral();
+    } catch (error) {
+      reportBuildFailure(error);
+      throw error;
     }
+  })
+);
+
+function getGeckoDirs() {
+  const geckoPath =
+    getArgValue("--path") ?? getArgValue("-p") ?? process.env.GECKO_PATH;
+
+  if (!geckoPath) {
+    throw new Error(
+      "Missing mozilla-central path; please use either the " +
+        '"--path <path>" (or "-p <path>") argument or the "GECKO_PATH" ' +
+        "environment variable."
+    );
+  }
+  const rootDir = path.resolve(geckoPath);
+
+  if (!checkFile(path.join(rootDir, "mach"))) {
+    throw new Error(
+      `"${rootDir}" does not appear to be a mozilla-central checkout.`
+    );
+  }
+  const pdfjsDir = path.join(rootDir, "toolkit", "components", "pdfjs"),
+    l10nDir = path.join(
+      rootDir,
+      "toolkit",
+      "locales",
+      "en-US",
+      "toolkit",
+      "pdfviewer"
+    );
+
+  for (const dir of [pdfjsDir, l10nDir]) {
+    if (!checkDir(dir)) {
+      throw new Error(`The "${dir}" folder does not exist.`);
+    }
+  }
+  return { rootDir, pdfjsDir, l10nDir };
+}
+
+/** Copy `src` if contents differ; otherwise preserve `dest`'s mtime. */
+function copyFileIfChanged(src, dest, stats) {
+  const data = fs.readFileSync(src);
+  let destData;
+  try {
+    destData = fs.readFileSync(dest);
+  } catch (ex) {
+    if (ex.code !== "ENOENT" && ex.code !== "EISDIR") {
+      throw ex;
+    }
+  }
+
+  if (destData?.equals(data)) {
+    stats.unchanged++;
+    return;
+  }
+  // Remove first because `dest` may be a directory.
+  fs.rmSync(dest, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, data);
+  stats.updated.push(dest);
+}
+
+/** Mirror regular files and directories from `src`, deleting stale entries. */
+function mirrorDir(src, dest, stats) {
+  const destStats = fs.lstatSync(dest, { throwIfNoEntry: false });
+
+  if (destStats && !destStats.isDirectory()) {
+    fs.rmSync(dest, { recursive: true, force: true });
+    stats.removed.push(dest);
+  }
+  fs.mkdirSync(dest, { recursive: true });
+
+  const srcEntries = fs.readdirSync(src, { withFileTypes: true });
+  const srcDirs = new Set(),
+    srcFiles = new Set();
+
+  for (const entry of srcEntries) {
+    if (entry.isDirectory()) {
+      srcDirs.add(entry.name);
+    } else if (entry.isFile()) {
+      srcFiles.add(entry.name);
+    } else {
+      throw new Error(
+        `Unsupported entry type for "${path.join(src, entry.name)}".`
+      );
+    }
+  }
+
+  // Remove stale entries and entries whose type changed.
+  for (const entry of fs.readdirSync(dest, { withFileTypes: true })) {
+    if (
+      (entry.isDirectory() && srcDirs.has(entry.name)) ||
+      (entry.isFile() && srcFiles.has(entry.name))
+    ) {
+      continue;
+    }
+    const destPath = path.join(dest, entry.name);
+    fs.rmSync(destPath, { recursive: true, force: true });
+    stats.removed.push(destPath);
+  }
+
+  for (const entry of srcEntries) {
+    const srcPath = path.join(src, entry.name),
+      destPath = path.join(dest, entry.name);
+
+    if (entry.isDirectory()) {
+      mirrorDir(srcPath, destPath, stats);
+    } else {
+      copyFileIfChanged(srcPath, destPath, stats);
+    }
+  }
+}
+
+function hasWatchArg() {
+  // Node consumes "--watch" before gulp can parse it.
+  if (process.env.WATCH_REPORT_DEPENDENCIES) {
+    throw new Error(
+      'The "--watch" option is consumed by Node; please use "-w" instead.'
+    );
+  }
+  return process.argv.includes("-w");
+}
+
+function syncMozcentral() {
+  const { rootDir, pdfjsDir, l10nDir } = getGeckoDirs();
+  console.log(`\n### Updating PDF.js in "${rootDir}"`);
+
+  const stats = { updated: [], removed: [], unchanged: 0 };
+
+  // Mirror `build` and `web`; preserve other `content` entries.
+  for (const dir of ["build", "web"]) {
+    mirrorDir(
+      MOZCENTRAL_CONTENT_DIR + dir,
+      path.join(pdfjsDir, "content", dir),
+      stats
+    );
+  }
+
+  for (const file of ["LICENSE", "PdfJsDefaultPrefs.js"]) {
+    copyFileIfChanged(
+      MOZCENTRAL_EXTENSION_DIR + file,
+      path.join(pdfjsDir, file),
+      stats
+    );
+  }
+
+  for (const file of fs.readdirSync(MOZCENTRAL_L10N_DIR)) {
+    if (file.endsWith(".ftl")) {
+      copyFileIfChanged(
+        MOZCENTRAL_L10N_DIR + file,
+        path.join(l10nDir, file),
+        stats
+      );
+    }
+  }
+
+  for (const filePath of stats.removed) {
+    console.log(`  deleted: ${filePath}`);
+  }
+  for (const filePath of stats.updated) {
+    console.log(kleur.green(`  updated: ${filePath}`));
+  }
+  console.log(
+    `\n${stats.updated.length} file(s) updated, ` +
+      `${stats.removed.length} file(s) deleted, ` +
+      `${stats.unchanged} file(s) unchanged.`
+  );
+}
+
+function watchMozcentral(done) {
+  if (!hasWatchArg()) {
+    done();
+    return;
+  }
+  const MOZCENTRAL_SOURCE_FILES = [
+    "src/**",
+    "web/**",
+    "!web/locale/**", // Generated by the `locale` task.
+    "!web/wasm/**", // Generated by the `dev-wasm` task.
+    "l10n/en-US/*.ftl",
+    "external/bcmaps/*",
+    "external/iccs/*",
+    "external/jbig2/*",
+    "external/openjpeg/*",
+    "external/qcms/*",
+    "external/standard_fonts/*",
+    "LICENSE",
+  ];
+
+  console.log("\n### Watching for changes; press Ctrl+C to stop");
+
+  const changedFiles = new Set();
+  let timeoutId = null,
+    building = false;
+
+  async function rebuild() {
+    timeoutId = null;
+    if (building) {
+      return; // The active rebuild will consume these changes.
+    }
+    building = true;
+
+    while (changedFiles.size > 0) {
+      const files = new Set(changedFiles);
+      changedFiles.clear();
+
+      console.log(
+        `\n### Changed: ${[...files].map(repoPath).sort().join(", ")}`
+      );
+      try {
+        if (await buildMozcentral(files)) {
+          syncMozcentral();
+        }
+      } catch (error) {
+        // Keep watching so a later edit can fix the error.
+        reportBuildFailure(error);
+      }
+    }
+    building = false;
+  }
+
+  gulp.watch(MOZCENTRAL_SOURCE_FILES).on("all", (event, filePath) => {
+    changedFiles.add(path.resolve(filePath));
+    // Coalesce event bursts such as branch switches.
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(rebuild, 100);
+  });
+
+  done();
+}
+
+gulp.task(
+  "firefox",
+  gulp.series(
+    "mozcentral",
+    function updateMozcentral(done) {
+      syncMozcentral();
+      done();
+    },
+    watchMozcentral
   )
 );
 
-function createChromiumPrefsSchema() {
+async function createChromiumPrefsSchema() {
   console.log("\n### Building Chromium preferences file");
 
-  const prefs = getDefaultPreferences("chromium/");
+  const prefs = await getDefaultPreferences("chromium/");
   const chromiumPrefs = buildPrefsSchema(prefs);
 
   return createStringSource(
@@ -1448,8 +2175,7 @@ gulp.task(
       console.log("\n### Building Chromium extension");
       const defines = { ...DEFINES, CHROME: true, SKIP_BABEL: false };
 
-      const CHROME_BUILD_DIR = BUILD_DIR + "/chromium/",
-        CHROME_BUILD_CONTENT_DIR = CHROME_BUILD_DIR + "/content/";
+      const CHROME_BUILD_CONTENT_DIR = CHROMIUM_DIR + "content/";
 
       const CHROME_WEB_FILES = [
         ...COMMON_WEB_FILES,
@@ -1457,7 +2183,7 @@ gulp.task(
       ];
 
       // Clear out everything in the chrome extension build directory
-      fs.rmSync(CHROME_BUILD_DIR, { recursive: true, force: true });
+      fs.rmSync(CHROMIUM_DIR, { recursive: true, force: true });
 
       const version = getVersionJSON().version;
 
@@ -1502,31 +2228,25 @@ gulp.task(
         ),
         preprocessCSS("web/viewer.css", defines)
           .pipe(
-            postcss([
-              postcssDirPseudoClass(),
-              discardCommentsCSS(),
-              postcssNesting(),
-              postcssLightDarkFunction({ preserve: true }),
-              autoprefixer(AUTOPREFIXER_CONFIG),
-            ])
+            postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)])
           )
           .pipe(gulp.dest(CHROME_BUILD_CONTENT_DIR + "web")),
 
-        gulp
-          .src("LICENSE", { encoding: false })
-          .pipe(gulp.dest(CHROME_BUILD_DIR)),
+        gulp.src("LICENSE", { encoding: false }).pipe(gulp.dest(CHROMIUM_DIR)),
         gulp
           .src("extensions/chromium/manifest.json", { encoding: false })
           .pipe(replace(/\bPDFJSSCRIPT_VERSION\b/g, version))
-          .pipe(gulp.dest(CHROME_BUILD_DIR)),
+          .pipe(gulp.dest(CHROMIUM_DIR)),
         gulp
           .src(["extensions/chromium/**/*.{html,js,css,png}"], {
             base: "extensions/chromium/",
             encoding: false,
           })
-          .pipe(gulp.dest(CHROME_BUILD_DIR)),
-        createChromiumPrefsSchema().pipe(gulp.dest(CHROME_BUILD_DIR)),
+          .pipe(gulp.dest(CHROMIUM_DIR)),
       ]);
+    },
+    async function prefsSchemaChromium() {
+      return writeToDirectory(await createChromiumPrefsSchema(), CHROMIUM_DIR);
     }
   )
 );
@@ -1551,50 +2271,100 @@ gulp.task("types", function (done) {
 });
 
 function buildLibHelper(bundleDefines, inputStream, outputDir) {
-  function preprocessLib(content) {
-    const skipBabel = bundleDefines.SKIP_BABEL;
-    content = babel.transform(content, {
-      sourceType: "module",
-      presets: skipBabel
-        ? undefined
-        : [
-            [
-              "@babel/preset-env",
-              { ...BABEL_PRESET_ENV_OPTS, loose: false, modules: false },
-            ],
-          ],
-      plugins: [[babelPluginPDFJSPreprocessor, ctx]],
-      targets: BABEL_TARGETS,
-    }).code;
-    content = content.replaceAll(
-      /(\sfrom\s".*?)(?:\/src)(\/[^"]*"?;)$/gm,
-      (all, prefix, suffix) => prefix + suffix
-    );
-    return licenseHeaderLibre + content;
-  }
+  const licenseHeader = fs
+    .readFileSync("./src/license_header.js")
+    .toString()
+    .trim()
+    .replace(/^\/\*/, "")
+    .replace(/\*\/$/, "");
+
   const ctx = {
     rootPath: __dirname,
     defines: bundleDefines,
     map: {
       "pdfjs-lib": "../pdf.js",
-      "display-cmap_reader_factory": "./cmap_reader_factory.js",
-      "display-standard_fontdata_factory": "./standard_fontdata_factory.js",
-      "display-wasm_factory": "./wasm_factory.js",
-      "display-fetch_stream": "./fetch_stream.js",
-      "display-network": "./network.js",
-      "display-node_stream": "./node_stream.js",
+      "display-binary_data_factory": "./binary_data_factory.js",
+      "display-network_stream": "./network_stream.js",
       "display-node_utils": "./node_utils.js",
       "fluent-bundle": "../../../node_modules/@fluent/bundle/esm/index.js",
       "fluent-dom": "../../../node_modules/@fluent/dom/esm/index.js",
       "web-null_l10n": "../web/genericl10n.js",
     },
   };
-  const licenseHeaderLibre = fs
-    .readFileSync("./src/license_header_libre.js")
-    .toString();
-  return inputStream
-    .pipe(transform("utf8", preprocessLib))
-    .pipe(gulp.dest(outputDir));
+  const enableSourceMaps = bundleDefines.TESTING;
+  const enableCoverage = bundleDefines.COVERAGE;
+
+  function preprocessLib(file, _enc, callback) {
+    const skipBabel = bundleDefines.SKIP_BABEL;
+
+    if (file.isNull()) {
+      return callback(null, file);
+    }
+
+    if (file.isStream()) {
+      return callback(new Error("Streaming not supported"));
+    }
+
+    try {
+      // Calculate where the output file will be
+      const outputFilePath = path.join(__dirname, outputDir, file.relative);
+      const outputFileDir = path.dirname(outputFilePath);
+      // Calculate relative path from output directory to source file
+      const relativeSourcePath = path.relative(outputFileDir, file.path);
+
+      const plugins = [
+        [babelPluginPDFJSPreprocessor, ctx],
+        [babelPluginStripSrcPath],
+      ];
+      if (!skipBabel) {
+        plugins.push(["babel-plugin-polyfill-corejs3", BABEL_COREJS_OPTS]);
+      }
+      if (enableCoverage) {
+        plugins.push([
+          "babel-plugin-istanbul",
+          {
+            cwd: __dirname,
+            include: ["external/**/*.js", "src/**/*.js", "web/**/*.js"],
+          },
+        ]);
+      }
+      plugins.push([babelPluginAddHeaderComment, { header: licenseHeader }]);
+
+      const result = babel.transformSync(file.contents.toString(), {
+        ...(enableCoverage && {
+          filename: file.path,
+          babelrc: false,
+          configFile: false,
+        }),
+        sourceType: "module",
+        presets: skipBabel ? undefined : ["@babel/preset-env"],
+        plugins,
+        targets: BABEL_TARGETS,
+        sourceMaps: enableSourceMaps,
+        sourceFileName: relativeSourcePath,
+      });
+
+      file.contents = Buffer.from(result.code);
+      // Attach the source map to the file for gulp-sourcemaps
+      if (result.map) {
+        file.sourceMap = result.map;
+      }
+
+      return callback(null, file);
+    } catch (err) {
+      return callback(err);
+    }
+  }
+
+  const pipeline = inputStream.pipe(
+    new stream.Transform({
+      objectMode: true,
+      transform: preprocessLib,
+    })
+  );
+  return pipeline.pipe(
+    gulp.dest(outputDir, enableSourceMaps ? { sourcemaps: "." } : {})
+  );
 }
 
 function buildLib(defines, dir) {
@@ -1605,25 +2375,52 @@ function buildLib(defines, dir) {
     BUNDLE_VERSION: versionInfo.version,
     BUNDLE_BUILD: versionInfo.commit,
     TESTING: defines.TESTING ?? process.env.TESTING === "true",
+    COVERAGE:
+      defines.COVERAGE ??
+      (process.argv.includes("--coverage") ||
+        process.argv.includes("--coverage-per-test")),
     DEFAULT_FTL: getDefaultFtl(),
   };
 
+  const enableSourceMaps = bundleDefines.TESTING;
   const inputStream = ordered([
     gulp.src(
       [
         "src/{core,display,shared}/**/*.js",
         "src/{pdf,pdf.image_decoders,pdf.worker}.js",
       ],
-      { base: "src/", encoding: false }
+      { base: "src/", encoding: false, sourcemaps: enableSourceMaps }
     ),
     gulp.src(["web/*.js", "!web/{pdfjs,viewer}.js"], {
       base: ".",
       encoding: false,
+      sourcemaps: enableSourceMaps,
     }),
-    gulp.src("test/unit/*.js", { base: ".", encoding: false }),
-    gulp.src("external/openjpeg/*.js", { base: "openjpeg/", encoding: false }),
-    gulp.src("external/qcms/*.js", { base: "qcms/", encoding: false }),
-    gulp.src("external/jbig2/*.js", { base: "jbig2/", encoding: false }),
+    gulp.src("test/unit/*.js", {
+      base: ".",
+      encoding: false,
+      sourcemaps: enableSourceMaps,
+    }),
+    gulp.src("external/openjpeg/*.js", {
+      base: "openjpeg/",
+      encoding: false,
+      sourcemaps: enableSourceMaps,
+    }),
+    gulp.src("external/qcms/*.js", {
+      base: "qcms/",
+      encoding: false,
+      sourcemaps: enableSourceMaps,
+    }),
+    gulp.src("external/jbig2/*.js", {
+      base: "jbig2/",
+      encoding: false,
+      sourcemaps: enableSourceMaps,
+    }),
+    gulp.src("external/brotli/*.js", {
+      base: "brotli/",
+      encoding: false,
+      sourcemaps: enableSourceMaps,
+    }),
   ]);
 
   return buildLibHelper(bundleDefines, inputStream, dir);
@@ -1756,29 +2553,6 @@ gulp.task(
 );
 
 gulp.task(
-  "xfatest",
-  gulp.series(setTestEnv, "generic", "components", async function runXfaTest() {
-    await runTests("unit");
-    await runTests("browser", { xfaOnly: true });
-    await runTests("integration");
-  })
-);
-
-gulp.task(
-  "botxfatest",
-  gulp.series(
-    setTestEnv,
-    "generic",
-    "components",
-    async function runBotXfaTest() {
-      await runTests("unit", { bot: true });
-      await runTests("browser", { bot: true, xfaOnly: true });
-      await runTests("integration");
-    }
-  )
-);
-
-gulp.task(
   "browsertest",
   gulp.series(
     setTestEnv,
@@ -1862,7 +2636,7 @@ gulp.task(
       const defines = { ...DEFINES, MOZCENTRAL: true };
       return buildDefaultPreferences(defines, "mozcentral/");
     },
-    function checkPrefs() {
+    async function checkPrefs() {
       console.log("\n### Checking preference generation");
 
       // Check that the preferences were correctly generated,
@@ -1873,14 +2647,12 @@ gulp.task(
         "chromium/",
         "mozcentral/",
       ]) {
-        getDefaultPreferences(dir);
+        await getDefaultPreferences(dir);
       }
 
       // Check that all the relevant files can be generated.
-      return ordered([
-        createChromiumPrefsSchema().pipe(gulp.dest(PREFSTEST_DIR)),
-        createDefaultPrefsFile().pipe(gulp.dest(PREFSTEST_DIR)),
-      ]);
+      await writeToDirectory(await createChromiumPrefsSchema(), PREFSTEST_DIR);
+      await writeToDirectory(await createDefaultPrefsFile(), PREFSTEST_DIR);
     }
   )
 );
@@ -1889,7 +2661,7 @@ gulp.task(
   "typestest",
   gulp.series(
     setTestEnv,
-    "generic",
+    createBuildNumber,
     "types",
     function createTypesTest() {
       return ordered([
@@ -1917,57 +2689,84 @@ gulp.task(
   )
 );
 
-function createBaseline(done) {
-  console.log("\n### Creating baseline environment");
-
-  const baselineCommit = process.env.BASELINE;
-  if (!baselineCommit) {
-    done(new Error("Missing baseline commit. Specify the BASELINE variable."));
-    return;
-  }
-
-  let initializeCommand = "git fetch origin";
-  if (!checkDir(BASELINE_DIR)) {
-    fs.mkdirSync(BASELINE_DIR, { recursive: true });
-    initializeCommand = "git clone ../../ .";
-  }
-
-  const workingDirectory = path.resolve(process.cwd(), BASELINE_DIR);
-  exec(initializeCommand, { cwd: workingDirectory }, function (error) {
-    if (error) {
-      done(new Error("Baseline clone/fetch failed."));
-      return;
-    }
-
-    exec(
-      "git checkout " + baselineCommit,
-      { cwd: workingDirectory },
-      function (error2) {
-        if (error2) {
-          done(new Error("Baseline commit checkout failed."));
-          return;
-        }
-
-        console.log('Baseline commit "' + baselineCommit + '" checked out.');
-        done();
-      }
-    );
-  });
-}
-
 gulp.task(
   "unittestcli",
   gulp.series(
     setTestEnv,
     "generic-legacy",
     "lib-legacy",
+    function downloadPDFs(done) {
+      console.log("\n### Downloading PDFs");
+
+      const PDF_TEST = process.env.PDF_TEST || "test_manifest.json";
+      const args = ["test.mjs", "--manifestFile=" + PDF_TEST, "--downloadOnly"];
+
+      const testProcess = startNode(args, {
+        cwd: TEST_DIR,
+        stdio: "inherit",
+      });
+      testProcess.on("close", function (code) {
+        if (code !== 0) {
+          done(new Error(`Downloading PDFs failed.`));
+        }
+        done();
+      });
+    },
     function runUnitTestCli(done) {
+      const useCoverage = process.argv.includes("--coverage");
+      const coverageDir =
+        getArgValue("--coverage-output") || BUILD_DIR + "coverage";
+      const coverageFormats = parseCoverageFormats(
+        getArgValue("--coverage-formats")
+      );
+
+      const coverageFile = path.join(
+        __dirname,
+        BUILD_DIR,
+        "tmp",
+        "unittestcli-coverage.json"
+      );
+      const env = { ...process.env };
+      if (useCoverage) {
+        console.log("\n### Running unit tests with code coverage");
+        env.UNITTESTCLI_COVERAGE_FILE = coverageFile;
+        fs.rmSync(coverageFile, { force: true });
+      }
+
       const options = [
+        "--enable-source-maps",
         "node_modules/jasmine/bin/jasmine",
         "JASMINE_CONFIG_PATH=test/unit/clitests.json",
       ];
-      const jasmineProcess = startNode(options, { stdio: "inherit" });
+      const jasmineProcess = startNode(options, { stdio: "inherit", env });
+
       jasmineProcess.on("close", function (code) {
+        if (useCoverage) {
+          if (fs.existsSync(coverageFile)) {
+            const rawCoverage = JSON.parse(
+              fs.readFileSync(coverageFile, "utf8")
+            );
+            const coverageMap = istanbulCoverage.createCoverageMap(rawCoverage);
+            const context = libReport.createContext({
+              dir: coverageDir,
+              coverageMap,
+            });
+            for (const fmt of coverageFormats) {
+              istanbulReportGenerator
+                .create(COVERAGE_FORMAT_TO_REPORTER[fmt], {
+                  projectRoot: __dirname,
+                })
+                .execute(context);
+            }
+            console.log(
+              `\n### Code coverage report generated in ${coverageDir} directory`
+            );
+          } else {
+            console.warn(
+              `\n### No coverage data found at ${coverageFile}. Did the build include 'babel-plugin-istanbul'?`
+            );
+          }
+        }
         if (code !== 0) {
           done(new Error("Unit tests failed."));
           return;
@@ -1978,6 +2777,232 @@ gulp.task(
   )
 );
 
+gulp.task("lint-licenses", function (done) {
+  console.log("\n### Checking license headers");
+
+  const jsRE =
+    /^(?:#[^\n]*\n)?\/\* Copyright \d{4} Mozilla Foundation\n \*\n \* Licensed under the Apache License, Version 2\.0 \(the "License"\);/;
+  const htmlRE = /^<!doctype html>\n<!--\nCopyright \d{4} Mozilla Foundation\n/;
+
+  // Files with non-standard license headers (different copyright holder,
+  // different license, or missing license).
+  const NON_STANDARD_HEADER_FILES = new Set([
+    "examples/learning/helloworld.html",
+    "examples/learning/helloworld64.html",
+    "examples/learning/prevnext.html",
+    "examples/node/getinfo.mjs",
+    "examples/text-only/index.html",
+    "examples/webpack/index.html",
+    "examples/webpack/main.mjs",
+    "examples/webpack/webpack.config.js",
+    "test/add_test.mjs",
+    "src/license_header_libre.js",
+    "src/shared/murmurhash3.js",
+    "test/font/font_core_spec.js",
+    "test/font/font_fpgm_spec.js",
+    "test/font/font_os2_spec.js",
+    "test/font/font_post_spec.js",
+    "test/reporter.js",
+    "test/resources/reftest-analyzer.css",
+    "test/resources/reftest-analyzer.js",
+    "test/stats/statcmp.js",
+    "web/grab_to_pan.js",
+    "web/toggle_button.css",
+  ]);
+
+  const errors = [];
+
+  gulp
+    .src(
+      [
+        "{src,web,test,examples}/**/*.{js,mjs,css}",
+        "examples/**/*.html",
+        "!web/wasm/**/*",
+      ],
+      { base: "." }
+    )
+    .on("data", function (file) {
+      if (!file.contents) {
+        console.warn(
+          `  ${file.relative} is a directory, skipping license header check.`
+        );
+        return;
+      }
+
+      const relativePath = file.relative.replaceAll("\\", "/");
+      const content = file.contents.toString();
+      const re = relativePath.endsWith(".html") ? htmlRE : jsRE;
+
+      if (NON_STANDARD_HEADER_FILES.has(relativePath)) {
+        if (re.test(content)) {
+          console.warn(
+            `  ${relativePath} has a standard license header, but is in the list of non-standard header files list.`
+          );
+        }
+        return;
+      }
+      if (!re.test(content)) {
+        errors.push(relativePath);
+      }
+    })
+    .on("end", function () {
+      if (errors.length > 0) {
+        for (const file of errors.sort()) {
+          console.log(`  Invalid license header: ${file}`);
+        }
+        done(new Error("License header check failed."));
+        return;
+      }
+      console.log("files checked, no errors found");
+      done();
+    });
+});
+
+gulp.task("lint-chmod", function (done) {
+  console.log("\n### Checking executable bit on tracked and untracked files");
+
+  // Files allowed to keep the executable bit (shebang scripts).
+  const EXECUTABLE_FILES = new Set(["test/chromium/test-telemetry.js"]);
+
+  // Cover untracked-but-not-ignored files too: a `gulp lint` run before
+  // `git add` would otherwise miss any 0755 file the developer just created.
+  // `-z` is NUL-separated to tolerate whitespace in paths; `--exclude-standard`
+  // honours .gitignore / .git/info/exclude / core.excludesFile.
+  let lsFiles;
+  try {
+    lsFiles = execSync("git ls-files -coz --exclude-standard", {
+      encoding: "utf8",
+    });
+  } catch (e) {
+    done(e);
+    return;
+  }
+
+  const offenders = [];
+  for (const file of lsFiles.split("\0")) {
+    if (!file || EXECUTABLE_FILES.has(file)) {
+      continue;
+    }
+    let stat;
+    try {
+      stat = fs.lstatSync(file);
+    } catch {
+      // Tracked file removed from the working tree, broken symlink, etc.
+      continue;
+    }
+    // Skip symlinks (stored as mode 120000) and directories (submodules show
+    // up here as 160000 in the index, never as a regular file on disk).
+    if (!stat.isFile()) {
+      continue;
+    }
+    // Match git's own heuristic in `ce_permissions`: only the owner execute
+    // bit matters when deciding between 100644 and 100755.
+    if (stat.mode & 0o100) {
+      offenders.push(file);
+    }
+  }
+
+  if (offenders.length === 0) {
+    console.log("files checked, no errors found");
+    done();
+    return;
+  }
+
+  if (!process.argv.includes("--fix")) {
+    for (const file of offenders.sort()) {
+      console.log(`  Unexpected executable bit: ${file}`);
+    }
+    done(
+      new Error(
+        "Executable-bit check failed (run `gulp lint-chmod --fix` to clear)."
+      )
+    );
+    return;
+  }
+
+  // Working-tree-only fix, like every other --fix in `gulp lint`: clear the
+  // bit on disk and let the user stage the change. On filesystems with
+  // `core.filemode=false` (e.g. Windows) this is a no-op and the offending
+  // mode must be cleared with `git update-index --chmod=-x` instead.
+  for (const file of offenders.sort()) {
+    try {
+      const { mode } = fs.statSync(file);
+      fs.chmodSync(file, mode & ~0o111);
+    } catch (e) {
+      done(e);
+      return;
+    }
+    console.log(`  cleared executable bit: ${file}`);
+  }
+  console.log(`done: ${offenders.length} file(s) updated`);
+  done();
+});
+
+gulp.task("lint-bom", async function () {
+  console.log("\n### Checking for UTF-8 byte order marks");
+
+  // Cover untracked-but-not-ignored files too, so a BOM in a freshly created
+  // file is caught before `git add`.
+  const files = execSync("git ls-files -coz --exclude-standard", {
+    encoding: "utf8",
+    maxBuffer: 1 << 28,
+  })
+    .split("\0")
+    .filter(Boolean);
+
+  // Only the first three bytes matter: a leading EF BB BF is a UTF-8 BOM.
+  async function hasBOM(file) {
+    let handle;
+    try {
+      handle = await fs.promises.open(file, "r");
+    } catch {
+      return false; // Directory, broken symlink, removed file, etc.
+    }
+    try {
+      const { bytesRead, buffer } = await handle.read(Buffer.alloc(3), 0, 3, 0);
+      return (
+        bytesRead === 3 &&
+        buffer[0] === 0xef &&
+        buffer[1] === 0xbb &&
+        buffer[2] === 0xbf
+      );
+    } finally {
+      await handle.close();
+    }
+  }
+
+  // Don't exhaust file descriptors.
+  const offenders = [];
+  for (let i = 0; i < files.length; i += 256) {
+    const chunk = files.slice(i, i + 256);
+    const flags = await Promise.all(chunk.map(hasBOM));
+    chunk.forEach((file, j) => flags[j] && offenders.push(file));
+  }
+  offenders.sort();
+
+  if (offenders.length === 0) {
+    console.log("files checked, no errors found");
+    return;
+  }
+
+  if (!process.argv.includes("--fix")) {
+    for (const file of offenders) {
+      console.log(`  Unexpected byte order mark: ${file}`);
+    }
+    throw new Error("BOM check failed (run `gulp lint-bom --fix` to clear).");
+  }
+
+  // Strip the BOM on disk and let the user stage the change.
+  await Promise.all(
+    offenders.map(async file => {
+      const content = await fs.promises.readFile(file);
+      await fs.promises.writeFile(file, content.subarray(3));
+      console.log(`  removed byte order mark: ${file}`);
+    })
+  );
+  console.log(`done: ${offenders.length} file(s) updated`);
+});
+
 gulp.task("lint", function (done) {
   console.log("\n### Linting JS/CSS/JSON/SVG/HTML files");
 
@@ -1986,6 +3011,7 @@ gulp.task("lint", function (done) {
     "node_modules/eslint/bin/eslint",
     ".",
     "--report-unused-disable-directives",
+    "--concurrency=auto",
   ];
   if (process.argv.includes("--fix")) {
     esLintOptions.push("--fix");
@@ -2000,9 +3026,11 @@ gulp.task("lint", function (done) {
     styleLintOptions.push("--fix");
   }
 
+  // JSON files are intentionally not passed to Prettier here: ESLint already
+  // formats them via its prettier/prettier rule (with identical output), and
+  // running both in parallel would race on writes in --fix mode.
   const prettierOptions = [
     "node_modules/prettier/bin/prettier.cjs",
-    "**/*.json",
     "**/*.html",
   ];
   if (process.argv.includes("--fix")) {
@@ -2018,41 +3046,28 @@ gulp.task("lint", function (done) {
     "--no-summary",
   ];
 
-  const esLintProcess = startNode(esLintOptions, { stdio: "inherit" });
-  esLintProcess.on("close", function (esLintCode) {
-    if (esLintCode !== 0) {
-      done(new Error("ESLint failed."));
+  function runLinter(name, options) {
+    return new Promise(resolve => {
+      const proc = startNode(options, { stdio: "inherit" });
+      proc.on("close", code => {
+        resolve(code === 0 ? null : name);
+      });
+    });
+  }
+
+  Promise.all([
+    runLinter("ESLint", esLintOptions),
+    runLinter("Stylelint", styleLintOptions),
+    runLinter("Prettier", prettierOptions),
+    runLinter("svglint", svgLintOptions),
+  ]).then(results => {
+    const failures = results.filter(Boolean);
+    if (failures.length) {
+      done(new Error(`${failures.join(", ")} failed.`));
       return;
     }
 
-    const styleLintProcess = startNode(styleLintOptions, { stdio: "inherit" });
-    styleLintProcess.on("close", function (styleLintCode) {
-      if (styleLintCode !== 0) {
-        done(new Error("Stylelint failed."));
-        return;
-      }
-
-      const prettierProcess = startNode(prettierOptions, { stdio: "inherit" });
-      prettierProcess.on("close", function (prettierCode) {
-        if (prettierCode !== 0) {
-          done(new Error("Prettier failed."));
-          return;
-        }
-
-        const svgLintProcess = startNode(svgLintOptions, {
-          stdio: "inherit",
-        });
-        svgLintProcess.on("close", function (svgLintCode) {
-          if (svgLintCode !== 0) {
-            done(new Error("svglint failed."));
-            return;
-          }
-
-          console.log("files checked, no errors found");
-          done();
-        });
-      });
-    });
+    gulp.series("lint-licenses", "lint-chmod", "lint-bom")(done);
   });
 });
 
@@ -2129,7 +3144,12 @@ gulp.task(
     },
     function watchWasm() {
       gulp.watch(
-        ["external/openjpeg/*", "external/qcms/*", "external/jbig2/*"],
+        [
+          "external/openjpeg/*",
+          "external/qcms/*",
+          "external/jbig2/*",
+          "external/quickjs/*",
+        ],
         { ignoreInitial: false },
         gulp.series("dev-wasm")
       );
@@ -2140,7 +3160,6 @@ gulp.task(
           "src/pdf.{sandbox,sandbox.external,scripting}.js",
           "src/scripting_api/*.js",
           "src/shared/scripting_utils.js",
-          "external/quickjs/*.js",
         ],
         { ignoreInitial: false },
         gulp.series("dev-sandbox")
@@ -2160,8 +3179,17 @@ gulp.task(
         }
       }
 
+      let host;
+      const j = process.argv.indexOf("--host");
+      if (j >= 0 && j + 1 < process.argv.length) {
+        host = process.argv[j + 1];
+        if (host === "0") {
+          host = "0.0.0.0";
+        }
+      }
+
       const { WebServer } = await import("./test/webserver.mjs");
-      const server = new WebServer({ port });
+      const server = new WebServer({ host, port });
       server.start();
     }
   )
@@ -2240,6 +3268,62 @@ gulp.task("importl10n", async function () {
   await downloadL10n(L10N_DIR);
 });
 
+gulp.task("check_l10n", function (done) {
+  console.log("\n### Checking for unused l10n IDs");
+
+  const checkProcess = startNode(["external/check_l10n/check_l10n.mjs"], {
+    stdio: "inherit",
+  });
+  checkProcess.on("close", function (code) {
+    if (code !== 0) {
+      done(new Error("check_l10n failed."));
+      return;
+    }
+    done();
+  });
+});
+
+function createInternalViewerBundle(defines) {
+  const viewerFileConfig = createWebpackConfig(defines, {
+    filename: "debugger.mjs",
+    library: {
+      type: "module",
+    },
+  });
+  return gulp
+    .src("./web/internal/debugger.js", { encoding: false })
+    .pipe(webpack2Stream(viewerFileConfig));
+}
+
+function buildInternalViewer(defines, dir) {
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  return ordered([
+    createMainBundle(defines).pipe(gulp.dest(dir + "build")),
+    createWorkerBundle(defines).pipe(gulp.dest(dir + "build")),
+    createInternalViewerBundle(defines).pipe(gulp.dest(dir + "web")),
+    preprocessHTML("web/internal/debugger.html", defines).pipe(
+      gulp.dest(dir + "web")
+    ),
+    preprocessCSS("web/internal/debugger.css", defines)
+      .pipe(postcss([discardCommentsCSS(), autoprefixer(AUTOPREFIXER_CONFIG)]))
+      .pipe(gulp.dest(dir + "web")),
+    createCMapBundle().pipe(gulp.dest(dir + "web/cmaps")),
+    createICCBundle().pipe(gulp.dest(dir + "web/iccs")),
+    createStandardFontBundle().pipe(gulp.dest(dir + "web/standard_fonts")),
+    createWasmBundle().pipe(gulp.dest(dir + "web/wasm")),
+  ]);
+}
+
+gulp.task(
+  "internal-viewer",
+  gulp.series(createBuildNumber, function createInternalViewer() {
+    console.log("\n### Creating internal viewer");
+    const defines = { ...DEFINES, GENERIC: true, INTERNAL_VIEWER: true };
+    return buildInternalViewer(defines, INTERNAL_VIEWER_DIR);
+  })
+);
+
 function ghPagesPrepare() {
   console.log("\n### Creating web site");
 
@@ -2263,6 +3347,13 @@ function ghPagesPrepare() {
     gulp
       .src(JSDOC_BUILD_DIR + "**/*", { base: JSDOC_BUILD_DIR, encoding: false })
       .pipe(gulp.dest(GH_PAGES_DIR + "api/draft/")),
+    gulp
+      .src(INTERNAL_VIEWER_DIR + "**/*", {
+        base: INTERNAL_VIEWER_DIR,
+        encoding: false,
+        removeBOM: false,
+      })
+      .pipe(gulp.dest(GH_PAGES_DIR + "internal-viewer/")),
   ]);
 }
 
@@ -2314,6 +3405,7 @@ gulp.task(
   gulp.series(
     "generic",
     "generic-legacy",
+    "internal-viewer",
     "jsdoc",
     ghPagesPrepare,
     "metalsmith"
@@ -2342,8 +3434,7 @@ function packageJson() {
     bugs: DIST_BUGS_URL,
     license: DIST_LICENSE,
     optionalDependencies: {
-      "@napi-rs/canvas": "^0.1.88",
-      "node-readable-to-web-readable-stream": "^0.4.2",
+      "@napi-rs/canvas": "^1.0.0",
     },
     browser: {
       canvas: false,
@@ -2357,7 +3448,7 @@ function packageJson() {
       url: `git+${DIST_GIT_URL}`,
     },
     engines: {
-      node: ">=20.16.0 || >=22.3.0",
+      node: ">=22.13.0 || >=24",
     },
     scripts: {},
   };
@@ -2393,6 +3484,11 @@ gulp.task(
             removeBOM: false,
           })
           .pipe(gulp.dest(DIST_DIR)),
+        gulp
+          .src("external/dist/webpack.mjs", {
+            encoding: false,
+          })
+          .pipe(gulp.dest(DIST_DIR + "legacy/")),
         gulp
           .src(GENERIC_DIR + "LICENSE", { encoding: false })
           .pipe(gulp.dest(DIST_DIR)),
@@ -2505,87 +3601,6 @@ gulp.task(
     safeSpawnSync("npm", ["install", distPath], opts);
     done();
   })
-);
-
-gulp.task(
-  "mozcentralbaseline",
-  gulp.series(createBaseline, function createMozcentralBaseline(done) {
-    console.log("\n### Creating mozcentral baseline environment");
-
-    // Create a mozcentral build.
-    fs.rmSync(BASELINE_DIR + BUILD_DIR, { recursive: true, force: true });
-
-    const workingDirectory = path.resolve(process.cwd(), BASELINE_DIR);
-    safeSpawnSync("gulp", ["mozcentral"], {
-      env: process.env,
-      cwd: workingDirectory,
-      stdio: "inherit",
-    });
-
-    // Copy the mozcentral build to the mozcentral baseline directory.
-    fs.rmSync(MOZCENTRAL_BASELINE_DIR, { recursive: true, force: true });
-    fs.mkdirSync(MOZCENTRAL_BASELINE_DIR, { recursive: true });
-
-    gulp
-      .src([BASELINE_DIR + BUILD_DIR + "mozcentral/**/*"], { encoding: false })
-      .pipe(gulp.dest(MOZCENTRAL_BASELINE_DIR))
-      .on("end", function () {
-        // Commit the mozcentral baseline.
-        safeSpawnSync("git", ["init"], { cwd: MOZCENTRAL_BASELINE_DIR });
-        safeSpawnSync("git", ["add", "."], { cwd: MOZCENTRAL_BASELINE_DIR });
-        safeSpawnSync("git", ["commit", "-m", '"mozcentral baseline"'], {
-          cwd: MOZCENTRAL_BASELINE_DIR,
-        });
-        done();
-      });
-  })
-);
-
-gulp.task(
-  "mozcentraldiff",
-  gulp.series(
-    "mozcentral",
-    "mozcentralbaseline",
-    function createMozcentralDiff(done) {
-      console.log("\n### Creating mozcentral diff");
-
-      // Create the diff between the current mozcentral build and the
-      // baseline mozcentral build, which both exist at this point.
-      // Remove all files/folders, except for `.git` because it needs to be a
-      // valid Git repository for the Git commands below to work.
-      for (const entry of fs.readdirSync(MOZCENTRAL_BASELINE_DIR)) {
-        if (entry !== ".git") {
-          fs.rmSync(MOZCENTRAL_BASELINE_DIR + entry, {
-            recursive: true,
-            force: true,
-          });
-        }
-      }
-
-      gulp
-        .src([BUILD_DIR + "mozcentral/**/*"], { encoding: false })
-        .pipe(gulp.dest(MOZCENTRAL_BASELINE_DIR))
-        .on("end", function () {
-          safeSpawnSync("git", ["add", "-A"], { cwd: MOZCENTRAL_BASELINE_DIR });
-          const diff = safeSpawnSync(
-            "git",
-            ["diff", "--binary", "--cached", "--unified=8"],
-            { cwd: MOZCENTRAL_BASELINE_DIR }
-          ).stdout;
-
-          createStringSource(MOZCENTRAL_DIFF_FILE, diff)
-            .pipe(gulp.dest(BUILD_DIR))
-            .on("end", function () {
-              console.log(
-                "Result diff can be found at " +
-                  BUILD_DIR +
-                  MOZCENTRAL_DIFF_FILE
-              );
-              done();
-            });
-        });
-    }
-  )
 );
 
 gulp.task("externaltest", function (done) {
