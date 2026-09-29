@@ -17,8 +17,8 @@
 /** @typedef {import("./event_utils").EventBus} EventBus */
 /** @typedef {import("./pdf_link_service.js").PDFLinkService} PDFLinkService */
 
-import { getNormalizeWithNFKC, isEntireWord } from "./pdf_find_utils.js";
 import { binarySearchFirstItem, scrollIntoView } from "./ui_utils.js";
+import { getNormalizeWithNFKC, isEntireWord } from "./pdf_find_utils.js";
 import { internalOpt } from "./internal_evt.js";
 
 // MC: restored from pre-v6 to offset the scrolled-to match from the very top of

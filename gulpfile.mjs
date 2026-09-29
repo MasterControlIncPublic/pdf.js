@@ -25,8 +25,8 @@ import {
   parseCoverageFormats,
 } from "./external/ccov/coverage_format.mjs";
 import { exec, execSync, spawn, spawnSync } from "child_process";
-import artifactoryUpload from "gulp-artifactory-upload";
 import { finished, pipeline as runPipeline } from "stream/promises";
+import artifactoryUpload from "gulp-artifactory-upload";
 import autoprefixer from "autoprefixer";
 import { buildPrefsSchema } from "./external/chromium/prefs.mjs";
 import crypto from "crypto";
@@ -63,8 +63,6 @@ const TEST_DIR = "test/";
 
 const MC_DIR = BUILD_DIR + "PDFjs/";
 
-const BASELINE_DIR = BUILD_DIR + "baseline/";
-const MOZCENTRAL_BASELINE_DIR = BUILD_DIR + "mozcentral.baseline/";
 const GENERIC_DIR = BUILD_DIR + "generic/";
 const GENERIC_LEGACY_DIR = BUILD_DIR + "generic-legacy/";
 const COMPONENTS_DIR = BUILD_DIR + "components/";
