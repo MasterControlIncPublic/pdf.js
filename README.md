@@ -56,6 +56,7 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * These README updates
 * The additional gulp tasks detailed below
 * Changed ESLint sourceType to "module" for Chrome extension to support ES6 imports (eslint.config.mjs)
+* Set `fail_ci_if_error: false` for the Codecov upload steps so CI doesn't fail on tokenless coverage uploads. Codecov was introduced upstream in v6; we don't use it and the fork has no `CODECOV_TOKEN`. (.github/workflows/ci.yml, coverage_browser_tests.yml, font_tests.yml, integration_tests.yml, unit_tests.yml)
 
 #### Search & Text
 * **NFKC normalization for all browsers**: Enabled Unicode NFKC normalization (including Kangxi radicals U+2F00-U+2FD5) for all browsers, not just Firefox. This fixes search issues with Japanese text where PDFTron generates Kangxi radicals (e.g., ⼿ U+2F3F) instead of standard CJK characters (e.g., 手 U+624B). Mozilla made this Firefox-only in v5.4.449 (commit eee20cf13) due to ICU 78 updates, but Kangxi radicals have stable normalization across all browsers. (web/pdf_find_utils.js)
