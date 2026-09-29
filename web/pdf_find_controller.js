@@ -18,8 +18,12 @@
 /** @typedef {import("./pdf_link_service.js").PDFLinkService} PDFLinkService */
 
 import { getNormalizeWithNFKC, isEntireWord } from "./pdf_find_utils.js";
-import { binarySearchFirstItem } from "./ui_utils.js";
+import { binarySearchFirstItem, scrollIntoView } from "./ui_utils.js";
 import { internalOpt } from "./internal_evt.js";
+
+// MC: restored from pre-v6 to offset the scrolled-to match from the very top of
+// the viewer (used with the internal scrollIntoView helper). (QX-33029)
+const MATCH_SCROLL_OFFSET_TOP = -50; // px
 
 const FindState = {
   FOUND: 0,
@@ -577,7 +581,12 @@ class PDFFindController {
       return;
     }
     this._scrollMatches = false; // Ensure that scrolling only happens once.
-    element.scrollIntoView({ block: "start", inline: "center" });
+    // MC: use pdf.js's internal scrollIntoView helper (v5 behavior) instead of
+    // the native Element.scrollIntoView. The native call scrolls ALL scrollable
+    // ancestors, which in MasterControl's embedded (iframe) viewer also scrolls
+    // the outer container ~19px, shifting the toolbar up. The internal helper
+    // scrolls only the viewer's own scroll container. (QX-33029)
+    scrollIntoView(element, { top: MATCH_SCROLL_OFFSET_TOP });
   }
 
   #reset() {
