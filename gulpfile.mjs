@@ -2806,6 +2806,7 @@ gulp.task("lint-licenses", function (done) {
     "test/stats/statcmp.js",
     "web/grab_to_pan.js",
     "web/toggle_button.css",
+    "web/mc_options.js",
   ]);
 
   const errors = [];
