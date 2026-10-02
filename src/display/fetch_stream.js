@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 
-import { AbortException, warn } from "../shared/util.js";
+import { AbortException, assert } from "../shared/util.js";
 import {
   BasePDFStream,
   BasePDFStreamRangeReader,
@@ -58,8 +58,7 @@ function getArrayBuffer(val) {
   if (val instanceof ArrayBuffer) {
     return val;
   }
-  warn(`getArrayBuffer - unexpected data format: ${val}`);
-  return new Uint8Array(val).buffer;
+  throw new Error(`getArrayBuffer - unexpected data: ${val}`);
 }
 
 class PDFFetchStream extends BasePDFStream {
@@ -67,8 +66,13 @@ class PDFFetchStream extends BasePDFStream {
 
   constructor(source) {
     super(source, PDFFetchStreamReader, PDFFetchStreamRangeReader);
-    this.isHttp = /^https?:/i.test(source.url);
-    this.headers = createHeaders(this.isHttp, source.httpHeaders);
+    const { httpHeaders, url } = source;
+
+    assert(
+      /https?:/.test(url.protocol),
+      "PDFFetchStream only supports http(s):// URLs."
+    );
+    this.headers = createHeaders(/* isHttp = */ true, httpHeaders);
   }
 }
 
@@ -82,15 +86,12 @@ class PDFFetchStreamReader extends BasePDFStreamReader {
     const {
       disableRange,
       disableStream,
-      length,
       rangeChunkSize,
       url,
       withCredentials,
     } = stream._source;
 
-    this._contentLength = length;
     this._isStreamingSupported = !disableStream;
-    this._isRangeSupported = !disableRange;
     // Always create a copy of the headers.
     const headers = new Headers(stream.headers);
 
@@ -103,17 +104,15 @@ class PDFFetchStreamReader extends BasePDFStreamReader {
 
         const responseHeaders = response.headers;
 
-        const { allowRangeRequests, suggestedLength } =
+        const { contentLength, isRangeSupported } =
           validateRangeRequestCapabilities({
             responseHeaders,
-            isHttp: stream.isHttp,
+            isHttp: true,
             rangeChunkSize,
             disableRange,
           });
-
-        this._isRangeSupported = allowRangeRequests;
-        // Setting right content length.
-        this._contentLength = suggestedLength || this._contentLength;
+        this._contentLength = contentLength;
+        this._isRangeSupported = isRangeSupported;
 
         this._filename = extractFilenameFromHeader(responseHeaders);
 
@@ -135,10 +134,7 @@ class PDFFetchStreamReader extends BasePDFStreamReader {
       return { value, done };
     }
     this._loaded += value.byteLength;
-    this.onProgress?.({
-      loaded: this._loaded,
-      total: this._contentLength,
-    });
+    this._callOnProgress();
 
     return { value: getArrayBuffer(value), done: false };
   }
@@ -192,4 +188,4 @@ class PDFFetchStreamRangeReader extends BasePDFStreamRangeReader {
   }
 }
 
-export { PDFFetchStream };
+export { getArrayBuffer, PDFFetchStream };

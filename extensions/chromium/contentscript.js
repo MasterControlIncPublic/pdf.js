@@ -47,7 +47,7 @@ function watchObjectOrEmbed(elem) {
   // <embed src> <object data>
   var srcAttribute = "src" in elem ? "src" : "data";
   var path = elem[srcAttribute];
-  if (!mimeType && !/\.pdf($|[?#])/i.test(path)) {
+  if (!mimeType && !/\.pdf(?:$|[?#])/i.test(path)) {
     return;
   }
 
