@@ -2808,8 +2808,6 @@ function onNamedAction(evt) {
       break;
 
     case "SaveAs":
-      // Don't allow download of mc files: downloadOrSave() is itself gated by
-      // the `supportsDownloading` option (default false in MC).
       this.downloadOrSave();
       break;
   }
