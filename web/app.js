@@ -898,8 +898,6 @@ const PDFViewerApplication = {
       // In a relative URL a "#" is assumed to be part of the filename, rather
       // than a fragment separator, since the viewer takes its own hash
       // parameters from the *viewer* URL (issue 19990).
-      // MC: replaced our `new URL(file, location)` workaround with upstream's
-      // fix for issues 20137/19990. VERIFY relative `file=` params still load.
       file = URL.parse(file)?.href ?? file.replaceAll("#", "%23");
       validateFileURL(file);
     } else if (PDFJSDev.test("MOZCENTRAL")) {
@@ -1405,9 +1403,6 @@ const PDFViewerApplication = {
   },
 
   async download() {
-    // Don't allow download of mc files.
-    // MC: downloads are gated by the `supportsDownloading` option (default
-    // false in MC), which nulls downloadManager and hides the download buttons.
     if (!this.downloadManager) {
       if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
         this.eventBus.dispatch("downloadskipped", { source: this });
@@ -1427,8 +1422,6 @@ const PDFViewerApplication = {
   },
 
   async save() {
-    // Don't allow download of mc files.
-    // MC: gated by the `supportsDownloading` option (default false in MC).
     if (!this.downloadManager) {
       if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("TESTING")) {
         this.eventBus.dispatch("downloadskipped", { source: this });
