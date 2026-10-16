@@ -56,6 +56,8 @@ Use a **squash merge PR for new feature work** so that all your development comm
 * These README updates
 * The additional gulp tasks detailed below
 * Changed ESLint sourceType to "module" for Chrome extension to support ES6 imports (eslint.config.mjs)
+* Set `fail_ci_if_error: false` for the Codecov upload steps so CI doesn't fail on tokenless coverage uploads. Codecov was introduced upstream in v6; we don't use it and the fork has no `CODECOV_TOKEN`. (.github/workflows/ci.yml, coverage_browser_tests.yml, font_tests.yml, integration_tests.yml, unit_tests.yml)
+* Exempted our MC-added `web/mc_options.js` from the `lint-licenses` header check by adding it to the `NON_STANDARD_HEADER_FILES` set. The check hard-codes a `Copyright <year> Mozilla Foundation` regex, which `mc_options.js` can't satisfy; exempting it skips only the header check for that one file (no build/bundle or other-lint impact). (gulpfile.mjs)
 
 #### Search & Text
 * **NFKC normalization for all browsers**: Enabled Unicode NFKC normalization (including Kangxi radicals U+2F00-U+2FD5) for all browsers, not just Firefox. This fixes search issues with Japanese text where PDFTron generates Kangxi radicals (e.g., ⼿ U+2F3F) instead of standard CJK characters (e.g., 手 U+624B). Mozilla made this Firefox-only in v5.4.449 (commit eee20cf13) due to ICU 78 updates, but Kangxi radicals have stable normalization across all browsers. (web/pdf_find_utils.js)
@@ -193,7 +195,7 @@ We're using the tagname pattern of `v[versionNumber]-mc` like `v3.1.37-mc` to he
 TODO: Consider changing our tagging practice to show both which mozilla tag we're based off of and which version the mc-build process built. Perhaps something like v4.3.136-moz_v4.3.238-mc or v4.3.136-mc238
 
 # ORIGINAL README BELOW
-# PDF.js [![CI](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml/badge.svg?query=branch%3Amaster)](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml?query=branch%3Amaster)
+# PDF.js [![CI](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml/badge.svg?query=branch%3Amaster)](https://github.com/mozilla/pdf.js/actions/workflows/ci.yml?query=branch%3Amaster) [![codecov](https://codecov.io/gh/mozilla/pdf.js/branch/master/graph/badge.svg)](https://codecov.io/gh/mozilla/pdf.js)
 
 [PDF.js](https://mozilla.github.io/pdf.js/) is a Portable Document Format (PDF) viewer that is built with HTML5.
 
@@ -225,6 +227,9 @@ latest JavaScript features; please also see [this wiki page](https://github.com/
 
 + Older browsers: https://mozilla.github.io/pdf.js/legacy/web/viewer.html
 
+> [!NOTE]
+> Open new files via the menu (the ">>" icon) or by dragging and dropping.
+
 ### Browser Extensions
 
 #### Firefox
@@ -238,6 +243,10 @@ PDF.js is built into version 19+ of Firefox.
 + Build Your Own - Get the code as explained below and issue `npx gulp chromium`. Then open
 Chrome, go to `Tools > Extension` and load the (unpackaged) extension from the
 directory `build/chromium`.
+
+### PDF debugger
+
+Browse the internal structure of a PDF document with https://mozilla.github.io/pdf.js/internal-viewer/web/debugger.html
 
 ## Getting the Code
 
@@ -281,6 +290,88 @@ If you need to support older browsers, run:
 This will generate `pdf.js` and `pdf.worker.js` in the `build/generic/build/` directory (respectively `build/generic-legacy/build/`).
 Both scripts are needed but only `pdf.js` needs to be included since `pdf.worker.js` will
 be loaded by `pdf.js`. The PDF.js files are large and should be minified for production.
+
+## Code coverage
+
+We track how much of the code is exercised by the test suite on
+[Codecov](https://codecov.io/gh/mozilla/pdf.js) (see the badge at the top of this
+file).
+
+### How it is collected
+
+When coverage is enabled, the build instruments the bundled code with
+[`babel-plugin-istanbul`](https://github.com/istanbuljs/babel-plugin-istanbul),
+which adds counters that record every line, branch and function that runs:
+
++ For browser-based tests (unit, integration and reference tests) the
+  instrumented code runs in the browser, fills a global `window.__coverage__`
+  object, and the test runner collects it from each browser session, merges the
+  results, and writes the report.
++ For the Node-based unit tests (`unittestcli`) the raw data is written to
+  `build/tmp/unittestcli-coverage.json` and turned into a report afterwards.
+
+### Collecting coverage locally
+
+Add the `--coverage` flag to any of the test tasks, for example:
+
+    $ npx gulp unittest --coverage           # browser unit tests
+    $ npx gulp unittestcli --coverage        # Node unit tests
+    $ npx gulp integrationtest --coverage    # Puppeteer integration tests
+    $ npx gulp botbrowsertest --coverage     # reference tests
+
+The following options control the output:
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `--coverage` | Enable coverage collection. | off |
+| `--coverage-output <dir>` | Directory where the report is written. | `build/coverage` |
+| `--coverage-formats <list>` | Comma-separated list of formats: `info`, `html`, `json`, `text`, `cobertura`, `clover`. | `info` |
+| `--coverage-per-test` | Also build a per-test index (see below). | off |
+
+By default the report is written to `build/coverage` in the `info` format, i.e.
+an [LCOV](https://github.com/linux-test-project/lcov) `lcov.info` file (the same
+format that is uploaded to Codecov). Use `--coverage-formats html` to get a
+browsable HTML report instead, or pass several formats at once, e.g.
+`--coverage-formats info,html`.
+
+### Finding which tests cover a given line
+
+`coverage_search` lists the ref tests that exercised a specific source line or
+function. It uses the per-test index (`per-test-index.json`) that is rebuilt on
+every push to `master` and published to the
+[`pdf.js.refs`](https://github.com/mozilla/pdf.js.refs/tree/gh-pages)
+repository. The index is downloaded on demand, cached locally, and only
+re-downloaded when it has changed, so no local coverage build is required:
+
+    $ npx gulp coverage_search --code="canvas.js::205"
+    $ npx gulp coverage_search --code="canvas.js::drawImageAtIntegerCoords"
+
+To run — or regenerate the reference images for — only the ref tests that touch
+a given line or function, pass the same `--code` option to a browser test or
+`makeref` task:
+
+    $ npx gulp browsertest --code="canvas.js::205"
+    $ npx gulp makeref --code="canvas.js::205"
+
+Pass `--no-download` to reuse the locally cached index without contacting the
+network. The index can also be built and queried locally (the CI job that
+publishes it builds it the same way):
+
+    $ npx gulp botbrowsertest --coverage-per-test
+    $ npx gulp coverage_search --code="canvas.js::205" \
+        --index=build/coverage/per-test-index.json --no-download
+
+### Continuous integration
+
+On every push and pull request three GitHub Actions workflows collect coverage
+and upload it to Codecov, each tagged with its own Codecov *flag* so the test
+types can be told apart:
+
+| Workflow | Task | Codecov flag |
+| --- | --- | --- |
+| `unit_tests.yml` | `unittest` | `unittest` |
+| `integration_tests.yml` | `integrationtest` | `integrationtest` |
+| `coverage_browser_tests.yml` | `botbrowsertest` | `browsertest` |
 
 ## Using PDF.js in a web application
 

@@ -56,7 +56,6 @@ class LZWStream extends DecodeStream {
     }
     this.bitsCached = bitsCached -= n;
     this.cachedData = cachedData;
-    this.lastCode = null;
     return (cachedData >>> bitsCached) & ((1 << n) - 1);
   }
 
@@ -66,11 +65,7 @@ class LZWStream extends DecodeStream {
     let estimatedDecodedSize = blockSize * 2;
     let i, j, q;
 
-    const lzwState = this.lzwState;
-    if (!lzwState) {
-      return; // eof was found
-    }
-
+    const { lzwState } = this;
     const earlyChange = lzwState.earlyChange;
     let nextCode = lzwState.nextCode;
     const dictionaryValues = lzwState.dictionaryValues;

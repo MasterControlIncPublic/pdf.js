@@ -25,8 +25,10 @@ import {
   ensureResponseOrigin,
   extractFilenameFromHeader,
   getResponseOrigin,
+  trimHeadersEnd,
   validateRangeRequestCapabilities,
 } from "./network_utils.js";
+import { endRequests } from "./transport_stream.js";
 
 if (typeof PDFJSDev !== "undefined" && PDFJSDev.test("MOZCENTRAL")) {
   throw new Error(
@@ -48,9 +50,11 @@ class PDFNetworkStream extends BasePDFStream {
 
   constructor(source) {
     super(source, PDFNetworkStreamReader, PDFNetworkStreamRangeReader);
-    this.url = source.url;
-    this.isHttp = /^https?:/i.test(this.url);
-    this.headers = createHeaders(this.isHttp, source.httpHeaders);
+    const { httpHeaders, url } = source;
+
+    this.url = url;
+    this.isHttp = /https?:/.test(url.protocol);
+    this.headers = createHeaders(this.isHttp, httpHeaders);
   }
 
   /**
@@ -137,7 +141,7 @@ class PDFNetworkStream extends BasePDFStream {
     const chunk = getArrayBuffer(xhr.response);
     if (xhrStatus === PARTIAL_CONTENT_RESPONSE) {
       const rangeHeader = xhr.getResponseHeader("Content-Range");
-      if (/bytes (\d+)-(\d+)\/(\d+)/.test(rangeHeader)) {
+      if (/bytes \d+-\d+\/\d+/.test(rangeHeader)) {
         pendingRequest.onDone(chunk);
       } else {
         warn(`Missing or invalid "Content-Range" header.`);
@@ -172,6 +176,8 @@ class PDFNetworkStream extends BasePDFStream {
 }
 
 class PDFNetworkStreamReader extends BasePDFStreamReader {
+  #endRequests = endRequests.bind(this);
+
   _cachedChunks = [];
 
   _done = false;
@@ -182,9 +188,6 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
 
   constructor(stream) {
     super(stream);
-    const { length } = stream._source;
-
-    this._contentLength = length;
     // Note that `XMLHttpRequest` doesn't support streaming, and range requests
     // will be enabled (if supported) in `this.#onHeadersReceived` below.
 
@@ -206,9 +209,7 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
     const rawResponseHeaders = fullRequestXhr.getAllResponseHeaders();
     const responseHeaders = new Headers(
       rawResponseHeaders
-        ? rawResponseHeaders
-            .trimStart()
-            .replace(/[^\S ]+$/, "") // Not `trimEnd`, to keep regular spaces.
+        ? trimHeadersEnd(rawResponseHeaders.trimStart())
             .split(/[\r\n]+/)
             .map(x => {
               const [key, ...val] = x.split(": ");
@@ -217,19 +218,15 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
         : []
     );
 
-    const { allowRangeRequests, suggestedLength } =
+    const { contentLength, isRangeSupported } =
       validateRangeRequestCapabilities({
         responseHeaders,
         isHttp: stream.isHttp,
         rangeChunkSize,
         disableRange,
       });
-
-    if (allowRangeRequests) {
-      this._isRangeSupported = true;
-    }
-    // Setting right content length.
-    this._contentLength = suggestedLength || this._contentLength;
+    this._contentLength = contentLength;
+    this._isRangeSupported = isRangeSupported;
 
     this._filename = extractFilenameFromHeader(responseHeaders);
 
@@ -252,13 +249,9 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
       this._cachedChunks.push(chunk);
     }
     this._done = true;
-    if (this._cachedChunks.length > 0) {
-      return;
+    if (this._cachedChunks.length === 0) {
+      this.#endRequests();
     }
-    for (const capability of this._requests) {
-      capability.resolve({ value: undefined, done: true });
-    }
-    this._requests.length = 0;
   }
 
   #onError(status) {
@@ -299,10 +292,7 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
   cancel(reason) {
     this._done = true;
     this._headersCapability.reject(reason);
-    for (const capability of this._requests) {
-      capability.resolve({ value: undefined, done: true });
-    }
-    this._requests.length = 0;
+    this.#endRequests();
 
     this._stream._abortRequest(this._fullRequestXhr);
     this._fullRequestXhr = null;
@@ -310,6 +300,8 @@ class PDFNetworkStreamReader extends BasePDFStreamReader {
 }
 
 class PDFNetworkStreamRangeReader extends BasePDFStreamRangeReader {
+  #endRequests = endRequests.bind(this);
+
   onClosed = null;
 
   _done = false;
@@ -351,10 +343,7 @@ class PDFNetworkStreamRangeReader extends BasePDFStreamRangeReader {
       this._queuedChunk = chunk;
     }
     this._done = true;
-    for (const capability of this._requests) {
-      capability.resolve({ value: undefined, done: true });
-    }
-    this._requests.length = 0;
+    this.#endRequests();
     this.onClosed?.();
   }
 
@@ -386,10 +375,7 @@ class PDFNetworkStreamRangeReader extends BasePDFStreamRangeReader {
 
   cancel(reason) {
     this._done = true;
-    for (const capability of this._requests) {
-      capability.resolve({ value: undefined, done: true });
-    }
-    this._requests.length = 0;
+    this.#endRequests();
 
     this._stream._abortRequest(this._requestXhr);
     this.onClosed?.();

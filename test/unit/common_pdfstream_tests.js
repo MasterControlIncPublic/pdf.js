@@ -24,7 +24,7 @@ async function testCrossOriginRedirects({
   redirectIfRange,
   testRangeReader,
 }) {
-  const basicApiUrl = TestPdfsServer.resolveURL("basicapi.pdf").href;
+  const basicApiUrl = TestPdfsServer.resolveURL("basicapi.pdf");
   const basicApiFileLength = 105779;
 
   const rangeSize = 32768;
@@ -40,7 +40,7 @@ async function testCrossOriginRedirects({
 
   await fullReader.headersReady;
   // Sanity check: We can only test range requests if supported:
-  expect(fullReader.isRangeSupported).toEqual(true);
+  expect(fullReader.isRangeSupported).toBeTrue();
   // ^ When range requests are supported (and streaming is disabled), the full
   // initial request is aborted and we do not need to call fullReader.cancel().
 
@@ -83,7 +83,7 @@ function getCrossOriginUrlWithRedirects(testserverUrl, redirectIfRange) {
   if (redirectIfRange) {
     url.searchParams.set("redirectIfRange", "1");
   }
-  return url.href;
+  return url;
 }
 
 export { testCrossOriginRedirects };

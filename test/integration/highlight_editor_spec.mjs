@@ -613,6 +613,47 @@ describe("Highlight Editor", () => {
     });
   });
 
+  describe("Free highlight drawing state", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait("empty.pdf", ".annotationEditorLayer");
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must be cleared when the pointer is released outside the text layer", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToHighlight(page);
+
+          const rect = await getRect(page, ".textLayer");
+          const x = rect.x + 40;
+          const y = rect.y + 40;
+          const clickHandle = await waitForPointerUp(page);
+
+          await page.mouse.move(x, y);
+          await page.mouse.down();
+          await page.waitForSelector(".textLayer.highlighting.free");
+          await page.mouse.move(x + 40, y + 40);
+          await page.mouse.move(rect.x - 10, y);
+          await page.mouse.up();
+          await awaitPromise(clickHandle);
+
+          await page.waitForSelector(".textLayer.highlighting:not(.free)", {
+            visible: true,
+          });
+          const isFree = await page.$eval(".textLayer", element =>
+            element.classList.contains("free")
+          );
+          expect(isFree).withContext(`In ${browserName}`).toEqual(false);
+        })
+      );
+    });
+  });
+
   describe("Highlight with the keyboard", () => {
     let pages;
 
@@ -667,10 +708,10 @@ describe("Highlight Editor", () => {
           // layer we can't be sure of the dimensions.
           expect(Math.abs(w - 73) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
           expect(Math.abs(h - 9) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
         })
       );
     });
@@ -745,16 +786,16 @@ describe("Highlight Editor", () => {
 
           expect(Math.abs(rectDiv.x - rectSVG.x) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
           expect(Math.abs(rectDiv.y - rectSVG.y) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
           expect(Math.abs(rectDiv.height - rectSVG.height) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
           expect(Math.abs(rectDiv.width - rectSVG.width) <= 2)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
         })
       );
     });
@@ -857,7 +898,7 @@ describe("Highlight Editor", () => {
         {
           eventBusSetup: eventBus => {
             window.editingEvents = [];
-            eventBus.on("annotationeditorstateschanged", ({ details }) => {
+            eventBus.on("editingstateschanged", ({ details }) => {
               window.editingEvents.push(details);
             });
           },
@@ -886,10 +927,10 @@ describe("Highlight Editor", () => {
           });
           expect(editingEvent.isEditing)
             .withContext(`In ${browserName}`)
-            .toBe(false);
+            .toBeFalse();
           expect(editingEvent.hasSelectedText)
             .withContext(`In ${browserName}`)
-            .toBe(true);
+            .toBeTrue();
 
           // Click somewhere to unselect the current selection.
           await page.mouse.click(rect.x + rect.width + 10, y, { count: 1 });
@@ -901,7 +942,7 @@ describe("Highlight Editor", () => {
           });
           expect(editingEvent.hasSelectedText)
             .withContext(`In ${browserName}`)
-            .toBe(false);
+            .toBeFalse();
 
           await page.mouse.click(x, y, { count: 2, delay: 100 });
           await page.waitForFunction(() => window.editingEvents.length > 0);
@@ -1396,6 +1437,48 @@ describe("Highlight Editor", () => {
     });
   });
 
+  describe("Floating highlight button in a RTL locale", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "tracemonkey.pdf",
+        ".annotationEditorLayer",
+        null,
+        null,
+        { locale: "ar" }
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must check that the floating toolbar is next to the selected text", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          const { x, y, width, height } = await getSpanRectFromText(
+            page,
+            1,
+            "Abstract"
+          );
+          await page.mouse.click(x + width / 2, y + height / 2, {
+            count: 2,
+            delay: 100,
+          });
+
+          const toolbarRect = await getRect(page, ".textLayer .editToolbar");
+
+          // In RTL, the left edge of the toolbar is aligned on the left edge
+          // of the selection (bug 2060032).
+          expect(toolbarRect.x)
+            .withContext(`In ${browserName}`)
+            .toBeCloseTo(x, 0);
+        })
+      );
+    });
+  });
+
   describe("Text layer must have the focus before highlights", () => {
     let pages;
 
@@ -1726,10 +1809,6 @@ describe("Highlight Editor", () => {
     it("must check that an existing highlight is ignored on hovering", async () => {
       await Promise.all(
         pages.map(async ([browserName, page]) => {
-          if (navigator.platform.includes("Win")) {
-            pending("Fails consistently on Windows (issue #20136).");
-          }
-
           await switchToHighlight(page);
 
           const rect = await getSpanRectFromText(
@@ -2275,9 +2354,7 @@ describe("Highlight Editor", () => {
           const pdfData = fs.readFileSync(pdfPath).toString("base64");
           const dataTransfer = await page.evaluateHandle(data => {
             const transfer = new DataTransfer();
-            const view = Uint8Array.from(atob(data), code =>
-              code.charCodeAt(0)
-            );
+            const view = Uint8Array.fromBase64(data);
             const file = new File([view], "basicapi.pdf", {
               type: "application/pdf",
             });

@@ -43,6 +43,7 @@ import {
   unselectEditor,
   waitForAnnotationEditorLayer,
   waitForAnnotationModeChanged,
+  waitForBrowserTrip,
   waitForEntryInStorage,
   waitForPageRendered,
   waitForSelectedEditor,
@@ -83,14 +84,6 @@ const copyImage = async (page, imagePath, selector) => {
 
   await waitForImage(page, selector);
 };
-
-async function waitForTranslation(page) {
-  return page.evaluate(async () => {
-    await new Promise(resolve => {
-      window.requestAnimationFrame(resolve);
-    });
-  });
-}
 
 const switchToStamp = switchToEditor.bind(null, "Stamp");
 
@@ -562,10 +555,10 @@ describe("Stamp Editor", () => {
         let [newWidth, newHeight] = await getDims();
         expect(newWidth > width + 30)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
         expect(newHeight > height + 30)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
 
         for (let i = 0; i < 4; i++) {
           await kbBigMoveRight(page);
@@ -576,10 +569,10 @@ describe("Stamp Editor", () => {
         [newWidth, newHeight] = await getDims();
         expect(Math.abs(newWidth - width) < 2)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
         expect(Math.abs(newHeight - height) < 2)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
 
         // Move the focus to the next resizer.
         await page.keyboard.press("Tab");
@@ -596,7 +589,7 @@ describe("Stamp Editor", () => {
         [, newHeight] = await getDims();
         expect(newHeight > height + 50)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
 
         for (let i = 0; i < 4; i++) {
           await kbBigMoveDown(page);
@@ -607,7 +600,7 @@ describe("Stamp Editor", () => {
         [, newHeight] = await getDims();
         expect(Math.abs(newHeight - height) < 2)
           .withContext(`In ${browserName}`)
-          .toEqual(true);
+          .toBeTrue();
 
         // Escape should remove the focus from the resizer.
         await page.keyboard.press("Escape");
@@ -1007,7 +1000,7 @@ describe("Stamp Editor", () => {
         const buttonSelector = `${editorSelector} button.altText.new`;
         await page.waitForSelector(buttonSelector, { visible: true });
 
-        await waitForTranslation(page);
+        await waitForBrowserTrip(page);
         // Check the text in the button.
         let text = await page.evaluate(
           sel => document.querySelector(sel).textContent,
@@ -1056,7 +1049,7 @@ describe("Stamp Editor", () => {
         await waitForSelectedEditor(page, editorSelector);
         await page.waitForSelector(buttonSelector, { visible: true });
 
-        await waitForTranslation(page);
+        await waitForBrowserTrip(page);
         // Check the text in the button.
         text = await page.evaluate(
           sel => document.querySelector(sel).textContent,
@@ -1098,7 +1091,7 @@ describe("Stamp Editor", () => {
         await page.click("#newAltTextSave");
         await page.waitForSelector("#newAltTextDialog", { visible: false });
 
-        await waitForTranslation(page);
+        await waitForBrowserTrip(page);
         // Check the text in the button.
         text = await page.evaluate(
           sel => document.querySelector(sel).firstChild.textContent,
@@ -1174,7 +1167,9 @@ describe("Stamp Editor", () => {
       // Run sequentially to avoid clipboard issues.
       for (const [, page] of pages) {
         await page.evaluate(() => {
-          window.PDFViewerApplication.mlManager.enableAltTextModelDownload = false;
+          const { mlManager } = window.PDFViewerApplication;
+          mlManager.enableGuessAltText =
+            mlManager.enableAltTextModelDownload = false;
         });
 
         await switchToStamp(page);
@@ -1197,7 +1192,9 @@ describe("Stamp Editor", () => {
       // Run sequentially to avoid clipboard issues.
       for (const [browserName, page] of pages) {
         await page.evaluate(() => {
-          window.PDFViewerApplication.mlManager.enableAltTextModelDownload = true;
+          const { mlManager } = window.PDFViewerApplication;
+          mlManager.enableGuessAltText =
+            mlManager.enableAltTextModelDownload = true;
         });
         await switchToStamp(page);
 
@@ -1286,7 +1283,7 @@ describe("Stamp Editor", () => {
           },
         },
         {
-          enableAltText: false,
+          enableAltText: true,
           enableFakeMLManager: false,
           enableUpdatedAddImage: true,
           enableGuessAltText: true,
@@ -1296,6 +1293,19 @@ describe("Stamp Editor", () => {
 
     afterEach(async () => {
       await closePages(pages);
+    });
+
+    it("must hide the alt-text settings when there is no AI", async () => {
+      await Promise.all(
+        pages.map(async ([, page]) => {
+          await page.waitForSelector("#imageAltTextSettings", {
+            hidden: true,
+          });
+          await page.waitForSelector("#imageAltTextSettingsSeparator", {
+            hidden: true,
+          });
+        })
+      );
     });
 
     it("must check that the toggle button isn't displayed when there is no AI", async () => {

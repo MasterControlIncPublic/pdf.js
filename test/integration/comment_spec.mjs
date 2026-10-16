@@ -21,6 +21,7 @@ import {
   dragAndDrop,
   getEditorSelector,
   getRect,
+  getSpanRectFromText,
   highlightSpan,
   kbModifierDown,
   kbModifierUp,
@@ -31,6 +32,7 @@ import {
   selectEditor,
   switchToEditor,
   waitAndClick,
+  waitForBrowserTrip,
   waitForSerialized,
   waitForTimeout,
 } from "./test_utils.mjs";
@@ -535,7 +537,11 @@ describe("Comment", () => {
             await page.mouse.down();
 
             const steps = 20;
-            await page.mouse.move(startX - extraWidth, startY, { steps });
+            for (let i = 1; i <= steps; i++) {
+              const x = Math.round(startX - (extraWidth * i) / steps);
+              await page.mouse.move(x, startY);
+              await waitForBrowserTrip(page);
+            }
             await page.mouse.up();
 
             const rectAfter = await getRect(page, sidebarSelector);
@@ -572,6 +578,7 @@ describe("Comment", () => {
               await kbModifierDown(page);
               await page.keyboard.press(arrowKey);
               await kbModifierUp(page);
+              await waitForBrowserTrip(page);
             }
 
             const rectAfter = await getRect(page, sidebarSelector);
@@ -589,6 +596,7 @@ describe("Comment", () => {
             const arrowKey = extraWidth > 0 ? "ArrowLeft" : "ArrowRight";
             for (let i = 0; i < Math.abs(extraWidth); i++) {
               await page.keyboard.press(arrowKey);
+              await waitForBrowserTrip(page);
             }
 
             const rectAfter = await getRect(page, sidebarSelector);
@@ -613,8 +621,9 @@ describe("Comment", () => {
               Array.from(
                 document.querySelectorAll(
                   `#editorCommentParamsToolbar ul > li > time`
-                )
-              ).map(time => new Date(time.getAttribute("datetime")))
+                ),
+                time => new Date(time.getAttribute("datetime"))
+              )
             );
             for (let i = 0; i < dates.length - 1; i++) {
               expect(dates[i])
@@ -904,7 +913,7 @@ describe("Comment", () => {
               ),
             editorSelector
           );
-          expect(hasCommentButton).withContext(`In ${browserName}`).toBe(false);
+          expect(hasCommentButton).withContext(`In ${browserName}`).toBeFalse();
         })
       );
     });
@@ -1171,6 +1180,93 @@ describe("Comment", () => {
 
           // Redo the deletion - popup should be hidden
           await kbRedo(page);
+          await page.waitForSelector("#commentPopup", { hidden: true });
+        })
+      );
+    });
+  });
+
+  describe("Must close comment popups (bug 1989406)", () => {
+    let pages;
+
+    beforeEach(async () => {
+      pages = await loadAndWait(
+        "tracemonkey.pdf",
+        ".annotationEditorLayer",
+        "page-fit",
+        null,
+        { enableComment: true }
+      );
+    });
+
+    afterEach(async () => {
+      await closePages(pages);
+    });
+
+    it("must close a comment popup on escape", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToHighlight(page);
+          await highlightSpan(page, 1, "Abstract");
+          await editComment(page, getEditorSelector(0), "hi");
+          const rect = await getSpanRectFromText(page, 1, "Introduction");
+
+          // Unfocus.
+          await page.mouse.click(rect.x, rect.y);
+
+          await waitAndClick(page, ".annotationCommentButton");
+
+          await page.waitForSelector("#commentPopup", { visible: true });
+
+          await page.keyboard.press("Escape");
+
+          await page.waitForSelector("#commentPopup", { hidden: true });
+        })
+      );
+    });
+
+    it("must close a comment popup on click outside", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToHighlight(page);
+          await highlightSpan(page, 1, "Abstract");
+          await editComment(page, getEditorSelector(0), "hi");
+          const rect = await getSpanRectFromText(page, 1, "Introduction");
+
+          // Unfocus.
+          await page.mouse.click(rect.x, rect.y);
+
+          await waitAndClick(page, ".annotationCommentButton");
+
+          await page.waitForSelector("#commentPopup", { visible: true });
+
+          // Click outside the popup.
+          await page.mouse.click(rect.x, rect.y);
+
+          await page.waitForSelector("#commentPopup", { hidden: true });
+        })
+      );
+    });
+
+    it("must close a comment popup on click on other highlight", async () => {
+      await Promise.all(
+        pages.map(async ([browserName, page]) => {
+          await switchToHighlight(page);
+
+          await highlightSpan(page, 1, "Abstract");
+          await editComment(page, getEditorSelector(0), "hello");
+
+          await highlightSpan(page, 1, "Introduction");
+          await editComment(page, getEditorSelector(1), "world");
+
+          // Open "Abstract" comment popup.
+          await waitAndClick(page, ".annotationCommentButton");
+
+          await page.waitForSelector("#commentPopup", { visible: true });
+
+          // Click on "Introduction" highlight.
+          await waitAndClick(page, getEditorSelector(1));
+
           await page.waitForSelector("#commentPopup", { hidden: true });
         })
       );

@@ -45,7 +45,8 @@ class CommentManager {
     linkService,
     overlayManager,
     ltr,
-    hasForcedColors
+    hasForcedColors,
+    globalAbortSignal
   ) {
     const dateFormat = new Intl.DateTimeFormat(undefined, {
       dateStyle: "long",
@@ -69,7 +70,8 @@ class CommentManager {
       linkService,
       this.#popup,
       dateFormat,
-      ltr
+      ltr,
+      globalAbortSignal
     );
     this.#popup.sidebar = this.#sidebar;
     CommentManager.#hasForcedColors = hasForcedColors;
@@ -130,7 +132,7 @@ class CommentManager {
     return this.#hasForcedColors
       ? null
       : findContrastColor(
-          applyOpacity(...color, opacity ?? 1),
+          applyOpacity(color, opacity ?? 1),
           CSSConstants.commentForegroundColor
         );
   }
@@ -188,12 +190,14 @@ class CommentSidebar extends Sidebar {
     linkService,
     popup,
     dateFormat,
-    ltr
+    ltr,
+    globalAbortSignal
   ) {
     super(
       { sidebar, resizer: sidebarResizer, toggleButton: commentToolbarButton },
       ltr,
-      /* isResizerOnTheLeft = */ true
+      /* isResizerOnTheLeft = */ true,
+      globalAbortSignal
     );
     this.#sidebarTitle = sidebarTitle;
     this.#commentsList = commentsList;
@@ -608,6 +612,8 @@ class CommentDialog {
 
   #saveButton;
 
+  #saveButtonLabel;
+
   #uiManager;
 
   #prevDragX = 0;
@@ -633,6 +639,7 @@ class CommentDialog {
     this.#overlayManager = overlayManager;
     this.#eventBus = eventBus;
     this.#saveButton = saveButton;
+    this.#saveButtonLabel = saveButton.firstElementChild;
     this.#title = title;
     this.#isLTR = ltr;
 
@@ -740,7 +747,7 @@ class CommentDialog {
         "data-l10n-id",
         "pdfjs-editor-edit-comment-dialog-title-when-editing"
       );
-      this.#saveButton.setAttribute(
+      this.#saveButtonLabel.setAttribute(
         "data-l10n-id",
         "pdfjs-editor-edit-comment-dialog-save-button-when-editing"
       );
@@ -749,7 +756,7 @@ class CommentDialog {
         "data-l10n-id",
         "pdfjs-editor-edit-comment-dialog-title-when-adding"
       );
-      this.#saveButton.setAttribute(
+      this.#saveButtonLabel.setAttribute(
         "data-l10n-id",
         "pdfjs-editor-edit-comment-dialog-save-button-when-adding"
       );
